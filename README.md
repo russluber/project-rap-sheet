@@ -40,8 +40,6 @@ In particular, this project aims to model emcee career histories and build a Fli
 
 ```
 project-rap-sheet/
-├── README.md
-├── .gitignore
 ├── data/
 |   ├── README.md
 │   ├── raw/
@@ -55,12 +53,16 @@ project-rap-sheet/
 ├── fliptop/
 |   ├── README.md
 │   ├── __init__.py
+│   ├── emcee_table.py
 │   ├── data_cleaning.py
 │   └── rename_map.py
 ├── notebooks/
 |   ├── README.md
 │   └── eda.ipynb
-└── scripts/
-    ├── fetch_youtube_channel_uploads.py
-    └── fetch_events_metadata_from_fliptop_web.py
+├── scripts/
+|   ├── fetch_youtube_channel_uploads.py
+|   └── fetch_events_metadata_from_fliptop_web.py
+├── README.md
+├── LICENSE
+└── .gitignore
 ```
