@@ -10,11 +10,9 @@ Features:
 - Supports incremental updates by skipping videos already present in the output JSON.
 - Designed as the "Extract" step for the FlipTop Analysis project.
 
-Usage (from repo root, in VS Code terminal for example):
+Usage (from repo root):
 
-    python scripts/fetch_youtube_channel_uploads.py \
-        --channel UCBdHwFIE4AJWSa3Wxdu7bAQ \
-        --output data/raw/youtube_videos.json
+    python scripts/fetch_youtube_channel_uploads.py --channel UCBdHwFIE4AJWSa3Wxdu7bAQ --output data/raw/youtube_videos.json
 """
 
 import os
