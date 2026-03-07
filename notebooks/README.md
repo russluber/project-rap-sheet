@@ -1,7 +1,8 @@
-# Living Document
+# notebooks
 
-# Research Question
-----
+This is a document where project assumptions, ideas, and tasks live. A journal of sorts to document the process.
+
+## Research Question
 
 The central question of this project revolves around FlipTop battle rap careers and their length.
 

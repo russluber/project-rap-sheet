@@ -4,7 +4,7 @@ A reproducible data pipeline for cleaning and organizing FlipTop rap battle data
 
 ## Overview
 
-This project builds a clean battle-level dataset from two raw sources:
+The first objective of this project is to create a database for FlipTop rap batles. To this end, this project builds a clean battle-level dataset from two raw sources:
 
 1. `youtube_videos.json`  
    Raw YouTube upload metadata collected from the [FlipTop channel](https://www.youtube.com/@fliptopbattles).
@@ -13,7 +13,6 @@ This project builds a clean battle-level dataset from two raw sources:
    Raw event and matchup metadata scraped from the [FlipTop website](https://www.fliptop.com.ph/videos/battle).
 
 The main output is a cleaned `df_battles` table with one row per battle, including:
-
 - title
 - emcee names
 - cleaned matchup string
@@ -23,6 +22,9 @@ The main output is a cleaned `df_battles` table with one row per battle, includi
 - event location
 - duration information
 - YouTube URL data
+
+
+The second objective is to analyze data about FlipTop rap battles. In particular, this project aims to model emcee career histories and build a network of FlipTop rap battle emcees.
 
 ## Project Structure
 

@@ -1,5 +1,6 @@
-# Data layout
+# data
 
+Data layout:
 - `raw/`  
   Original scraped and downloaded files. Treated as read only.
 

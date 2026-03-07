@@ -1,6 +1,7 @@
 # scripts
 
-This folder contains standalone scripts used to **collect raw data** for the project.  
+This folder contains standalone scripts used to **collect raw data** for the project.
+
 They are responsible for populating the `data/raw/` directory.
 
 These scripts are run **before the data cleaning pipeline** in `fliptop/`.
