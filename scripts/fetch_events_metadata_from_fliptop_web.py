@@ -15,10 +15,9 @@ The output is a tidy CSV with one row per matchup:
 
     matchup, event_name, event_description, video_id
 
-Usage (from repo root, in VS Code terminal for example):
-    python scripts/fetch_youtube_channel_uploads.py \
-        --channel UCBdHwFIE4AJWSa3Wxdu7bAQ \
-        --output data/raw/youtube_videos.json
+Usage (from repo root):
+
+    python scripts/fetch_events_metadata_from_fliptop_web.py
 """
 
 import time
