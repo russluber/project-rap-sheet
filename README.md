@@ -24,7 +24,9 @@ The main output is a cleaned `df_battles` table with one row per battle, includi
 - YouTube URL data
 
 
-The second objective is to analyze data about FlipTop rap battles. In particular, this project aims to model emcee career histories and build a network of FlipTop rap battle emcees.
+The second objective is to analyze data about FlipTop rap battles. 
+
+In particular, this project aims to model emcee career histories and build a FlipTop rap battle network.
 
 ## Project Structure
 
