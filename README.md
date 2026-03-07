@@ -9,7 +9,7 @@ The first objective of this project is to create a database for FlipTop rap batl
 1. `youtube_videos.json`  
    Raw YouTube upload metadata collected from the [FlipTop channel](https://www.youtube.com/@fliptopbattles).
 
-2. `matchup_events_metadata_with_ids.csv`  
+2. `matchup_events_metadata.csv`  
    Raw event and matchup metadata scraped from the [FlipTop website](https://www.fliptop.com.ph/videos/battle).
 
 The main output is a cleaned `df_battles` table with one row per battle, including:
@@ -49,6 +49,7 @@ project-rap-sheet/
 │   │   └── matchup_events_metadata.csv
 │   ├── processed/
 │   │   └── df_battles.json
+│   │   └── emcees.csv
 │   └── secret/
 │       └── secret.json
 ├── fliptop/
