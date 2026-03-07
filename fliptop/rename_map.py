@@ -78,5 +78,9 @@ RENAME_MAP: Mapping[str, str] = {
     "Sinagtala": "GL",
     "1ce Water": "J-Blaque",
     "Deadpan": "Shehyee",
-    "Mia Sonin": "Batang Rebelde"
+    "Mia Sonin": "Batang Rebelde",
+    "GameBoy": "Gameboy",
+    "Lil Strocks": "LilStrocks",
+    "Lil John": "LilJohn",
+    "NIkki": "Nikki"
 }
