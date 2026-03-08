@@ -1,0 +1,24 @@
+name: fliptop-analysis
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.11
+  - cython
+  - ca-certificates
+  - openssl
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+  - plotly
+  - jupyterlab
+  - ipykernel
+  - beautifulsoup4
+  - requests
+  - scikit-learn
+  - networkx
+  - lifelines
+  - scikit-survival
+  - pyvis
+  - pandoc
