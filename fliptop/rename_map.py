@@ -82,5 +82,6 @@ RENAME_MAP: Mapping[str, str] = {
     "GameBoy": "Gameboy",
     "Lil Strocks": "LilStrocks",
     "Lil John": "LilJohn",
-    "NIkki": "Nikki"
+    "NIkki": "Nikki",
+    "Nico": "AKT"
 }
