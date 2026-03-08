@@ -64,5 +64,6 @@ project-rap-sheet/
 |   └── fetch_events_metadata_from_fliptop_web.py
 ├── README.md
 ├── LICENSE
+├── environment.yml
 └── .gitignore
 ```
