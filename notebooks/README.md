@@ -38,6 +38,7 @@ My criteria for what is considered a rap battle for the purposes of this project
 Note:
 - **By these criteria, earlier videos of FlipTop wouldn't be included. Need explanation for what I'm doing here.**
     - I've changed my mind on this. I've included them alongside the freestyle battles whether a capella or with a beat.
+    - Actually, no. I include the freestyle,a capella battles from the early days but not the freestyle battles with accompanying beats.
 
 
 
@@ -64,7 +65,12 @@ As a long-time viewer of these videos, there's a couple key words that makes fil
    - **Tutok** - other BTS videos?
    - **Abangan** - clips
 
-For the scope of this project, I will only consider the battles that are between two people. FlipTop has a variety of rap battle formats, not just two people insulting each other back and forth. Examples include: the Royal Rumble, the 5 vs 5, and the tag-team 2 vs 2 (Dos Por Dos) matches. The vast majority of the battles, though, are one versus one. Those battles will be the focus of this project.
+For the scope of this project, I will only consider the battles that are between two people. FlipTop has a variety of rap battle formats, not just two people insulting each other back and forth. Examples include: 
+- Royal Rumble (1v1v1v1v1)
+- 5 on 5,
+- Tag-team 2 vs 2 (Dos Por Dos) matches. 
+
+The vast majority of the battles, though, are one versus one. Those battles will be the focus of this project.
 
 
 
@@ -75,47 +81,52 @@ What to do about well-known emcees that have battled under aliases (not their us
 - Goriong Talas as Ghostly
 - Emar Industriya as No. 144
 - Sayadd as Carlito
+- GL as 1ce Water
 
-I've decided to do away with these gimmick aliases. At the end of the day, what I'm interested in is the careers of the *people* behind the personas. I will count these battles as battles under their main emcee names. Not the aliases.
+I've decided to do away with these gimmick aliases. At the end of the day, what I'm interested in is the careers of the *people* behind the personas. So I will count these battles as battles under their main emcee names. Not the aliases.
+
+### Standardizing Emcee Names 
+Sometimes, the naming of emcees in the video titles are inconsistent. For data analysis purposes, it's important that the names of the emcees are consistent across data points.
 
 An outline of how I standardized the names:
 - I took each emcee's most recent name if they had more than one spelling of their name or if they renamed themselves over time.
 - Aesthetically speaking, I arbitrarily picked whichever name looks more appealing to me e.g. "Daddy Joe D" vs "Daddie Joe D" vs "DaddieJoe D"
 - I cross-referenced less well-known emcees who have changed their names over the years by comparing faces across the videos.
-- `rename_dict`
+- `rename_map.py` is where these renaming conventions are formalized.
 
 
+### Actual Event Dates for COVID-era Battles -- ONGOING task
 
-### Actual Event Dates -- ONGOING task
 - Go back to before all this analysis and extract dates for actual event dates of the battles.
 - Hard task.
 - But also: The battle being uploaded to YouTube is *part* of the battlers' careers. It's like their music videos releasing after the audio has been released months before. So technically maybe we don't *need* to do all that very tricky text extraction and NLP.
 
-All COVID-era battles don't have `event_date`s to them.
-- There are also unreasonable value for `event_date`s in `df_meta` that need to be cleaned up. The rows with "June XX, XXXX" in them.
-- Let's first deal with the NAs. This will be a difficult thing to do.
-- In particular any battle occuring after The FlipTop Festival and until Ahon 12 (Quarantine Isabuhay 2020 and 2021).
+All COVID-era battles don't have `event_date`s to them. Obfuscated. In YouTube video descriptions as well as the FlipTop website, COVID-era battles have implausible `event_date`s and made-up `event_location`s.
 
 Events that I need to find actual dates for:
-- Ahon 11 (Day 2)
-- Ahon 11 (Day 1)
-- Bwelta Balentong 7 (Day 2)
-- Bwelta Balentong 7 (Day 1)
-- Zoning 10
-- Unibersikulo 8
-- Second Sight 8
-- Ahon 12 (Day 2)
-- Ahon 12 (Day 1)
-- Unibersikulo 10
-- Zoning 13
-- Unibersikulo 9
-- Grain Assault 11
-- Zoning 11 
-- Zoning 12
-- Bwelta Balentong 8
+1. Second Sight 8
+2. Unibersikulo 8
+3. Zoning 10
+4. Bwelta Balentong 7 (Day 1, Day 2)
+5. Ahon 11 (Day 1, Day 2)
+6. Grain Assault 11
+7. Second Sight 9
+8. Zoning 11
+9. Bwelta Balentong 8
+10. Zoning 12
+11. Unibersikulo 9
+12. Zoning 13
+13. Unibersikulo 10
+14. Ahon 12 (Day 1, Day 2)
 
 Second Sight 8 was the first event that happened during the COVID era. The last event in the COVID era was Ahon 12. Info here:
 - https://www.fliptop.com.ph/articles/an-unforgettable-second-sight-8
+
+Need to get `event_location` and `event_date` for COVID-era battles from external sources.
+
+Possible avenues:
+- Contact FlipTop directly?
+- Emcee posts from COVID-era on FB?
 
 
 ### Further-down-the-line questions
@@ -129,8 +140,6 @@ Some questions I'm interested in:
 - Correlation between length of career and views over time? Do emcees get popular over time or something?
 - Winstreaks? Maybe I could manually go through each video and add another col to who won? Who has the longest winstreak?
 
-
-
-### Actual Event/Venue Location information -- task for later
-- Need to clean up
-
+### Add winner column
+There's no automated way to add a `winner` column. Need to enhance `df_battles` with `winner` column manually. Go through every recorded 1v1 battle in `df_battles` via `url`.
+- Get a Excel spreadsheet going buddy boy.
