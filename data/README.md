@@ -1,8 +1,8 @@
 # data
 
-Data layout:
+layout:
 - `raw/`  
-  Original scraped and downloaded files. Treated as read only.
+  Original data files from webscraping and intermediate files for manual editing.
 
 - `processed/`  
   Clean tables created by the `fliptop` package.  
