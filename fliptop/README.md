@@ -106,6 +106,30 @@ Each row represents **one battle**.
 
 ---
 
+## `battle_network.py`
+
+This module builds an undirected weighted battle network from `df_battles`.
+
+- nodes are emcees
+- edges indicate two emcees have battled
+- edge `weight` is the number of times they have battled
+
+Typical usage:
+
+```python
+from fliptop.battle_network import build_battle_network
+
+G = build_battle_network(df_battles)
+```
+
+Each node stores:
+- `battle_count`
+
+Each edge stores:
+- `weight`
+
+---
+
 ## `rename_map.py`
 
 This module contains the **canonical emcee rename map**.
