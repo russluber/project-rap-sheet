@@ -15,21 +15,21 @@ The first objective of this project is to create a database for FlipTop rap batt
 The main output is a cleaned `df_battles` table with one row per battle, including:
 
 
-| Variable name | Description |
-| ------------- | ----------- |
-| `id` | Unique identifier for the battle as a string |
-| `title` | The title of the YouTube video as a string |
-| `description` | The text description box of the YouTube video as a string |
-| `upload_date` | Date of the video as a datetime object |
-| `duration_seconds` | Duration of the battle's video in seconds as a datetime object |
-| `duration_hms` | Duration of the battle's video in hours, minutes, seconds as a datetime object |
-| `emcee1` | Name of emcee1 as a string |
-| `emcee2` | Name of emcee2 as a string |
-| `matchup` | Cleaned and standardized `emcee1` vs `emcee2` string |
-| `event_name` | Name of FlipTop event the battle took place in as string |
-| `event_date` | Date of when the FlipTop event took place as datetime object |
-| `event_location` | Location of where the battle took place as a string |
-| `url`| Link to the battle |
+| Variable | Type | Description |
+| ------------- | ------------- | ----------- |
+| `id` | string | Unique identifier for the battle |
+| `title` | string | The title of the YouTube video |
+| `description` | string | The text description box of the YouTube video |
+| `upload_date` | datetime | Date of when the video of the battle was uploaded to YouTube |
+| `duration_seconds` | datetime | Duration of the battle's video in seconds |
+| `duration_hms` | datetime | Duration of the battle's video in hours, minutes, seconds |
+| `emcee1` | string | Name of the first emcee in the battle |
+| `emcee2` | string | Name of the second emcee in the battle |
+| `matchup` | string | Cleaned and standardized `emcee1` vs `emcee2` |
+| `event_name` | string | Name of the FlipTop event the battle took place in |
+| `event_date` | datetime | Date of when the FlipTop event took place |
+| `event_location` | string | Location of where the battle took place |
+| `url`| string | Link to the battle |
 
 
 The second objective is to analyze data about FlipTop rap battles. 
@@ -54,10 +54,10 @@ project-rap-sheet/
 ├── fliptop/
 |   ├── README.md
 │   ├── __init__.py
-│   ├── emcee_table.py
-│   ├── battle_network.py
 │   ├── data_cleaning.py
-│   └── rename_map.py
+│   ├── rename_map.py
+│   ├── battle_network.py 
+│   └── emcee_table.py 
 ├── notebooks/
 |   ├── README.md
 │   └── eda.ipynb
