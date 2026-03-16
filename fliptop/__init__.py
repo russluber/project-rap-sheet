@@ -13,6 +13,8 @@ so that notebooks and scripts can share the same paths and pipeline.
 
 from pathlib import Path
 
+from .battle_network import build_battle_network
+
 # Paths relative to the package location
 PACKAGE_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = PACKAGE_ROOT.parent
@@ -27,4 +29,5 @@ __all__ = [
     "DATA_DIR",
     "RAW_DATA_DIR",
     "PROCESSED_DATA_DIR",
+    "build_battle_network",
 ]
