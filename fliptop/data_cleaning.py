@@ -561,6 +561,12 @@ def clean_event_location(
         if not txt:
             return pd.NA
 
+        # Normalize known Davao variants.
+        if re.fullmatch(r"Davao City,\s*Metro Manila,\s*Philippines", txt):
+            return "Davao City, Philippines"
+        if txt == "Davao City":
+            return "Davao City, Philippines"
+
         return txt
 
     return df.assign(
@@ -654,6 +660,43 @@ def fill_metadata_from_yt_description(df: pd.DataFrame) -> pd.DataFrame:
     df = df.drop(columns=["_event_name_from_desc"], errors="ignore")
 
     return df
+
+
+def apply_manual_event_location_overrides(
+    df: pd.DataFrame,
+    event_name_col: str = "event_name",
+    event_location_col: str = "event_location",
+) -> pd.DataFrame:
+    """
+    Apply hand-maintained event location overrides after final cleanup.
+
+    Rules:
+      - Any event_location containing "D' mention" becomes
+        "FlipTop Baraks, Mandaluyong City, Philippines"
+      - Ahon 12 Day 1 and Day 2 become
+        "Jenerick Resort, Tanauan City, Batangas, Philippines"
+    """
+    out = df.copy()
+
+    if event_location_col in out.columns:
+        d_mention_mask = out[event_location_col].astype("string").str.contains(
+            "D' mention",
+            regex=False,
+            na=False,
+        )
+        out.loc[
+            d_mention_mask,
+            event_location_col,
+        ] = "FlipTop Baraks, Mandaluyong City, Philippines"
+
+    if {event_name_col, event_location_col} <= set(out.columns):
+        ahon12_mask = out[event_name_col].isin(["Ahon 12 (Day 1)", "Ahon 12 (Day 2)"])
+        out.loc[
+            ahon12_mask,
+            event_location_col,
+        ] = "Jenerick Resort, Tanauan City, Batangas, Philippines"
+
+    return out
 
 # ---------------------------------------------------------------------------
 # V. Mid level stage functions
@@ -979,22 +1022,7 @@ def finalize_battles(
     battles = battles.drop(columns=["yt_raw_title"], errors="ignore")
 
     # 7) Apply manual event_location fixes you had in the notebook
-    if "event_location" in battles.columns:
-        battles["event_location"] = (
-            battles["event_location"]
-            # Fix incorrect 'Davao City, Metro Manila, Philippines'
-            .str.replace(
-                r"^Davao City,\s*Metro Manila,\s*Philippines$",
-                "Davao City, Philippines",
-                regex=True,
-            )
-            # Normalize plain 'Davao City'
-            .str.replace(
-                r"^Davao City$",
-                "Davao City, Philippines",
-                regex=True,
-            )
-        )
+    battles = apply_manual_event_location_overrides(battles)
 
     # 8) Select and order final columns (keep only those that exist)
     final_cols = [
