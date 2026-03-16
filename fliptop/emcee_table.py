@@ -2,6 +2,20 @@
 fliptop.emcee_table
 
 Utilities for building and writing emcee-level datasets from the battle-level dataset df_battles.
+
+Typical notebook usage:
+
+    from fliptop import PROCESSED_DATA_DIR, RAW_DATA_DIR
+    from fliptop.data_cleaning import build_df_battles
+    from fliptop.emcee_table import build_emcees_table, write_emcees_table
+
+    df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)
+    df_emcees = build_emcees_table(df_battles)
+
+    write_emcees_table(
+        df_battles,
+        PROCESSED_DATA_DIR / "emcees.csv",
+    )
 """
 
 from __future__ import annotations
