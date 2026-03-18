@@ -17,7 +17,7 @@ The output is a tidy CSV with one row per matchup:
 
 Usage (from repo root):
 
-    python scripts/fetch_events_metadata_from_fliptop_web.py
+    python scripts/fetch_events_metadata_from_fliptop_web.py --start 2010 --end 2026
 """
 
 import time
