@@ -140,6 +140,3 @@ Some questions I'm interested in:
 - Correlation between length of career and views over time? Do emcees get popular over time or something?
 - Winstreaks? Maybe I could manually go through each video and add another col to who won? Who has the longest winstreak?
 
-### Add winner column
-There's no automated way to add a `winner` column. Need to enhance `df_battles` with `winner` column manually. Go through every recorded 1v1 battle in `df_battles` via `url`.
-- Get a Excel spreadsheet going buddy boy.
