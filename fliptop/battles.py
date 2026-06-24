@@ -561,12 +561,16 @@ def clean_event_location(
         if not txt:
             return pd.NA
 
-        # 5) Fix a period mistakenly used before the country name. Some FlipTop
-        # descriptions write "..., City. Philippines" instead of
-        # "..., City, Philippines"; a country is never correctly preceded by a
-        # period. Narrowly targets "Philippines" so legitimate abbreviation
-        # periods (St., Dr., J.P., ...) are left untouched.
-        txt = re.sub(r"\.\s*Philippines\b", ", Philippines", txt)
+        # 5) Collapse an accidentally repeated word, e.g. a source typo like
+        # "Makati City City" -> "Makati City".
+        txt = re.sub(r"\b(\w+)(?:\s+\1\b)+", r"\1", txt, flags=re.IGNORECASE)
+
+        # 6) Ensure the country name is preceded by a comma. Some source
+        # descriptions write "..., City. Philippines" or "..., Metro Manila
+        # Philippines" (period, or no separator at all) instead of
+        # "..., Philippines". Targets "Philippines" specifically, so legitimate
+        # abbreviation periods (St., Dr., J.P., ...) are left untouched.
+        txt = re.sub(r"(?<=\w)[ .]+Philippines\b", ", Philippines", txt)
 
         # Normalize known Davao variants.
         if re.fullmatch(r"Davao City,\s*Metro Manila,\s*Philippines", txt):
@@ -680,8 +684,13 @@ def apply_manual_event_location_overrides(
     Rules:
       - Any event_location containing "D' mention" becomes
         "FlipTop Baraks, Mandaluyong City, Philippines"
-      - Ahon 12 Day 1 and Day 2 become
-        "Jenerick Resort, Tanauan City, Batangas, Philippines"
+      - Per-event fixes (keyed by event_name) for battles whose location could
+        not be extracted correctly from the source description:
+          * Ahon 12 (Day 1/2): the obfuscated COVID-era location.
+          * Grafilipinas: the description put a promo blurb after the first '@'
+            and the real venue after a second '@', past the date.
+          * Process of Illumination 4: a no-'@' description leaked the event
+            name into the location.
     """
     out = df.copy()
 
@@ -696,12 +705,21 @@ def apply_manual_event_location_overrides(
             event_location_col,
         ] = "FlipTop Baraks, Mandaluyong City, Philippines"
 
+    # Per-event location overrides, keyed by exact event_name.
+    event_location_overrides = {
+        "Ahon 12 (Day 1)": "Jenerick Resort, Tanauan City, Batangas, Philippines",
+        "Ahon 12 (Day 2)": "Jenerick Resort, Tanauan City, Batangas, Philippines",
+        "Grafilipinas (FlipTop x Meiday x Wall Lords)": (
+            "Marikina River Banks, Marikina City, Metro Manila, Philippines"
+        ),
+        "Process of Illumination 4": (
+            "B-Side, Malugay Street, Makati City, Metro Manila, Philippines"
+        ),
+    }
+
     if {event_name_col, event_location_col} <= set(out.columns):
-        ahon12_mask = out[event_name_col].isin(["Ahon 12 (Day 1)", "Ahon 12 (Day 2)"])
-        out.loc[
-            ahon12_mask,
-            event_location_col,
-        ] = "Jenerick Resort, Tanauan City, Batangas, Philippines"
+        for event_name, location in event_location_overrides.items():
+            out.loc[out[event_name_col] == event_name, event_location_col] = location
 
     return out
 

@@ -64,22 +64,33 @@ def test_clean_event_location_normalizes_davao_variants():
     assert out.tolist() == ["Davao City, Philippines", "Davao City, Philippines"]
 
 
-def test_clean_event_location_fixes_period_before_philippines():
-    # Some source descriptions write "City. Philippines" (a typo); after the
-    # '@' split it should normalize to "City, Philippines".
+def test_clean_event_location_normalizes_country_separator():
+    # The country should always be preceded by ", ". Sources write it three ways:
+    # period ("City. Philippines"), no separator ("Metro Manila Philippines"),
+    # and the already-correct comma (must be left unchanged / idempotent).
     df = pd.DataFrame(
         {
             "event_location": [
-                "FlipTop presents: Event @ TIU Theater, Makati Central Square, Makati City. Philippines",
-                "FlipTop presents: Event @ Davao City. Philippines",
+                "FlipTop presents: Event @ Makati Central Square, Makati City. Philippines",
+                "FlipTop presents: Event @ San Juan Gym, San Juan City, Metro Manila Philippines",
+                "FlipTop presents: Event @ B-Side, Makati City, Metro Manila, Philippines",
             ]
         }
     )
     out = clean_event_location(df)["event_location_clean"]
     assert out.tolist() == [
-        "TIU Theater, Makati Central Square, Makati City, Philippines",
-        "Davao City, Philippines",
+        "Makati Central Square, Makati City, Philippines",
+        "San Juan Gym, San Juan City, Metro Manila, Philippines",
+        "B-Side, Makati City, Metro Manila, Philippines",
     ]
+
+
+def test_clean_event_location_collapses_doubled_word():
+    df = pd.DataFrame(
+        {"event_location": ["FlipTop presents: Event @ TIU Theater, MCS, Makati City City, Metro Manila, Philippines"]}
+    )
+    out = clean_event_location(df)["event_location_clean"].iloc[0]
+    assert out == "TIU Theater, MCS, Makati City, Metro Manila, Philippines"
 
 
 def test_clean_event_location_leaves_abbreviation_periods_untouched():
@@ -135,3 +146,21 @@ def test_manual_overrides_d_mention_and_ahon12():
         out["event_location"].iloc[2]
         == "Jenerick Resort, Tanauan City, Batangas, Philippines"
     )
+
+
+def test_manual_overrides_grafilipinas_and_poi4():
+    df = pd.DataFrame(
+        {
+            "event_name": [
+                "Grafilipinas (FlipTop x Meiday x Wall Lords)",
+                "Process of Illumination 4",
+            ],
+            "event_location": [
+                "Grafilipinas. FlipTop x Meiday x Wall Lords",
+                "Process of Illumination 4 Tryouts, B-Side, Malugay Street, Makati City, Metro Manila, Philippines",
+            ],
+        }
+    )
+    out = apply_manual_event_location_overrides(df)
+    assert out["event_location"].iloc[0] == "Marikina River Banks, Marikina City, Metro Manila, Philippines"
+    assert out["event_location"].iloc[1] == "B-Side, Malugay Street, Makati City, Metro Manila, Philippines"
