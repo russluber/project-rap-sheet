@@ -64,6 +64,38 @@ def test_clean_event_location_normalizes_davao_variants():
     assert out.tolist() == ["Davao City, Philippines", "Davao City, Philippines"]
 
 
+def test_clean_event_location_fixes_period_before_philippines():
+    # Some source descriptions write "City. Philippines" (a typo); after the
+    # '@' split it should normalize to "City, Philippines".
+    df = pd.DataFrame(
+        {
+            "event_location": [
+                "FlipTop presents: Event @ TIU Theater, Makati Central Square, Makati City. Philippines",
+                "FlipTop presents: Event @ Davao City. Philippines",
+            ]
+        }
+    )
+    out = clean_event_location(df)["event_location_clean"]
+    assert out.tolist() == [
+        "TIU Theater, Makati Central Square, Makati City, Philippines",
+        "Davao City, Philippines",
+    ]
+
+
+def test_clean_event_location_leaves_abbreviation_periods_untouched():
+    # The fix must not corrupt legitimate abbreviation periods.
+    df = pd.DataFrame(
+        {
+            "event_location": [
+                "FlipTop presents: Event @ Club Z, Dr. A. Santos Avenue, Paranaque City, Metro Manila, Philippines"
+            ]
+        }
+    )
+    out = clean_event_location(df)["event_location_clean"].iloc[0]
+    assert "Dr. A. Santos Avenue" in out
+    assert out.endswith("Metro Manila, Philippines")
+
+
 # ---------------------------------------------------------------------------
 # extract_event_name_from_description
 # ---------------------------------------------------------------------------

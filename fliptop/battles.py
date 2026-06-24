@@ -561,6 +561,13 @@ def clean_event_location(
         if not txt:
             return pd.NA
 
+        # 5) Fix a period mistakenly used before the country name. Some FlipTop
+        # descriptions write "..., City. Philippines" instead of
+        # "..., City, Philippines"; a country is never correctly preceded by a
+        # period. Narrowly targets "Philippines" so legitimate abbreviation
+        # periods (St., Dr., J.P., ...) are left untouched.
+        txt = re.sub(r"\.\s*Philippines\b", ", Philippines", txt)
+
         # Normalize known Davao variants.
         if re.fullmatch(r"Davao City,\s*Metro Manila,\s*Philippines", txt):
             return "Davao City, Philippines"
