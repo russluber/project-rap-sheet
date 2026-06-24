@@ -60,7 +60,7 @@ project-rap-sheet/
 │   └── emcee_table.py 
 ├── notebooks/
 |   ├── README.md
-│   └── eda.ipynb
+│   └── wrangling.ipynb
 ├── scripts/
 |   ├── fetch_youtube_channel_uploads.py
 |   └── fetch_events_metadata_from_fliptop_web.py
