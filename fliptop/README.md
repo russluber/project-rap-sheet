@@ -19,7 +19,7 @@ The main output produced by this package is the **`df_battles`** table.
 fliptop/
 ├── __init__.py         # package init + shared data-dir paths
 ├── battles.py    # raw sources -> df_battles pipeline
-├── rename_map.py       # canonical emcee name mapping
+├── rename_map.py       # loads/validates the alias map from data/emcee_aliases.csv
 ├── structures.py       # structures derived from df_battles (emcee table + battle network)
 ├── refresh.py          # fliptop-refresh CLI: rebuild (and optionally re-fetch) the datasets
 ├── annotations.py      # battle-results store (winner/judging/notes) + helpers
@@ -138,12 +138,29 @@ G = build_battle_network(df_battles)
 
 ## `rename_map.py`
 
-This module contains the **canonical emcee rename map**.
+Loads and validates the **canonical emcee name mapping** used by the pipeline to
+normalize the `emcee1` / `emcee2` columns.
 
-FlipTop emcees often appear in YouTube titles under different aliases or formatting variations.  
-The rename map standardizes these names so that the dataset uses **consistent canonical emcee names**.
+The mapping itself is hand-maintained reference data in a CSV (one row per
+alias), so you can edit it like the project's other data:
 
-This mapping is used during the pipeline to normalize the `emcee1` and `emcee2` columns.
+```
+data/emcee_aliases.csv
+columns: alias,canonical
+```
+
+`load_rename_map()` reads that file into an `alias -> canonical` dict and
+validates it:
+
+- skips blank rows and no-op self-maps; de-duplicates identical rows;
+- **raises** if an alias maps to two different canonicals (a real data error);
+- **resolves alias chains transitively** with cycle detection — e.g. if the file
+  has `Ghostly -> Goriong Talas` and you later add `Spade -> Ghostly`, the result
+  is `Spade -> Goriong Talas` regardless of row order. (`df.replace` is a single
+  pass and would otherwise leave `Spade -> Ghostly`.)
+
+To add an alias, append a row to `data/emcee_aliases.csv`; the next build picks
+it up.
 
 ---
 

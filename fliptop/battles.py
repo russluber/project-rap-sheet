@@ -33,7 +33,7 @@ import pandas as pd
 import isodate
 import re
 from datetime import timedelta
-from .rename_map import RENAME_MAP
+from .rename_map import load_rename_map
 
 from dateutil import parser as dateparse
 
@@ -731,8 +731,8 @@ def make_df_1v1_uploads(
     df_yt:
         Raw uploads DataFrame as loaded from youtube_videos.json.
     rename_map:
-        Optional alias->canonical mapping for emcee names. If None,
-        defaults to fliptop.rename_map.RENAME_MAP.
+        Optional alias->canonical mapping for emcee names. If None, it is loaded
+        from data/emcee_aliases.csv via fliptop.rename_map.load_rename_map().
 
     Returns
     -------
@@ -740,7 +740,7 @@ def make_df_1v1_uploads(
         Clean 1v1 uploads with canonical emcee names and matchup_clean.
     """
     if rename_map is None:
-        rename_map = RENAME_MAP
+        rename_map = load_rename_map()
 
     df = (
         df_yt

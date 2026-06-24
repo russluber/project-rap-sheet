@@ -49,6 +49,7 @@ In particular, this project aims to model emcee career histories and build a Fli
 project-rap-sheet/
 ├── data/
 |   ├── README.md
+│   ├── emcee_aliases.csv
 │   ├── raw/
 │   │   ├── youtube_videos.json
 │   │   ├── battle_winners_review.xlsx

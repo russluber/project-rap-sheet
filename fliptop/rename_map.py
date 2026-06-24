@@ -1,87 +1,98 @@
 """
 fliptop.rename_map
 
-Canonical emcee name mapping.
+Loads and validates the canonical emcee-name mapping.
 
-This file contains the alias to canonical name mapping that is used to
-clean up emcee names in the data cleaning pipeline.
+FlipTop emcees often appear in YouTube titles under different aliases or
+formatting variations. The cleaning pipeline standardizes these so the dataset
+uses consistent canonical names.
 
-Populate RENAME_MAP with the same contents as your `rename_dict`
-from the old data_cleaning.ipynb notebook.
+The mapping is hand-maintained reference data and lives in a CSV so it can be
+edited like the project's other data (one row per alias):
+
+    data/emcee_aliases.csv
+    columns: alias,canonical
+
+`load_rename_map()` reads that file and returns an ``alias -> canonical`` dict,
+validating the data as it goes (see the function for the rules).
 """
 
 from __future__ import annotations
 
-from typing import Mapping
+import csv
+from pathlib import Path
 
-# Alias to canonical name mapping.
-# Example:
-# RENAME_MAP = {
-#     "Looniee": "Loonie",
-#     "Anygma (host)": "Anygma",
-# }
-#
-# Replace the example with the full mapping from your notebook.
-RENAME_MAP: Mapping[str, str] = {
-    "Daddie Joe D": "Daddy Joe D",
-    "DaddyJoe D": "Daddy Joe D",
-    "D.O.C. Pau": "Doc Pau",
-    "DOC Pau": "Doc Pau",
-    "Damnsa": "Damsa",
-    "Pareng Elbiz": "Elbiz",
-    "Flip": "Flipzydot1",
-    "Frooztreitted Hoemmizyd": "Frooz",
-    "GusTav": "Gustav",
-    "Hallucinate": "Kris Delano",
-    "Ice Rocks": "Saint Ice",
-    "J Skeelz": "J-Skeelz",
-    "Japormz": "Jhapormz",
-    "JayTee": "Jaytee",
-    "joshG": "Josh G",
-    "JoshG": "Josh G",
-    "Juan Lazy": "Juan Tamad",
-    "Hearty Tha Bomb": "Hearty",
-    "Mac-T": "Mac T",
-    "Malupet": "Malupit",
-    "Marshall": "Marshall Bonifacio",
-    "Mel Christ": "Melchrist",
-    "MelChrist": "Melchrist",
-    "Nerdskillz": "Nerd Skillz",
-    "One3D": "One3d",
-    "Poison 13": "Poison13",
-    "B.I.L.L.Y.": "Prosecutor Billy",
-    "R Zone": "R-Zone",
-    "RanieBoy": "Ranieboy",
-    "Righteous-One": "Righteous One", 
-    "Righteous1": "Righteous One",
-    "Single Shot": "SingleShot",
-    "Spade": "Goriong Talas",
-    "Stiffler": "Stiff",
-    "Tim aka Cleave Heckler": "Tim",
-    "W-Beat": "W Beat",
-    "WBeat": "W Beat",
-    "Young One": "YoungOne",
-    "2Khelle": "2khelle",
-    "Akt": "AKT",
-    "Crhyme": "CRhyme",
-    "Markong Bungo": "Poison13",
-    "Freak Sanchez": "Tipsy D",
-    "Ghostly": "Goriong Talas",
-    "No. 144": "Emar Industriya",
-    "Carlito": "Sayadd",
-    "sKarm": "Skarm",
-    "Cripli": "CripLi",
-    "M-Zhayt": "M Zhayt",
-    "Jdee": "JDee",
-    "Mastafeat": "MastaFeat",
-    "Cnine": "CNine",
-    "Sinagtala": "GL",
-    "1ce Water": "J-Blaque",
-    "Deadpan": "Shehyee",
-    "Mia Sonin": "Batang Rebelde",
-    "GameBoy": "Gameboy",
-    "Lil Strocks": "LilStrocks",
-    "Lil John": "LilJohn",
-    "NIkki": "Nikki",
-    "Nico": "AKT"
-}
+from . import DATA_DIR
+
+PathLike = str | Path
+
+ALIASES_CSV = DATA_DIR / "emcee_aliases.csv"
+
+EXPECTED_COLUMNS = {"alias", "canonical"}
+
+
+def load_rename_map(path: PathLike = ALIASES_CSV) -> dict[str, str]:
+    """
+    Load the alias -> canonical emcee mapping from CSV.
+
+    The CSV must have ``alias`` and ``canonical`` columns. This:
+
+      - strips whitespace and skips blank rows;
+      - skips no-op self-maps (alias == canonical);
+      - de-duplicates identical rows silently;
+      - raises ValueError if an alias maps to two *different* canonicals;
+      - resolves alias chains transitively (A->B, B->C  =>  A->C), with cycle
+        detection, so the result is order-independent and chain-safe.
+
+    Returns
+    -------
+    dict[str, str]
+        Mapping from alias to its terminal canonical name.
+    """
+    path = Path(path)
+
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None or not EXPECTED_COLUMNS <= set(reader.fieldnames):
+            raise ValueError(
+                f"{path}: expected columns {sorted(EXPECTED_COLUMNS)}, "
+                f"got {reader.fieldnames}"
+            )
+
+        direct: dict[str, str] = {}
+        for lineno, row in enumerate(reader, start=2):  # row 1 is the header
+            alias = (row.get("alias") or "").strip()
+            canonical = (row.get("canonical") or "").strip()
+
+            if not alias and not canonical:
+                continue
+            if not alias or not canonical:
+                raise ValueError(
+                    f"{path}:{lineno}: both 'alias' and 'canonical' are required"
+                )
+            if alias == canonical:
+                continue  # no-op self-map
+            if alias in direct and direct[alias] != canonical:
+                raise ValueError(
+                    f"{path}:{lineno}: alias {alias!r} maps to both "
+                    f"{direct[alias]!r} and {canonical!r}"
+                )
+            direct[alias] = canonical
+
+    return _resolve_chains(direct, path)
+
+
+def _resolve_chains(direct: dict[str, str], path: Path) -> dict[str, str]:
+    """Follow alias chains to their terminal canonical, detecting cycles."""
+    resolved: dict[str, str] = {}
+    for alias in direct:
+        seen = [alias]
+        current = direct[alias]
+        while current in direct:  # the canonical is itself an alias -> keep going
+            if current in seen:
+                cycle = " -> ".join(seen + [current])
+                raise ValueError(f"{path}: alias cycle detected: {cycle}")
+            seen.append(current)
+            current = direct[current]
+        resolved[alias] = current
+    return resolved

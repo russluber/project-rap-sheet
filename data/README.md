@@ -1,6 +1,11 @@
 # data
 
 layout:
+- `emcee_aliases.csv`  
+  Hand-maintained alias → canonical emcee-name mapping, used by the pipeline to
+  standardize names. Loaded and validated via `fliptop.rename_map.load_rename_map`.
+  Add a row to register a new alias.
+
 - `raw/`  
   Original data files from webscraping and intermediate files for manual editing.
 
