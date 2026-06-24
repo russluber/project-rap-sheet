@@ -17,9 +17,11 @@ The main output produced by this package is the **`df_battles`** table.
 # Package Structure
 ```
 fliptop/
-├── init.py
-├── data_cleaning.py
-└── rename_map.py
+├── __init__.py         # package init + shared data-dir paths
+├── data_cleaning.py    # raw sources -> df_battles pipeline
+├── rename_map.py       # canonical emcee name mapping
+├── battle_network.py   # build the emcee battle network from df_battles
+└── emcee_table.py      # build the emcee-level table from df_battles
 ```
 
 
@@ -34,7 +36,7 @@ This module contains the full data pipeline used to construct the final dataset.
 It converts raw data from:
 
 - `youtube_videos.json`
-- `matchup_events_metadata_with_ids.csv`
+- `matchup_events_metadata.csv`
 
 into a cleaned **battle-level dataset** where each row represents one FlipTop battle.
 
@@ -130,6 +132,25 @@ Each edge stores:
 
 ---
 
+## `emcee_table.py`
+
+This module builds an emcee-level table from `df_battles`.
+
+It collects every distinct name across `emcee1` and `emcee2`, sorts them, and
+assigns a stable integer `emcee_id`. The result is a two-column table
+(`emcee_id`, `emcee_name`) written to `data/processed/emcees.csv`.
+
+Typical usage:
+
+```python
+from fliptop.emcee_table import build_emcees_table, write_emcees_table
+
+df_emcees = build_emcees_table(df_battles)
+write_emcees_table(df_battles, "data/processed/emcees.csv")
+```
+
+---
+
 ## `rename_map.py`
 
 This module contains the **canonical emcee rename map**.
@@ -153,30 +174,34 @@ from fliptop.data_cleaning import build_df_battles
 
 ## Typical Usage
 
+The package uses shared path constants from `fliptop.__init__`, so you don't
+have to hard-code `data/` paths.
+
 Build the dataset in memory:
-```
+```python
+from fliptop import RAW_DATA_DIR
 from fliptop.data_cleaning import build_df_battles
 
-df_battles = build_df_battles(raw_dir="data/raw")
+df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)
 ```
 
-Build and write the dataset to disk:
-```
+Build and write the dataset to disk. The project's committed output is
+newline-delimited JSON, so pass `fmt="json"` (the function also supports
+`fmt="csv"`):
+```python
+from fliptop import RAW_DATA_DIR, PROCESSED_DATA_DIR
 from fliptop.data_cleaning import write_df_battles
 
 write_df_battles(
-    out_path="data/processed/df_battles.csv",
-    raw_dir="data/raw"
+    out_path=PROCESSED_DATA_DIR / "df_battles.json",
+    raw_dir=RAW_DATA_DIR,
+    fmt="json",
 )
 ```
 
-or
+Reload the written dataset (note `lines=True` for the JSON output):
+```python
+import pandas as pd
 
-```
-from fliptop.data_cleaning import write_df_battles
-
-write_df_battles(
-    out_path="data/processed/df_battles.csv",
-    raw_dir="data/raw"
-)
+df_battles = pd.read_json("data/processed/df_battles.json", lines=True)
 ```

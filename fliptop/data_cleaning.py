@@ -78,7 +78,7 @@ def load_event_metadata(path: PathLike) -> pd.DataFrame:
     ----------
     path:
         Path to matchup_events_metadata.csv as produced
-        by scrape_fliptop_event_matchups_with_ids.py.
+        by fetch_events_metadata_from_fliptop_web.py.
 
     Returns
     -------
