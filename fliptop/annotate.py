@@ -36,10 +36,9 @@ _SKIP = object()
 _NO_DECISION = object()
 
 
-def _first_url(url) -> str:
-    if isinstance(url, list):
-        return url[0] if url else ""
-    return "" if pd.isna(url) else str(url)
+def _watch_url(battle_key: str) -> str:
+    """Build a canonical, clickable YouTube watch URL from a battle id."""
+    return f"https://www.youtube.com/watch?v={battle_key}"
 
 
 def _prompt_winner(emcee1: str, emcee2: str):
@@ -167,7 +166,7 @@ def run(*, limit: int | None = None, event: str | None = None, open_urls: bool =
             break
 
         emcee1, emcee2 = str(row["emcee1"]), str(row["emcee2"])
-        url = _first_url(row["url"])
+        url = _watch_url(row["battle_key"])
         event_name = row.get("event_name", "")
         date = row.get("upload_date", "")
         date_str = pd.to_datetime(date).date().isoformat() if pd.notna(date) else "?"
