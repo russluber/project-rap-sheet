@@ -25,6 +25,7 @@ dependencies:
   - scikit-survival
   - pyvis
   - pandoc
+  - pytest
   - pip
   - pip:
       # Install the fliptop package itself in editable mode so notebooks/scripts

@@ -34,6 +34,13 @@ analysis = [
     "scikit-survival",
     "pyvis",
 ]
+# Developer tooling (tests). Kept out of the runtime and analysis installs.
+dev = [
+    "pytest",
+]
 
 [tool.setuptools]
 packages = ["fliptop"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
