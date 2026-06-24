@@ -54,6 +54,16 @@ Contains information such as:
 
 ## Typical Workflow
 
-1. Run the scripts in this folder to download raw data.
+You normally do not need to run these scripts by hand. The `fliptop-refresh`
+command orchestrates both of them plus the build step:
+
+```bash
+fliptop-refresh --fetch   # runs both scripts below, then rebuilds the processed datasets
+```
+
+Run them directly only when you want finer control (for example, scraping a
+single year). The end-to-end flow they fit into is:
+
+1. Run the scripts in this folder to download raw data (or `fliptop-refresh --fetch`).
 2. Raw files are saved to `data/raw/`.
-3. The cleaning pipeline in `fliptop/data_cleaning.py` processes these files to produce the final dataset in `data/processed/`.
+3. The cleaning pipeline in `fliptop/data_cleaning.py` processes these files to produce the final dataset in `data/processed/` (this is the rebuild step `fliptop-refresh` runs by default).

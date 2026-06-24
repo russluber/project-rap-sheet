@@ -63,8 +63,9 @@ project-rap-sheet/
 │   ├── __init__.py
 │   ├── data_cleaning.py
 │   ├── rename_map.py
-│   ├── battle_network.py 
-│   └── emcee_table.py 
+│   ├── battle_network.py
+│   ├── emcee_table.py
+│   └── refresh.py
 ├── notebooks/
 |   ├── README.md
 │   └── wrangling.ipynb
@@ -72,6 +73,7 @@ project-rap-sheet/
 |   ├── README.md
 |   ├── fetch_youtube_channel_uploads.py
 |   └── fetch_events_metadata_from_fliptop_web.py
+├── tests/
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml
@@ -98,21 +100,22 @@ pip install -e ".[analysis]"  # + notebook/analysis stack (plotting, lifelines, 
 
 ## Usage
 
-End to end, the workflow is:
+The whole pipeline is wrapped in a single command, `fliptop-refresh`:
 
-1. **Fetch raw data** (see `scripts/README.md`):
-   ```bash
-   python scripts/fetch_youtube_channel_uploads.py --channel <CHANNEL_ID> --output data/raw/youtube_videos.json
-   python scripts/fetch_events_metadata_from_fliptop_web.py --start 2010 --end 2026
-   ```
+```bash
+fliptop-refresh            # rebuild processed outputs from existing raw data
+fliptop-refresh --fetch    # fetch fresh raw data (YouTube + web) first, then rebuild
+```
 
-2. **Build the cleaned dataset** (see `fliptop/README.md`):
-   ```python
-   from fliptop import RAW_DATA_DIR, PROCESSED_DATA_DIR
-   from fliptop.data_cleaning import build_df_battles, write_df_battles
+- The default (no flags) is fast, deterministic, and needs no network or API
+  key: it rebuilds `data/processed/df_battles.json` and `data/processed/emcees.csv`
+  from the raw files already in `data/raw/`.
+- `--fetch` first runs the two collection scripts in `scripts/` to refresh the
+  raw data (this needs a YouTube API key — see `data/README.md`), then rebuilds.
+  Override the channel or scrape years with `--channel`, `--start`, `--end`.
 
-   df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)
-   write_df_battles(out_path=PROCESSED_DATA_DIR / "df_battles.json", raw_dir=RAW_DATA_DIR, fmt="json")
-   ```
-
-The `notebooks/wrangling.ipynb` notebook walks through this interactively.
+Under the hood the command runs three stages — fetch YouTube uploads, scrape
+FlipTop event metadata, then build the cleaned tables. You can also drive these
+stages directly; see `scripts/README.md` (collection) and `fliptop/README.md`
+(building in Python). The `notebooks/wrangling.ipynb` notebook walks through the
+build interactively.

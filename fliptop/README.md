@@ -21,7 +21,8 @@ fliptop/
 ├── data_cleaning.py    # raw sources -> df_battles pipeline
 ├── rename_map.py       # canonical emcee name mapping
 ├── battle_network.py   # build the emcee battle network from df_battles
-└── emcee_table.py      # build the emcee-level table from df_battles
+├── emcee_table.py      # build the emcee-level table from df_battles
+└── refresh.py          # fliptop-refresh CLI: rebuild (and optionally re-fetch) the datasets
 ```
 
 
@@ -162,6 +163,26 @@ This mapping is used during the pipeline to normalize the `emcee1` and `emcee2` 
 
 ---
 
+## `refresh.py`
+
+Implements the **`fliptop-refresh`** command (registered as a console script in
+`pyproject.toml`), the one-command way to regenerate the processed datasets.
+
+```bash
+fliptop-refresh            # rebuild df_battles.json + emcees.csv from existing raw data
+fliptop-refresh --fetch    # re-fetch raw data (YouTube + web) first, then rebuild
+```
+
+- `rebuild_processed()` builds `df_battles` once and writes both processed
+  outputs from that single frame.
+- `fetch_raw()` (used by `--fetch`) runs the two collection scripts in
+  `scripts/` as subprocesses.
+
+This is the recommended entry point; the Python API below is for when you want
+the table in memory or finer control.
+
+---
+
 ## `__init__.py`
 
 Initializes the `fliptop` package.
@@ -173,6 +194,10 @@ from fliptop.data_cleaning import build_df_battles
 ```
 
 ## Typical Usage
+
+> For a plain dataset refresh, prefer the `fliptop-refresh` command above. The
+> Python API here is for working with the table in memory or building it as part
+> of other code.
 
 The package uses shared path constants from `fliptop.__init__`, so you don't
 have to hard-code `data/` paths.
