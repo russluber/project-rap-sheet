@@ -1094,7 +1094,7 @@ def write_df_battles(
     youtube_json_name: str = "youtube_videos.json",
     events_csv_name: str = "matchup_events_metadata.csv",
     rename_map: Optional[RenameMap] = None,
-    fmt: str = "csv",
+    fmt: str = "json",
 ) -> Path:
     """
     Convenience helper to build df_battles and save it to disk.
@@ -1114,7 +1114,10 @@ def write_df_battles(
     rename_map:
         Optional emcee rename map for canonicalization.
     fmt:
-        "csv" (default) or "json".
+        "json" (default) or "csv". JSON is the default because consolidated
+        multi-part battles store list-valued `id` and `url` columns, which CSV
+        cannot represent or round-trip. The JSON output is newline-delimited
+        (one battle per line); reload it with `pd.read_json(path, lines=True)`.
 
     Returns
     -------
