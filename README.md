@@ -65,8 +65,7 @@ project-rap-sheet/
 │   ├── __init__.py
 │   ├── data_cleaning.py
 │   ├── rename_map.py
-│   ├── battle_network.py
-│   ├── emcee_table.py
+│   ├── structures.py
 │   ├── refresh.py
 │   ├── annotations.py
 │   └── annotate.py

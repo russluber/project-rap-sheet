@@ -20,8 +20,7 @@ fliptop/
 ├── __init__.py         # package init + shared data-dir paths
 ├── data_cleaning.py    # raw sources -> df_battles pipeline
 ├── rename_map.py       # canonical emcee name mapping
-├── battle_network.py   # build the emcee battle network from df_battles
-├── emcee_table.py      # build the emcee-level table from df_battles
+├── structures.py       # structures derived from df_battles (emcee table + battle network)
 ├── refresh.py          # fliptop-refresh CLI: rebuild (and optionally re-fetch) the datasets
 ├── annotations.py      # battle-results store (winner/judging/notes) + helpers
 └── annotate.py         # fliptop-annotate CLI: interactively record battle results
@@ -111,45 +110,28 @@ Each row represents **one battle**.
 
 ---
 
-## `battle_network.py`
+## `structures.py`
 
-This module builds an undirected weighted battle network from `df_battles`.
+Reusable structures **derived from `df_battles`**. These shape the battle table
+into analysis-ready form but do not perform analysis themselves — that lives in
+notebooks. Two structures live here today (a per-emcee career table for survival
+analysis would be a natural third).
 
-- nodes are emcees
-- edges indicate two emcees have battled
-- edge `weight` is the number of times they have battled
+**Emcee table** — every distinct name across `emcee1`/`emcee2`, sorted, with a
+stable 1-based `emcee_id`. Written to `data/processed/emcees.csv`.
 
-Typical usage:
-
-```python
-from fliptop.battle_network import build_battle_network
-
-G = build_battle_network(df_battles)
-```
-
-Each node stores:
-- `battle_count`
-
-Each edge stores:
-- `weight`
-
----
-
-## `emcee_table.py`
-
-This module builds an emcee-level table from `df_battles`.
-
-It collects every distinct name across `emcee1` and `emcee2`, sorts them, and
-assigns a stable integer `emcee_id`. The result is a two-column table
-(`emcee_id`, `emcee_name`) written to `data/processed/emcees.csv`.
+**Battle network** — an undirected weighted graph: nodes are emcees (with a
+`battle_count` attribute), edges mean two emcees battled (with a `weight` equal
+to how many times).
 
 Typical usage:
 
 ```python
-from fliptop.emcee_table import build_emcees_table, write_emcees_table
+from fliptop.structures import build_emcees_table, write_emcees_table, build_battle_network
 
 df_emcees = build_emcees_table(df_battles)
 write_emcees_table(df_battles, "data/processed/emcees.csv")
+G = build_battle_network(df_battles)
 ```
 
 ---

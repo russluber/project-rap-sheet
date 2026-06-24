@@ -29,7 +29,7 @@ from pathlib import Path
 
 from . import PROJECT_ROOT, PROCESSED_DATA_DIR, RAW_DATA_DIR
 from .data_cleaning import build_df_battles, save_df_battles
-from .emcee_table import write_emcees_table
+from .structures import write_emcees_table
 
 # Default FlipTop YouTube channel (see scripts/fetch_youtube_channel_uploads.py).
 DEFAULT_CHANNEL = "UCBdHwFIE4AJWSa3Wxdu7bAQ"

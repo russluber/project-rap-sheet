@@ -6,9 +6,13 @@ Utilities for scraping, cleaning, and analyzing FlipTop rap battle data.
 This package is meant to be imported from the project root, e.g.:
 
     from fliptop import RAW_DATA_DIR
-    from fliptop.data_cleaning import build_df_battles
+    from fliptop import build_df_battles, build_battle_network
 
 so that notebooks and scripts can share the same paths and pipeline.
+
+The main entry points are re-exported here and imported lazily, so a bare
+``import fliptop`` stays cheap (it does not eagerly pull in pandas/networkx);
+the heavy import happens the first time you actually use one.
 """
 
 from pathlib import Path
@@ -28,18 +32,36 @@ __all__ = [
     "DATA_DIR",
     "RAW_DATA_DIR",
     "PROCESSED_DATA_DIR",
+    "build_df_battles",
+    "build_emcees_table",
+    "write_emcees_table",
     "build_battle_network",
+    "merge_results",
 ]
 
+# Lazy public API: name -> (submodule, attribute). Imported on first access so
+# `import fliptop` does not eagerly load pandas/networkx.
+_LAZY = {
+    "build_df_battles": (".data_cleaning", "build_df_battles"),
+    "build_emcees_table": (".structures", "build_emcees_table"),
+    "write_emcees_table": (".structures", "write_emcees_table"),
+    "build_battle_network": (".structures", "build_battle_network"),
+    "merge_results": (".annotations", "merge_results"),
+}
+
 if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
-    from .battle_network import build_battle_network
+    from .data_cleaning import build_df_battles
+    from .structures import build_emcees_table, write_emcees_table, build_battle_network
+    from .annotations import merge_results
 
 
 def __getattr__(name: str):
-    """Lazily expose build_battle_network so `import fliptop` does not eagerly
-    import networkx (only the data-cleaning pipeline is needed most of the time)."""
-    if name == "build_battle_network":
-        from .battle_network import build_battle_network
+    """Lazily import re-exported entry points on first access."""
+    target = _LAZY.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-        return build_battle_network
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    import importlib
+
+    module = importlib.import_module(target[0], __name__)
+    return getattr(module, target[1])

@@ -1,8 +1,8 @@
 """
-Tests for the analysis-side builders:
+Tests for the df_battles-derived structures in fliptop.structures:
 
-    fliptop.battle_network.build_battle_network
-    fliptop.emcee_table.build_emcees_table
+    build_battle_network
+    build_emcees_table
 """
 
 from __future__ import annotations
@@ -10,8 +10,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from fliptop.battle_network import build_battle_network
-from fliptop.emcee_table import build_emcees_table
+from fliptop.structures import build_battle_network, build_emcees_table
 
 
 def _battles():
