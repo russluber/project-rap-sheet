@@ -41,6 +41,7 @@ dev = [
 
 [project.scripts]
 fliptop-refresh = "fliptop.refresh:main"
+fliptop-annotate = "fliptop.annotate:main"
 
 [tool.setuptools]
 packages = ["fliptop"]
