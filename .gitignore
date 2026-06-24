@@ -10,7 +10,7 @@ __pycache__/
 # --------------------------------------
 .ipynb_checkpoints/
 *.nbconvert.ipynb
-notebooks/missing_data_imputation.ipynb
+notebooks/imputation.ipynb
 
 # --------------------------------------
 # Environment / secrets
