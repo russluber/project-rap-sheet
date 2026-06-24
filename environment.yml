@@ -9,6 +9,9 @@ dependencies:
   - openssl
   - pandas
   - numpy
+  - python-dateutil
+  - isodate
+  - openpyxl
   - matplotlib
   - seaborn
   - plotly
@@ -22,3 +25,8 @@ dependencies:
   - scikit-survival
   - pyvis
   - pandoc
+  - pip
+  - pip:
+      # Install the fliptop package itself in editable mode so notebooks/scripts
+      # can `import fliptop` without sys.path hacks.
+      - -e .

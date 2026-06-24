@@ -12,8 +12,7 @@ so that notebooks and scripts can share the same paths and pipeline.
 """
 
 from pathlib import Path
-
-from .battle_network import build_battle_network
+from typing import TYPE_CHECKING
 
 # Paths relative to the package location
 PACKAGE_ROOT = Path(__file__).resolve().parent
@@ -31,3 +30,16 @@ __all__ = [
     "PROCESSED_DATA_DIR",
     "build_battle_network",
 ]
+
+if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
+    from .battle_network import build_battle_network
+
+
+def __getattr__(name: str):
+    """Lazily expose build_battle_network so `import fliptop` does not eagerly
+    import networkx (only the data-cleaning pipeline is needed most of the time)."""
+    if name == "build_battle_network":
+        from .battle_network import build_battle_network
+
+        return build_battle_network
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

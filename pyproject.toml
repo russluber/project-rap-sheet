@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fliptop"
+version = "0.1.0"
+description = "Reproducible data pipeline for cleaning and analyzing FlipTop rap battle data."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+authors = [{ name = "Russel Luber" }]
+dependencies = [
+    "pandas",
+    "numpy",
+    "isodate",
+    "python-dateutil",
+    "networkx",
+    "beautifulsoup4",
+    "requests",
+    "openpyxl",
+]
+
+[project.optional-dependencies]
+# Analysis / notebook extras kept separate from the core pipeline.
+analysis = [
+    "matplotlib",
+    "seaborn",
+    "plotly",
+    "jupyterlab",
+    "ipykernel",
+    "scikit-learn",
+    "lifelines",
+    "scikit-survival",
+    "pyvis",
+]
+
+[tool.setuptools]
+packages = ["fliptop"]
