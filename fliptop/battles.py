@@ -1,5 +1,5 @@
 """
-fliptop.data_cleaning
+fliptop.battles
 
 Reproducible pipeline to go from raw FlipTop data to a clean
 one-row-per-battle table (df_battles).
@@ -7,7 +7,7 @@ one-row-per-battle table (df_battles).
 Typical notebook usage:
 
     from fliptop import RAW_DATA_DIR, PROCESSED_DATA_DIR
-    from fliptop.data_cleaning import build_df_battles, write_df_battles
+    from fliptop.battles import build_df_battles, write_df_battles
 
     df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)
 

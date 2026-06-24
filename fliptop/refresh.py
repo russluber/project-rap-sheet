@@ -28,7 +28,7 @@ from datetime import date
 from pathlib import Path
 
 from . import PROJECT_ROOT, PROCESSED_DATA_DIR, RAW_DATA_DIR
-from .data_cleaning import build_df_battles, save_df_battles
+from .battles import build_df_battles, save_df_battles
 from .structures import write_emcees_table
 
 # Default FlipTop YouTube channel (see scripts/fetch_youtube_channel_uploads.py).

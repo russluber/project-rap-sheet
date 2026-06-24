@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from fliptop.data_cleaning import write_df_battles
+from fliptop.battles import write_df_battles
 
 EXPECTED_COLUMNS = [
     "id",

@@ -18,7 +18,7 @@ The main output produced by this package is the **`df_battles`** table.
 ```
 fliptop/
 ├── __init__.py         # package init + shared data-dir paths
-├── data_cleaning.py    # raw sources -> df_battles pipeline
+├── battles.py    # raw sources -> df_battles pipeline
 ├── rename_map.py       # canonical emcee name mapping
 ├── structures.py       # structures derived from df_battles (emcee table + battle network)
 ├── refresh.py          # fliptop-refresh CLI: rebuild (and optionally re-fetch) the datasets
@@ -31,7 +31,7 @@ fliptop/
 
 # Module Overview
 
-## `data_cleaning.py`
+## `battles.py`
 
 This module contains the full data pipeline used to construct the final dataset.
 
@@ -227,7 +227,7 @@ Initializes the `fliptop` package.
 This file allows modules within the folder to be imported as:
 
 ```python
-from fliptop.data_cleaning import build_df_battles
+from fliptop.battles import build_df_battles
 ```
 
 ## Typical Usage
@@ -242,7 +242,7 @@ have to hard-code `data/` paths.
 Build the dataset in memory:
 ```python
 from fliptop import RAW_DATA_DIR
-from fliptop.data_cleaning import build_df_battles
+from fliptop.battles import build_df_battles
 
 df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)
 ```
@@ -252,7 +252,7 @@ newline-delimited JSON, so pass `fmt="json"` (the function also supports
 `fmt="csv"`):
 ```python
 from fliptop import RAW_DATA_DIR, PROCESSED_DATA_DIR
-from fliptop.data_cleaning import write_df_battles
+from fliptop.battles import write_df_battles
 
 write_df_battles(
     out_path=PROCESSED_DATA_DIR / "df_battles.json",

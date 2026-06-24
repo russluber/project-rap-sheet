@@ -16,7 +16,7 @@ analysis) belong here too.
 Typical usage:
 
     from fliptop import RAW_DATA_DIR
-    from fliptop.data_cleaning import build_df_battles
+    from fliptop.battles import build_df_battles
     from fliptop.structures import build_emcees_table, build_battle_network
 
     df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)

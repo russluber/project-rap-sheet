@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from fliptop import RAW_DATA_DIR
-from fliptop.data_cleaning import build_df_battles
+from fliptop.battles import build_df_battles
 
 
 @pytest.fixture(scope="session")

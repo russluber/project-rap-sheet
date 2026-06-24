@@ -13,7 +13,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from fliptop.data_cleaning import (
+from fliptop.battles import (
     clean_titles,
     drop_non_battles,
     filter_titles_with_vs,

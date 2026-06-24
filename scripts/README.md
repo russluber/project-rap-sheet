@@ -66,4 +66,4 @@ single year). The end-to-end flow they fit into is:
 
 1. Run the scripts in this folder to download raw data (or `fliptop-refresh --fetch`).
 2. Raw files are saved to `data/raw/`.
-3. The cleaning pipeline in `fliptop/data_cleaning.py` processes these files to produce the final dataset in `data/processed/` (this is the rebuild step `fliptop-refresh` runs by default).
+3. The cleaning pipeline in `fliptop/battles.py` processes these files to produce the final dataset in `data/processed/` (this is the rebuild step `fliptop-refresh` runs by default).

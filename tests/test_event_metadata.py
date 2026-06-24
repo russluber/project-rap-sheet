@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from fliptop.data_cleaning import (
+from fliptop.battles import (
     apply_manual_event_location_overrides,
     clean_event_location,
     extract_event_name_from_description,

@@ -29,7 +29,7 @@ import pandas as pd
 
 from . import RAW_DATA_DIR
 from . import annotations as ann
-from .data_cleaning import build_df_battles
+from .battles import build_df_battles
 
 # sentinels returned by the winner prompt
 _QUIT = object()

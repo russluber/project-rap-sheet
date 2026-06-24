@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from fliptop.data_cleaning import consolidate_battle_parts
+from fliptop.battles import consolidate_battle_parts
 
 
 def _frame():
