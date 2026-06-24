@@ -164,3 +164,28 @@ def test_manual_overrides_grafilipinas_and_poi4():
     out = apply_manual_event_location_overrides(df)
     assert out["event_location"].iloc[0] == "Marikina River Banks, Marikina City, Metro Manila, Philippines"
     assert out["event_location"].iloc[1] == "B-Side, Malugay Street, Makati City, Metro Manila, Philippines"
+
+
+def test_manual_overrides_strip_leaked_event_names():
+    # Events whose description had no '@', leaking the event name into the front
+    # of the extracted location.
+    df = pd.DataFrame(
+        {
+            "event_name": [
+                "Bara Ko, Barako",
+                "Ahon 3",
+                'Masamang Damo (Batas - "Ako" Video Launch)',
+            ],
+            "event_location": [
+                "Bara ko, Barako, Naic Covered Court, Naic, Cavite, Philippines",
+                "Ahon 3, San Juan Gym, San Juan City, Metro Manila, Philippines",
+                'Masamang Damo, Batas "Ako" Video Launch, Tavern Asia, BF Homes, Paranaque City, Philippines',
+            ],
+        }
+    )
+    out = apply_manual_event_location_overrides(df)["event_location"].tolist()
+    assert out == [
+        "Naic Covered Court, Naic, Cavite, Philippines",
+        "San Juan Gym, San Juan City, Metro Manila, Philippines",
+        "Tavern Asia, BF Homes, Paranaque City, Philippines",
+    ]

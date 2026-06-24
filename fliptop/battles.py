@@ -705,7 +705,10 @@ def apply_manual_event_location_overrides(
             event_location_col,
         ] = "FlipTop Baraks, Mandaluyong City, Philippines"
 
-    # Per-event location overrides, keyed by exact event_name.
+    # Per-event location overrides, keyed by exact event_name. Several of these
+    # are "event name leaked into the location" cases: the source description had
+    # no '@' delimiter, so the event name ended up as the leading segment of the
+    # extracted location.
     event_location_overrides = {
         "Ahon 12 (Day 1)": "Jenerick Resort, Tanauan City, Batangas, Philippines",
         "Ahon 12 (Day 2)": "Jenerick Resort, Tanauan City, Batangas, Philippines",
@@ -714,6 +717,11 @@ def apply_manual_event_location_overrides(
         ),
         "Process of Illumination 4": (
             "B-Side, Malugay Street, Makati City, Metro Manila, Philippines"
+        ),
+        "Bara Ko, Barako": "Naic Covered Court, Naic, Cavite, Philippines",
+        "Ahon 3": "San Juan Gym, San Juan City, Metro Manila, Philippines",
+        'Masamang Damo (Batas - "Ako" Video Launch)': (
+            "Tavern Asia, BF Homes, Paranaque City, Philippines"
         ),
     }
 
