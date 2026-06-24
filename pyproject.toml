@@ -39,6 +39,9 @@ dev = [
     "pytest",
 ]
 
+[project.scripts]
+fliptop-refresh = "fliptop.refresh:main"
+
 [tool.setuptools]
 packages = ["fliptop"]
 

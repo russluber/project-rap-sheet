@@ -1124,15 +1124,45 @@ def write_df_battles(
     Path
         The path that was written.
     """
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
     df_battles = build_df_battles(
         raw_dir=raw_dir,
         youtube_json_name=youtube_json_name,
         events_csv_name=events_csv_name,
         rename_map=rename_map,
     )
+
+    return save_df_battles(df_battles, out_path, fmt=fmt)
+
+
+def save_df_battles(
+    df_battles: pd.DataFrame,
+    out_path: PathLike,
+    fmt: str = "json",
+) -> Path:
+    """
+    Serialize an already-built df_battles table to disk.
+
+    Split out from `write_df_battles` so callers that already hold a built
+    df_battles (for example the refresh CLI, which also writes the emcees
+    table from the same frame) do not have to rebuild it.
+
+    Parameters
+    ----------
+    df_battles:
+        The battle-level table to write.
+    out_path:
+        Destination path, e.g. data/processed/df_battles.json.
+    fmt:
+        "json" (default) or "csv". See `write_df_battles` for why JSON is the
+        default (list-valued id/url columns do not round-trip through CSV).
+
+    Returns
+    -------
+    Path
+        The path that was written.
+    """
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     fmt = fmt.lower()
     if fmt == "csv":
