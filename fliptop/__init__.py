@@ -33,6 +33,7 @@ __all__ = [
     "RAW_DATA_DIR",
     "PROCESSED_DATA_DIR",
     "build_df_battles",
+    "build_excluded_uploads",
     "build_emcees_table",
     "write_emcees_table",
     "build_battle_network",
@@ -43,6 +44,7 @@ __all__ = [
 # `import fliptop` does not eagerly load pandas/networkx.
 _LAZY = {
     "build_df_battles": (".battles", "build_df_battles"),
+    "build_excluded_uploads": (".battles", "build_excluded_uploads"),
     "build_emcees_table": (".structures", "build_emcees_table"),
     "write_emcees_table": (".structures", "write_emcees_table"),
     "build_battle_network": (".structures", "build_battle_network"),
@@ -50,7 +52,7 @@ _LAZY = {
 }
 
 if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
-    from .battles import build_df_battles
+    from .battles import build_df_battles, build_excluded_uploads
     from .structures import build_emcees_table, write_emcees_table, build_battle_network
     from .annotations import merge_results
 

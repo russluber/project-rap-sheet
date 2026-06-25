@@ -776,13 +776,7 @@ def make_df_1v1_uploads(
         rename_map = load_rename_map()
 
     df = (
-        df_yt
-        .pipe(clean_titles)
-        .pipe(parse_upload_date)
-        .pipe(add_duration_columns)
-        .pipe(convert_video_metrics_to_numeric)
-        .pipe(copy_yt_title)
-        .pipe(strip_pt_suffix_from_title)
+        prepare_uploads(df_yt)
         .pipe(filter_titles_with_vs)
         .pipe(drop_non_battles)
         .pipe(keep_1v1)
@@ -796,6 +790,94 @@ def make_df_1v1_uploads(
         df = df.sort_values("upload_date").reset_index(drop=True)
 
     return df
+
+
+def prepare_uploads(df_yt: pd.DataFrame) -> pd.DataFrame:
+    """
+    Apply the pre-filter transforms shared by the pipeline and the exclusion
+    audit: clean titles, parse dates/durations, numeric metrics, preserve the
+    raw title, and strip the 'pt. N' suffix from the working title.
+
+    Splitting this out keeps `build_excluded_uploads` in lock-step with
+    `make_df_1v1_uploads`, so the audit can never drift from what the pipeline
+    actually feeds into the filters.
+    """
+    return (
+        df_yt
+        .pipe(clean_titles)
+        .pipe(parse_upload_date)
+        .pipe(add_duration_columns)
+        .pipe(convert_video_metrics_to_numeric)
+        .pipe(copy_yt_title)
+        .pipe(strip_pt_suffix_from_title)
+    )
+
+
+def build_excluded_uploads(
+    raw_dir: PathLike,
+    youtube_json_name: str = "youtube_videos.json",
+) -> pd.DataFrame:
+    """
+    Return the raw uploads that the 1v1 filtering drops, tagged with the reason.
+
+    Audit helper: lets you eyeball everything the pipeline excludes so real
+    battles are not silently filtered out. It reruns the exact same filter
+    functions as `make_df_1v1_uploads` (via `prepare_uploads`), in the same
+    order, recording which stage removed each video:
+
+        - "no 'vs' token"      (filter_titles_with_vs)
+        - "non-battle keyword" (drop_non_battles; the matched word is recorded)
+        - "not 1v1"            (keep_1v1)
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per excluded upload, with id, both titles, upload_date, url,
+        `excluded_reason`, and `matched_keyword` (for non-battle drops).
+    """
+    df_yt = load_youtube_uploads(Path(raw_dir) / youtube_json_name)
+    pre = prepare_uploads(df_yt)
+
+    def _dropped(before: pd.DataFrame, after: pd.DataFrame, reason: str) -> pd.DataFrame:
+        out = before[~before["id"].isin(after["id"])].copy()
+        out["excluded_reason"] = reason
+        return out
+
+    after_vs = filter_titles_with_vs(pre)
+    after_nonbattle = drop_non_battles(after_vs)
+    after_1v1 = keep_1v1(after_nonbattle)
+
+    excluded = pd.concat(
+        [
+            _dropped(pre, after_vs, "no 'vs' token"),
+            _dropped(after_vs, after_nonbattle, "non-battle keyword"),
+            _dropped(after_nonbattle, after_1v1, "not 1v1"),
+        ],
+        ignore_index=True,
+    )
+
+    # Record which exclusion keyword matched, to make non-battle drops auditable.
+    def _matched_keyword(title):
+        if not isinstance(title, str):
+            return pd.NA
+        m = EXCLUDE_RE.search(title)
+        return m.group(0) if m else pd.NA
+
+    excluded["matched_keyword"] = excluded["title"].map(_matched_keyword)
+
+    cols = [
+        "id",
+        "yt_raw_title",
+        "title",
+        "upload_date",
+        "url",
+        "excluded_reason",
+        "matched_keyword",
+    ]
+    excluded = excluded[[c for c in cols if c in excluded.columns]]
+    if "upload_date" in excluded.columns:
+        excluded = excluded.sort_values("upload_date").reset_index(drop=True)
+    return excluded
 
 
 def attach_event_metadata(
