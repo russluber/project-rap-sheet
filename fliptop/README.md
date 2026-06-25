@@ -279,7 +279,6 @@ score unknown" is represented (no separate status for it).
   opt into the join only when analyzing.
 - `battle_key()` — the canonical scalar key for a battle (the first id for
   consolidated multi-part battles).
-- `migrate_from_xlsx()` — one-time import of the legacy `battle_winners_review.xlsx`.
 
 **`annotate.py`** — the `fliptop-annotate` console script: an interactive tool
 that walks un-annotated battles, lets you pick the winner by `1`/`2`, validates

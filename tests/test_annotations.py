@@ -1,6 +1,6 @@
 """
 Tests for fliptop.annotations: the id-keyed structured battle-results store and
-its helpers (battle key, validation, legacy parsing, pending, merge, round-trip).
+its helpers (battle key, validation, pending, merge, round-trip).
 """
 
 from __future__ import annotations
@@ -85,40 +85,6 @@ def test_validate_result_row_promo_has_no_winner_and_no_votes():
 
     assert ann.validate_result_row(dict(ok, votes_winner="5"))  # promo never has votes
     assert ann.validate_result_row(dict(ok, winner="A"))        # promo never has a winner
-
-
-# ---------------------------------------------------------------------------
-# legacy judging parser
-# ---------------------------------------------------------------------------
-
-@pytest.mark.parametrize(
-    "raw, vw, vl, nv, ot, overtime",
-    [
-        ("5-0", "5", "0", "0", "0", "no"),
-        ("3-2", "3", "2", "0", "0", "no"),
-        ("3-1-1(NV)", "3", "1", "1", "0", "no"),   # third = no-votes
-        ("4-0-1(OT)", "4", "0", "0", "1", "no"),   # third>0 = OT-votes, no overtime
-        ("5-0-0(OT)", "5", "0", "0", "0", "yes"),  # -0(OT) = went to overtime
-    ],
-)
-def test_parse_legacy_judging_scored(raw, vw, vl, nv, ot, overtime):
-    p = ann.parse_legacy_judging(raw)
-    assert p["battle_type"] == "judged"
-    assert (p["votes_winner"], p["votes_loser"]) == (vw, vl)
-    assert (p["votes_nv"], p["votes_ot"]) == (nv, ot)
-    assert p["overtime"] == overtime
-
-
-def test_parse_legacy_judging_blank_is_judged_unscored_and_promo_is_promo():
-    blank = ann.parse_legacy_judging("")
-    assert blank["battle_type"] == "judged" and blank["votes_winner"] == ann.NA
-    assert ann.parse_legacy_judging(None)["battle_type"] == "judged"
-    assert ann.parse_legacy_judging("promo")["battle_type"] == "promo"
-
-
-def test_parse_legacy_judging_flags_ambiguous_ot():
-    assert ann.parse_legacy_judging("5-0-0(OT)")["needs_review"] is True
-    assert ann.parse_legacy_judging("5-0")["needs_review"] is False
 
 
 # ---------------------------------------------------------------------------

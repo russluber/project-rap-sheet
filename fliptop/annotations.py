@@ -74,11 +74,6 @@ NO_NOTES = "none"  # explicit empty-notes marker
 # YouTube id from a watch?v=... or youtu.be/... URL.
 _VIDEO_ID_RE = re.compile(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})")
 
-# Legacy judging string patterns (from the old single-column format).
-_LEGACY_2 = re.compile(r"^(\d+)-(\d+)$")
-_LEGACY_OT = re.compile(r"^(\d+)-(\d+)-(\d+)\(OT\)$", re.I)
-_LEGACY_NV = re.compile(r"^(\d+)-(\d+)-(\d+)\(NV\)$", re.I)
-
 
 # ---------------------------------------------------------------------------
 # Battle identity
@@ -185,83 +180,6 @@ def validate_result_row(row: dict) -> list[str]:
             f"or all {NA!r} (score unknown), not a mix"
         )
     return problems
-
-
-# ---------------------------------------------------------------------------
-# Legacy judging string -> structured fields
-# ---------------------------------------------------------------------------
-
-def parse_legacy_judging(raw) -> dict:
-    """
-    Convert an old single-column judging value into structured fields.
-
-    Returns a dict with battle_type / vote columns / overtime, plus a boolean
-    ``needs_review`` flagging values whose interpretation is uncertain (the
-    ambiguous '(OT)' cases and anything unrecognized). The literal "promo"
-    yields a promo battle; everything else is a judged battle, scored when the
-    tally parses and score-unknown otherwise.
-    """
-    def judged(vw, vl, nv, ot, overtime, review=False):
-        return {
-            "battle_type": "judged",
-            "votes_winner": str(vw),
-            "votes_loser": str(vl),
-            "votes_nv": str(nv),
-            "votes_ot": str(ot),
-            "overtime": overtime,
-            "needs_review": review,
-        }
-
-    def judged_unscored(review=False):
-        # winner is carried by the caller; score simply was not recorded.
-        return {
-            "battle_type": "judged",
-            "votes_winner": NA,
-            "votes_loser": NA,
-            "votes_nv": NA,
-            "votes_ot": NA,
-            "overtime": NA,
-            "needs_review": review,
-        }
-
-    def promo(review=False):
-        return {
-            "battle_type": "promo",
-            "votes_winner": NA,
-            "votes_loser": NA,
-            "votes_nv": NA,
-            "votes_ot": NA,
-            "overtime": NA,
-            "needs_review": review,
-        }
-
-    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
-        return judged_unscored()
-    s = str(raw).strip()
-    if not s:
-        return judged_unscored()
-    if s.casefold() == "promo":
-        return promo()
-
-    m = _LEGACY_2.match(s)
-    if m:
-        return judged(m.group(1), m.group(2), 0, 0, "no")
-
-    m = _LEGACY_NV.match(s)
-    if m:
-        return judged(m.group(1), m.group(2), int(m.group(3)), 0, "no")
-
-    m = _LEGACY_OT.match(s)
-    if m:
-        third = int(m.group(3))
-        # Ambiguous legacy form: a non-zero third number means that many judges
-        # voted for overtime (battle did NOT go to OT); a zero third number with
-        # the (OT) flag means the battle DID go to overtime. Flag for review.
-        if third > 0:
-            return judged(m.group(1), m.group(2), 0, third, "no", review=True)
-        return judged(m.group(1), m.group(2), 0, 0, "yes", review=True)
-
-    return judged_unscored(review=True)
 
 
 # ---------------------------------------------------------------------------
@@ -373,71 +291,3 @@ def merge_results(
         how="left",
     )
     return merged
-
-
-# ---------------------------------------------------------------------------
-# One-time migration from the legacy xlsx
-# ---------------------------------------------------------------------------
-
-def migrate_from_xlsx(
-    xlsx_path: PathLike,
-    df_battles: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Convert legacy battle_winners_review.xlsx annotations into the structured,
-    id-keyed store, recovering each battle id from its URL and parsing the old
-    judging string into structured fields.
-
-    Returns
-    -------
-    (results, review)
-        results: structured DataFrame ready for save_results.
-        review:  rows that could not be matched, whose winner does not match the
-                 battle's emcees, or whose judging needs a human to confirm
-                 (the ambiguous '(OT)' cases).
-    """
-    legacy = pd.read_excel(xlsx_path)
-    annotated = legacy[legacy["winner"].notna()].copy()
-
-    bk = df_battles.copy()
-    bk["battle_key"] = bk["id"].map(battle_key)
-    emcees = bk.set_index("battle_key")[["emcee1", "emcee2"]].to_dict("index")
-
-    rows: list[dict] = []
-    review: list[dict] = []
-
-    for _, r in annotated.iterrows():
-        first_url = str(r.get("url", "")).split("|")[0].strip()
-        key = extract_video_id(first_url)
-        winner = str(r["winner"]).strip()
-        notes = "" if pd.isna(r.get("notes")) else str(r.get("notes")).strip()
-
-        if key is None or key not in emcees:
-            review.append({**r.to_dict(), "_reason": "no matching battle id"})
-            continue
-
-        parsed = parse_legacy_judging(r.get("judging"))
-        flagged = parsed.pop("needs_review", False)
-
-        # A promo bout has no winner, even if the legacy sheet named one.
-        row_winner = NA if parsed["battle_type"] == "promo" else winner
-
-        em = emcees[key]
-        if row_winner != NA and not validate_winner(row_winner, em["emcee1"], em["emcee2"]):
-            review.append({**r.to_dict(), "_reason": "winner not an emcee of this battle"})
-
-        row = make_result_row(id=key, winner=row_winner, notes=notes, **parsed)
-        rows.append(row)
-
-        if flagged:
-            review.append({
-                **r.to_dict(),
-                "_reason": f"confirm judging -> {parsed['battle_type']}, "
-                           f"ot={parsed['overtime']}, votes_ot={parsed['votes_ot']}",
-            })
-
-    results = (
-        pd.DataFrame(rows, columns=RESULTS_COLUMNS)
-        .drop_duplicates(subset=["id"], keep="last")
-    )
-    return results, pd.DataFrame(review)
