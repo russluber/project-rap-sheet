@@ -54,23 +54,37 @@ def test_validate_votes_and_overtime():
     assert not ann.validate_overtime("maybe")
 
 
-def test_validate_result_row_scored_requires_integer_votes():
+def test_validate_result_row_judged_with_score_requires_integer_votes():
     ok = ann.make_result_row(
-        id="x", winner="A", judging_status="scored",
+        id="x", winner="A", battle_type="judged",
         votes_winner=5, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no",
     )
     assert ann.validate_result_row(ok) == []
 
-    bad = dict(ok, votes_winner=ann.NA)  # scored but NA votes
+    bad = dict(ok, votes_winner=ann.NA)  # half-filled tally (some NA, some int)
     assert ann.validate_result_row(bad)
 
 
-def test_validate_result_row_nonscored_requires_na_votes():
-    ok = ann.make_result_row(id="x", winner=ann.NA, judging_status="no_decision")
+def test_validate_result_row_judged_score_unknown_is_all_na_votes():
+    ok = ann.make_result_row(id="x", winner="A", battle_type="judged")  # votes default NA
     assert ann.validate_result_row(ok) == []
 
-    bad = dict(ok, votes_winner="3")  # non-scored but has a number
+    bad = dict(ok, overtime="no")  # score unknown but overtime asserted
     assert ann.validate_result_row(bad)
+
+
+def test_validate_result_row_judged_requires_a_winner():
+    bad = ann.make_result_row(id="x", winner=ann.NA, battle_type="judged")
+    assert ann.validate_result_row(bad)
+
+
+def test_validate_result_row_promo_has_no_winner_and_no_votes():
+    ok = ann.make_result_row(id="x", winner=ann.NA, battle_type="promo")
+    assert "promo" in ann.BATTLE_TYPES
+    assert ann.validate_result_row(ok) == []
+
+    assert ann.validate_result_row(dict(ok, votes_winner="5"))  # promo never has votes
+    assert ann.validate_result_row(dict(ok, winner="A"))        # promo never has a winner
 
 
 # ---------------------------------------------------------------------------
@@ -78,27 +92,28 @@ def test_validate_result_row_nonscored_requires_na_votes():
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
-    "raw, status, vw, vl, nv, ot, overtime",
+    "raw, vw, vl, nv, ot, overtime",
     [
-        ("5-0", "scored", "5", "0", "0", "0", "no"),
-        ("3-2", "scored", "3", "2", "0", "0", "no"),
-        ("3-1-1(NV)", "scored", "3", "1", "1", "0", "no"),   # third = no-votes
-        ("4-0-1(OT)", "scored", "4", "0", "0", "1", "no"),   # third>0 = OT-votes, no overtime
-        ("5-0-0(OT)", "scored", "5", "0", "0", "0", "yes"),  # -0(OT) = went to overtime
+        ("5-0", "5", "0", "0", "0", "no"),
+        ("3-2", "3", "2", "0", "0", "no"),
+        ("3-1-1(NV)", "3", "1", "1", "0", "no"),   # third = no-votes
+        ("4-0-1(OT)", "4", "0", "0", "1", "no"),   # third>0 = OT-votes, no overtime
+        ("5-0-0(OT)", "5", "0", "0", "0", "yes"),  # -0(OT) = went to overtime
     ],
 )
-def test_parse_legacy_judging_scored(raw, status, vw, vl, nv, ot, overtime):
+def test_parse_legacy_judging_scored(raw, vw, vl, nv, ot, overtime):
     p = ann.parse_legacy_judging(raw)
-    assert p["judging_status"] == status
+    assert p["battle_type"] == "judged"
     assert (p["votes_winner"], p["votes_loser"]) == (vw, vl)
     assert (p["votes_nv"], p["votes_ot"]) == (nv, ot)
     assert p["overtime"] == overtime
 
 
-def test_parse_legacy_judging_blank_and_promo():
-    assert ann.parse_legacy_judging("")["judging_status"] == "unknown"
-    assert ann.parse_legacy_judging(None)["judging_status"] == "unknown"
-    assert ann.parse_legacy_judging("promo")["judging_status"] == "no_decision"
+def test_parse_legacy_judging_blank_is_judged_unscored_and_promo_is_promo():
+    blank = ann.parse_legacy_judging("")
+    assert blank["battle_type"] == "judged" and blank["votes_winner"] == ann.NA
+    assert ann.parse_legacy_judging(None)["battle_type"] == "judged"
+    assert ann.parse_legacy_judging("promo")["battle_type"] == "promo"
 
 
 def test_parse_legacy_judging_flags_ambiguous_ot():
@@ -113,9 +128,9 @@ def test_parse_legacy_judging_flags_ambiguous_ot():
 def test_save_keeps_explicit_markers_and_sorts(tmp_path):
     path = tmp_path / "battle_results.csv"
     rows = [
-        ann.make_result_row(id="b", winner=ann.NA, judging_status="no_decision"),
+        ann.make_result_row(id="b", winner=ann.NA, battle_type="promo"),
         ann.make_result_row(
-            id="a", winner="Y", judging_status="scored",
+            id="a", winner="Y", battle_type="judged",
             votes_winner=4, votes_loser=1, votes_nv=0, votes_ot=0, overtime="no",
         ),
     ]
@@ -132,17 +147,17 @@ def test_save_keeps_explicit_markers_and_sorts(tmp_path):
 
 
 def test_upsert_replaces_existing_id():
-    row1 = ann.make_result_row(id="a", winner="X", judging_status="scored",
+    row1 = ann.make_result_row(id="a", winner="X", battle_type="judged",
                                votes_winner=5, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no")
     results = pd.DataFrame([row1], columns=ann.RESULTS_COLUMNS)
-    row2 = ann.make_result_row(id="a", winner="Y", judging_status="scored",
+    row2 = ann.make_result_row(id="a", winner="Y", battle_type="judged",
                                votes_winner=4, votes_loser=1, votes_nv=0, votes_ot=0, overtime="no")
     results = ann.upsert_result(results, row2)
     assert len(results) == 1 and results.iloc[0]["winner"] == "Y"
 
 
 def test_make_result_row_fills_empty_notes_with_none():
-    row = ann.make_result_row(id="a", winner="X", judging_status="unknown", notes="")
+    row = ann.make_result_row(id="a", winner="X", battle_type="judged", notes="")
     assert row["notes"] == "none"
 
 
@@ -163,7 +178,7 @@ def _battles():
 
 def test_pending_excludes_battles_in_store():
     results = pd.DataFrame(
-        [ann.make_result_row(id="a", winner="Loonie", judging_status="scored",
+        [ann.make_result_row(id="a", winner="Loonie", battle_type="judged",
                              votes_winner=5, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no")],
         columns=ann.RESULTS_COLUMNS,
     )
@@ -175,7 +190,7 @@ def test_pending_excludes_battles_in_store():
 def test_merge_results_adds_columns_without_mutating_input():
     battles = _battles()
     results = pd.DataFrame(
-        [ann.make_result_row(id="c1", winner="Shehyee", judging_status="scored",
+        [ann.make_result_row(id="c1", winner="Shehyee", battle_type="judged",
                              votes_winner=7, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no")],
         columns=ann.RESULTS_COLUMNS,
     )

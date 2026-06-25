@@ -7,19 +7,26 @@ separate from the auto-built df_battles table.
 The authoritative store is an append-only CSV keyed by battle ``id``:
 
     data/annotations/battle_results.csv
-    columns: id, winner, judging_status,
+    columns: id, winner, battle_type,
              votes_winner, votes_loser, votes_nv, votes_ot, overtime, notes
 
-Judging is recorded as explicit, structured fields rather than one ambiguous
-string:
+A battle is one of two kinds, which the host announces, and the rest of the
+fields are recorded as explicit, structured values:
 
-    judging_status   "scored" | "no_decision" | "unknown"
+    battle_type      "judged" | "promo"
+                     "judged" = a real, decided battle with a winner.
+                     "promo"  = exhibition/promo bout with no winner by design.
+    winner           the winning emcee for a judged battle, else "NA" (promo).
     votes_winner     judges who voted for the winner   (int, else "NA")
     votes_loser      judges who voted for the loser     (int, else "NA")
     votes_nv         judges who did not vote (NV)        (int, else "NA")
     votes_ot         judges who voted to go to overtime  (int, else "NA")
     overtime         did the battle go to an OT round?   "yes" | "no" | "NA"
     notes            free text, or the literal "none"
+
+A judged battle whose score was not recorded keeps its ``winner`` but stores
+"NA" in every vote column (and ``overtime``); the vote columns being "NA" is
+exactly what marks "winner known, score unknown".
 
 The recorded vote tally is always the *final* (post-overtime) tally. Panel size
 is not fixed (5 / 7 / 9 judges) and is simply the sum of the vote columns. All
@@ -49,7 +56,7 @@ RESULTS_PATH = ANNOTATIONS_DIR / "battle_results.csv"
 RESULTS_COLUMNS = [
     "id",
     "winner",
-    "judging_status",
+    "battle_type",
     "votes_winner",
     "votes_loser",
     "votes_nv",
@@ -60,7 +67,7 @@ RESULTS_COLUMNS = [
 
 VOTE_COLUMNS = ["votes_winner", "votes_loser", "votes_nv", "votes_ot"]
 
-JUDGING_STATUSES = ("scored", "no_decision", "unknown")
+BATTLE_TYPES = ("judged", "promo")
 NA = "NA"          # explicit not-applicable marker (no blank cells)
 NO_NOTES = "none"  # explicit empty-notes marker
 
@@ -111,8 +118,8 @@ def validate_winner(winner: str, emcee1: str, emcee2: str) -> bool:
     return w in {str(emcee1).strip().casefold(), str(emcee2).strip().casefold()}
 
 
-def validate_status(status: str) -> bool:
-    return status in JUDGING_STATUSES
+def validate_battle_type(battle_type: str) -> bool:
+    return battle_type in BATTLE_TYPES
 
 
 def validate_votes(value) -> bool:
@@ -133,27 +140,50 @@ def validate_result_row(row: dict) -> list[str]:
     """
     Return a list of human-readable problems with a result row (empty == ok).
 
-    Enforces the cross-field rules: a 'scored' row needs integer vote columns
-    and a yes/no overtime; a non-scored row must have NA in those columns.
+    Enforces the cross-field rules:
+
+    * promo  - no winner: ``winner`` and every vote column and ``overtime`` are
+      all the NA marker.
+    * judged - a real winner. The score is either fully recorded (every vote
+      column an integer and ``overtime`` yes/no) or not recorded at all (every
+      vote column NA and ``overtime`` NA); a half-filled tally is rejected.
     """
     problems: list[str] = []
-    status = str(row.get("judging_status", "")).strip()
+    battle_type = str(row.get("battle_type", "")).strip()
 
-    if not validate_status(status):
-        problems.append(f"judging_status must be one of {JUDGING_STATUSES}")
+    if not validate_battle_type(battle_type):
+        problems.append(f"battle_type must be one of {BATTLE_TYPES}")
         return problems
 
-    if status == "scored":
-        for col in VOTE_COLUMNS:
-            v = str(row.get(col, "")).strip()
-            if v == NA or not v.isdigit():
-                problems.append(f"{col} must be an integer when scored (got {v!r})")
-        if str(row.get("overtime", "")).strip() not in ("yes", "no"):
-            problems.append("overtime must be 'yes' or 'no' when scored")
+    votes = [str(row.get(col, "")).strip() for col in VOTE_COLUMNS]
+    overtime = str(row.get("overtime", "")).strip()
+    winner = str(row.get("winner", "")).strip()
+
+    if battle_type == "promo":
+        if winner != NA:
+            problems.append(f"winner must be {NA!r} for a promo battle")
+        for col, v in zip(VOTE_COLUMNS + ["overtime"], votes + [overtime]):
+            if v != NA:
+                problems.append(f"{col} must be {NA!r} for a promo battle")
+        return problems
+
+    # judged
+    if winner == NA or not winner:
+        problems.append("winner must be a real emcee for a judged battle")
+
+    all_int = all(v.isdigit() for v in votes)
+    all_na = all(v == NA for v in votes)
+    if all_int:
+        if overtime not in ("yes", "no"):
+            problems.append("overtime must be 'yes' or 'no' when the score is recorded")
+    elif all_na:
+        if overtime != NA:
+            problems.append(f"overtime must be {NA!r} when the score is not recorded")
     else:
-        for col in VOTE_COLUMNS + ["overtime"]:
-            if str(row.get(col, "")).strip() != NA:
-                problems.append(f"{col} must be {NA!r} when status is {status!r}")
+        problems.append(
+            "vote columns must be either all integers (score recorded) "
+            f"or all {NA!r} (score unknown), not a mix"
+        )
     return problems
 
 
@@ -165,13 +195,15 @@ def parse_legacy_judging(raw) -> dict:
     """
     Convert an old single-column judging value into structured fields.
 
-    Returns a dict with judging_status / vote columns / overtime, plus a
-    boolean ``needs_review`` flagging values whose interpretation is uncertain
-    (the ambiguous '(OT)' cases and anything unrecognized).
+    Returns a dict with battle_type / vote columns / overtime, plus a boolean
+    ``needs_review`` flagging values whose interpretation is uncertain (the
+    ambiguous '(OT)' cases and anything unrecognized). The literal "promo"
+    yields a promo battle; everything else is a judged battle, scored when the
+    tally parses and score-unknown otherwise.
     """
-    def scored(vw, vl, nv, ot, overtime, review=False):
+    def judged(vw, vl, nv, ot, overtime, review=False):
         return {
-            "judging_status": "scored",
+            "battle_type": "judged",
             "votes_winner": str(vw),
             "votes_loser": str(vl),
             "votes_nv": str(nv),
@@ -180,9 +212,21 @@ def parse_legacy_judging(raw) -> dict:
             "needs_review": review,
         }
 
-    def non_scored(status, review=False):
+    def judged_unscored(review=False):
+        # winner is carried by the caller; score simply was not recorded.
         return {
-            "judging_status": status,
+            "battle_type": "judged",
+            "votes_winner": NA,
+            "votes_loser": NA,
+            "votes_nv": NA,
+            "votes_ot": NA,
+            "overtime": NA,
+            "needs_review": review,
+        }
+
+    def promo(review=False):
+        return {
+            "battle_type": "promo",
             "votes_winner": NA,
             "votes_loser": NA,
             "votes_nv": NA,
@@ -192,20 +236,20 @@ def parse_legacy_judging(raw) -> dict:
         }
 
     if raw is None or (isinstance(raw, float) and pd.isna(raw)):
-        return non_scored("unknown")
+        return judged_unscored()
     s = str(raw).strip()
     if not s:
-        return non_scored("unknown")
+        return judged_unscored()
     if s.casefold() == "promo":
-        return non_scored("no_decision", review=True)
+        return promo()
 
     m = _LEGACY_2.match(s)
     if m:
-        return scored(m.group(1), m.group(2), 0, 0, "no")
+        return judged(m.group(1), m.group(2), 0, 0, "no")
 
     m = _LEGACY_NV.match(s)
     if m:
-        return scored(m.group(1), m.group(2), int(m.group(3)), 0, "no")
+        return judged(m.group(1), m.group(2), int(m.group(3)), 0, "no")
 
     m = _LEGACY_OT.match(s)
     if m:
@@ -214,10 +258,10 @@ def parse_legacy_judging(raw) -> dict:
         # voted for overtime (battle did NOT go to OT); a zero third number with
         # the (OT) flag means the battle DID go to overtime. Flag for review.
         if third > 0:
-            return scored(m.group(1), m.group(2), 0, third, "no", review=True)
-        return scored(m.group(1), m.group(2), 0, 0, "yes", review=True)
+            return judged(m.group(1), m.group(2), 0, third, "no", review=True)
+        return judged(m.group(1), m.group(2), 0, 0, "yes", review=True)
 
-    return non_scored("unknown", review=True)
+    return judged_unscored(review=True)
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +294,7 @@ def make_result_row(
     *,
     id: str,
     winner: str = NA,
-    judging_status: str = "unknown",
+    battle_type: str = "judged",
     votes_winner=NA,
     votes_loser=NA,
     votes_nv=NA,
@@ -262,7 +306,7 @@ def make_result_row(
     return {
         "id": id,
         "winner": winner if winner else NA,
-        "judging_status": judging_status,
+        "battle_type": battle_type,
         "votes_winner": str(votes_winner),
         "votes_loser": str(votes_loser),
         "votes_nv": str(votes_nv),
@@ -375,17 +419,20 @@ def migrate_from_xlsx(
         parsed = parse_legacy_judging(r.get("judging"))
         flagged = parsed.pop("needs_review", False)
 
+        # A promo bout has no winner, even if the legacy sheet named one.
+        row_winner = NA if parsed["battle_type"] == "promo" else winner
+
         em = emcees[key]
-        if winner and not validate_winner(winner, em["emcee1"], em["emcee2"]):
+        if row_winner != NA and not validate_winner(row_winner, em["emcee1"], em["emcee2"]):
             review.append({**r.to_dict(), "_reason": "winner not an emcee of this battle"})
 
-        row = make_result_row(id=key, winner=winner, notes=notes, **parsed)
+        row = make_result_row(id=key, winner=row_winner, notes=notes, **parsed)
         rows.append(row)
 
         if flagged:
             review.append({
                 **r.to_dict(),
-                "_reason": f"confirm judging -> {parsed['judging_status']}, "
+                "_reason": f"confirm judging -> {parsed['battle_type']}, "
                            f"ot={parsed['overtime']}, votes_ot={parsed['votes_ot']}",
             })
 

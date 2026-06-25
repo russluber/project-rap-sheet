@@ -14,9 +14,10 @@ you left off, only ever showing battles you have not done.
     fliptop-annotate --event Ahon    # only battles whose event matches "Ahon"
     fliptop-annotate --open          # open each battle's URL in the browser
 
-For each battle you record the winner and the final (post-overtime) judges'
-tally. The common case is two keystrokes (winner, then a score like 5-0); the
-no-vote / overtime-vote / overtime follow-ups are only asked if you opt in.
+For each battle you record either the winner and the final (post-overtime)
+judges' tally, or that it was a promo bout with no winner (press ``p``). The
+common case is two keystrokes (winner, then a score like 5-0); the no-vote /
+overtime-vote / overtime follow-ups are only asked if you opt in.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ from .battles import build_df_battles
 # sentinels returned by the winner prompt
 _QUIT = object()
 _SKIP = object()
-_NO_DECISION = object()
+_PROMO = object()
 
 
 def _watch_url(battle_key: str) -> str:
@@ -43,25 +44,25 @@ def _watch_url(battle_key: str) -> str:
 
 
 def _prompt_winner(emcee1: str, emcee2: str):
-    """Return canonical winner name, or a _QUIT / _SKIP / _NO_DECISION sentinel."""
+    """Return winner name, or a _QUIT / _SKIP / _PROMO sentinel."""
     while True:
         raw = input(
-            f"  Winner [1={emcee1}  2={emcee2}  d=no decision  s=skip  q=quit]: "
+            f"  Winner [1={emcee1}  2={emcee2}  p=promo (no winner)  s=skip  q=quit]: "
         ).strip()
         low = raw.casefold()
         if low == "q":
             return _QUIT
         if low in ("", "s"):
             return _SKIP
-        if low == "d":
-            return _NO_DECISION
+        if low == "p":
+            return _PROMO
         if raw == "1":
             return emcee1
         if raw == "2":
             return emcee2
         if ann.validate_winner(raw, emcee1, emcee2):
             return emcee1 if raw.casefold() == emcee1.casefold() else emcee2
-        print("    ! enter 1, 2, an emcee name, d, s, or q")
+        print("    ! enter 1, 2, an emcee name, p, s, or q")
 
 
 def _prompt_score():
@@ -100,13 +101,13 @@ def _prompt_yes_no(label: str, default: str = "no") -> str:
 
 def _collect_judging(winner) -> dict:
     """Prompt the structured judging fields; returns kwargs for make_result_row."""
-    if winner is _NO_DECISION:
-        return {"winner": ann.NA, "judging_status": "no_decision"}
+    if winner is _PROMO:
+        return {"winner": ann.NA, "battle_type": "promo"}
 
     score = _prompt_score()
     if score is None:
-        # winner known, score not recorded
-        return {"winner": winner, "judging_status": "unknown"}
+        # judged battle, winner known, score not recorded
+        return {"winner": winner, "battle_type": "judged"}
 
     vw, vl = score
     nv, ot, overtime = 0, 0, "no"
@@ -117,7 +118,7 @@ def _collect_judging(winner) -> dict:
 
     return {
         "winner": winner,
-        "judging_status": "scored",
+        "battle_type": "judged",
         "votes_winner": vw,
         "votes_loser": vl,
         "votes_nv": nv,
@@ -127,9 +128,9 @@ def _collect_judging(winner) -> dict:
 
 
 def _summarize(row: dict) -> str:
-    if row["judging_status"] == "no_decision":
-        return "no decision"
-    if row["judging_status"] == "unknown":
+    if row["battle_type"] == "promo":
+        return "promo (no winner)"
+    if str(row["votes_winner"]) == ann.NA:
         return f"{row['winner']} wins (score unknown)"
     tally = f"{row['votes_winner']}-{row['votes_loser']}"
     extra = []

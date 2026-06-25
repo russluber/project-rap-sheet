@@ -245,16 +245,17 @@ Who won each battle (and the judges' tally) is collected **by hand** and kept
 
 ```
 data/annotations/battle_results.csv
-columns: id, winner, judging_status,
+columns: id, winner, battle_type,
          votes_winner, votes_loser, votes_nv, votes_ot, overtime, notes
 ```
 
-Judging is recorded as explicit, structured fields rather than one ambiguous
-string:
+Every battle is one of two kinds — which the host announces — and the rest is
+recorded as explicit, structured fields:
 
 | column | meaning |
 | ------ | ------- |
-| `judging_status` | `scored` \| `no_decision` \| `unknown` |
+| `battle_type` | `judged` (a real, decided battle) \| `promo` (exhibition bout, no winner by design) |
+| `winner` | the winning emcee for a judged battle, else `NA` (promo) |
 | `votes_winner` / `votes_loser` | judges voting for the winner / loser |
 | `votes_nv` | judges who did not vote (NV) |
 | `votes_ot` | judges who voted to go to overtime |
@@ -265,7 +266,9 @@ The tally is always the **final (post-overtime)** result. Panel size varies
 (5 / 7 / 9 judges) and is just the sum of the vote columns. Everything is stored
 as text with explicit markers (`NA` where not applicable, `none` for empty
 notes), so the CSV has **no blank cells**; convert the vote columns with
-`pd.to_numeric` for analysis.
+`pd.to_numeric` for analysis. A judged battle whose score was never recorded
+keeps its `winner` but has `NA` in every vote column — that's how "winner known,
+score unknown" is represented (no separate status for it).
 
 **`annotations.py`** — the store and its helpers:
 

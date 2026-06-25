@@ -69,9 +69,19 @@ def test_resolve_targets_returns_rematches_newest_first():
 
 def test_current_result_str_reports_stored_and_missing():
     results = pd.DataFrame(
-        [ann.make_result_row(id="aaaaaaaaaaa", winner="Loonie", judging_status="scored",
+        [ann.make_result_row(id="aaaaaaaaaaa", winner="Loonie", battle_type="judged",
                              votes_winner=5, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no")],
         columns=ann.RESULTS_COLUMNS,
     )
     assert "Loonie wins 5-0" in annotate._current_result_str(results, "aaaaaaaaaaa")
     assert annotate._current_result_str(results, "bbbbbbbbbbb") == "not yet recorded"
+
+
+def test_summarize_promo_reports_no_winner():
+    row = ann.make_result_row(id="aaaaaaaaaaa", winner=ann.NA, battle_type="promo")
+    assert annotate._summarize(row) == "promo (no winner)"
+
+
+def test_summarize_judged_without_score_reports_unknown():
+    row = ann.make_result_row(id="aaaaaaaaaaa", winner="Loonie", battle_type="judged")
+    assert annotate._summarize(row) == "Loonie wins (score unknown)"
