@@ -146,7 +146,28 @@ Davao variants.
 - sorts newest-upload-first,
 - applies `apply_manual_event_location_overrides` (hand-fixed locations for a
   handful of events the scrape got wrong, keyed by event name),
+- **`normalize_event_day`** standardizes multi-day events (see below),
 - selects and orders the final columns.
+
+#### Multi-day events (`normalize_event_day`)
+
+FlipTop events that run over several days appear in the source as separate
+`event_name`s with a day suffix — `"Ahon 16 (Day 1)"`, `"Ahon 16 (Day 2)"` (or
+the comma form `"Gubat 12, Day 1"` from YouTube descriptions). This step:
+
+- **Strips the day suffix** so the name standardizes to the event itself
+  (`"Ahon 16"`), collapsing the per-day duplicates, and records the day number
+  in the `event_day` column.
+- **Resolves the per-day date.** The source often carries the *date range*
+  (`"December 13-14, 2025"`) on every day's entry, which left both days pinned to
+  the range's first day. When an `event_date` still equals the range start, it is
+  moved to the N-th day (`start + (N-1)`, clamped to the range end), so Day 1 →
+  Dec 13 and Day 2 → Dec 14. Dates that already differ from the start (correctly
+  disambiguated at the source) and missing dates (COVID-era `NaT`) are left as-is.
+
+  This runs *after* the location overrides, which still key on the day-suffixed
+  names. One known limitation: cross-month ranges (`"Nov 30 – Dec 1"`) aren't
+  parsed as a range yet.
 
 ---
 
@@ -162,8 +183,9 @@ Davao variants.
 | `duration_hms` | string | `HH:MM:SS` |
 | `emcee1`, `emcee2` | string | canonicalized names |
 | `matchup` | string | `emcee1 vs emcee2` |
-| `event_name` | string | |
-| `event_date` | datetime | **null for COVID-era battles** (intentional) |
+| `event_name` | string | standardized — the `(Day N)` suffix is stripped (see below) |
+| `event_day` | Int64 | which day of a multi-day event (1/2/3…), `<NA>` for single-day events |
+| `event_date` | datetime | the battle's actual day; **null for COVID-era battles** (intentional) |
 | `event_location` | string | |
 | `url` | string or list | a **list** for multi-part battles |
 

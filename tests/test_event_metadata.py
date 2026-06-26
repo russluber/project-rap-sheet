@@ -10,9 +10,13 @@ from __future__ import annotations
 import pandas as pd
 
 from fliptop.battles import (
+    _parse_event_date_range,
+    _split_event_day,
+    apply_manual_event_date_overrides,
     apply_manual_event_location_overrides,
     clean_event_location,
     extract_event_name_from_description,
+    normalize_event_day,
     split_event_description,
 )
 
@@ -123,6 +127,125 @@ def test_extract_event_name_from_description():
     out = extract_event_name_from_description(df)
     assert out["event_name_from_desc"].iloc[0] == "Ahon 16"
     assert pd.isna(out["event_name_from_desc"].iloc[1])
+
+
+# ---------------------------------------------------------------------------
+# _parse_event_date_range
+# ---------------------------------------------------------------------------
+
+def test_parse_event_date_range_single_day():
+    assert _parse_event_date_range("Tectonics. Dec. 4, 2010.") == ("2010-12-04", "2010-12-04")
+
+
+def test_parse_event_date_range_two_day_range():
+    assert _parse_event_date_range("Ahon 16. December 13-14, 2025.") == ("2025-12-13", "2025-12-14")
+
+
+def test_parse_event_date_range_no_date_or_non_string():
+    assert _parse_event_date_range("no date here") == (None, None)
+    assert _parse_event_date_range(None) == (None, None)
+
+
+# ---------------------------------------------------------------------------
+# _split_event_day
+# ---------------------------------------------------------------------------
+
+def test_split_event_day_parenthesized_and_comma_forms():
+    assert _split_event_day("Ahon 16 (Day 2)") == ("Ahon 16", 2)
+    assert _split_event_day("Gubat 12, Day 1") == ("Gubat 12", 1)
+    assert _split_event_day("The FlipTop Festival (Day 1)") == ("The FlipTop Festival", 1)
+
+
+def test_split_event_day_no_day_label():
+    assert _split_event_day("Tectonics") == ("Tectonics", None)
+    # a non-day parenthetical is preserved; "Meiday" must not trip the matcher
+    assert _split_event_day("Grafilipinas (FlipTop x Meiday x Wall Lords)") == (
+        "Grafilipinas (FlipTop x Meiday x Wall Lords)",
+        None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# normalize_event_day
+# ---------------------------------------------------------------------------
+
+def test_normalize_event_day_fixes_day2_pinned_to_range_start():
+    df = pd.DataFrame(
+        {
+            "event_name": ["Ahon 16 (Day 1)", "Ahon 16 (Day 2)"],
+            "description": ["FlipTop presents: Ahon 16 @ The Tent. December 13-14, 2025."] * 2,
+            "event_date": pd.to_datetime(["2025-12-13", "2025-12-13"]),  # both pinned to day 1
+        }
+    )
+    out = normalize_event_day(df)
+    assert out["event_name"].tolist() == ["Ahon 16", "Ahon 16"]
+    assert out["event_day"].tolist() == [1, 2]
+    assert out["event_date"].tolist() == [
+        pd.Timestamp("2025-12-13"),
+        pd.Timestamp("2025-12-14"),
+    ]
+
+
+def test_normalize_event_day_leaves_already_disambiguated_date():
+    # Day 2 already moved off the range start -> trusted, not recomputed.
+    df = pd.DataFrame(
+        {
+            "event_name": ["Ahon 10 (Day 2)"],
+            "description": ["FlipTop presents: Ahon 10 @ TIU. December 13-14, 2019."],
+            "event_date": pd.to_datetime(["2019-12-14"]),
+        }
+    )
+    out = normalize_event_day(df)
+    assert out["event_name"].iloc[0] == "Ahon 10"
+    assert out["event_day"].iloc[0] == 2
+    assert out["event_date"].iloc[0] == pd.Timestamp("2019-12-14")
+
+
+def test_normalize_event_day_single_day_event_gets_na_day():
+    df = pd.DataFrame(
+        {
+            "event_name": ["Tectonics"],
+            "description": ["FlipTop presents: Tectonics @ Katips. Dec. 4, 2010."],
+            "event_date": pd.to_datetime(["2010-12-04"]),
+        }
+    )
+    out = normalize_event_day(df)
+    assert pd.isna(out["event_day"].iloc[0])
+    assert out["event_date"].iloc[0] == pd.Timestamp("2010-12-04")
+
+
+def test_normalize_event_day_never_unmasks_missing_date():
+    # A NaT date (e.g. COVID-masked) stays NaT, even though the name has a day
+    # and a range parses -> only the name is normalized.
+    df = pd.DataFrame(
+        {
+            "event_name": ["Ahon 12 (Day 2)"],
+            "description": ["FlipTop presents: Ahon 12 (Day 2) @ X. December 13-14, 2021."],
+            "event_date": [pd.NaT],
+        }
+    )
+    out = normalize_event_day(df)
+    assert out["event_name"].iloc[0] == "Ahon 12"
+    assert out["event_day"].iloc[0] == 2
+    assert pd.isna(out["event_date"].iloc[0])
+
+
+# ---------------------------------------------------------------------------
+# apply_manual_event_date_overrides
+# ---------------------------------------------------------------------------
+
+def test_manual_event_date_override_pins_known_battle():
+    # Nikki vs K-Ram: YouTube description mis-dates it; website wins (Sept 29).
+    df = pd.DataFrame(
+        {
+            "id": ["IdPP-JPtk4M", "other", ["x", "y"]],
+            "event_date": pd.to_datetime(["2023-09-30", "2020-01-01", "2020-01-01"]),
+        }
+    )
+    out = apply_manual_event_date_overrides(df)
+    assert out["event_date"].iloc[0] == pd.Timestamp("2023-09-29")  # corrected
+    assert out["event_date"].iloc[1] == pd.Timestamp("2020-01-01")  # untouched
+    assert out["event_date"].iloc[2] == pd.Timestamp("2020-01-01")  # list id, untouched
 
 
 # ---------------------------------------------------------------------------

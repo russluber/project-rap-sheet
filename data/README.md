@@ -113,6 +113,9 @@ The full column-by-column schema is documented in the
 
 - `id` and `url` are a **single value** for normal battles and a **list** for
   consolidated multi-part (`pt. 1`, `pt. 2`, …) uploads.
+- `event_name` is standardized (no `(Day N)` suffix); for multi-day events the
+  day lives in `event_day` (`1`/`2`/`3`…, `<NA>` for single-day events) and
+  `event_date` is that specific day.
 - Dates (`upload_date`, `event_date`) are stored as **epoch milliseconds** in the
   JSON; pass `convert_dates=[…]` (or `pd.to_datetime`) when loading.
 - `event_date` is **`null` for COVID-era battles** — intentional; see the note in

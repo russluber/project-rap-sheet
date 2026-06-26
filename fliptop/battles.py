@@ -421,10 +421,50 @@ _MONTH = (
 
 # <Month> <day or day-range>[,] <year>
 # examples: "Oct. 29, 2010" | "Feb 6, 2010" | "Dec. 20-21, 2024"
+# Groups: 1=month, 2=start day, 3=end day (optional, same-month range), 4=year.
 _DATE_RANGE = re.compile(
-    rf"{_MONTH}\s+(\d{{1,2}})(?:\s*-\s*\d{{1,2}})?\s*,\s*(\d{{4}})",
+    rf"{_MONTH}\s+(\d{{1,2}})(?:\s*-\s*(\d{{1,2}}))?\s*,\s*(\d{{4}})",
     re.I,
 )
+
+
+def _parse_event_date_range(text) -> tuple[Optional[str], Optional[str]]:
+    """
+    Find the first ``Month D[-D2], YYYY`` in ``text`` and return
+    ``(start_iso, end_iso)`` as ISO date strings, or ``(None, None)`` if none.
+
+    For a single day, ``end == start``. Only same-month ranges are recognized
+    (e.g. "December 13-14, 2025"); a cross-month range would yield just the
+    start day. If the end day parses before the start (bad data), it is clamped
+    to the start.
+    """
+    if not isinstance(text, str):
+        return (None, None)
+
+    m = _DATE_RANGE.search(text)
+    if not m:
+        return (None, None)
+
+    month_tok = m.group(1).replace(".", "")
+    day_start, day_end, year = m.group(2), m.group(3), m.group(4)
+
+    try:
+        start = dateparse.parse(f"{month_tok} {day_start} {year}").date()
+    except Exception:
+        return (None, None)
+
+    if day_end:
+        try:
+            end = dateparse.parse(f"{month_tok} {day_end} {year}").date()
+        except Exception:
+            end = start
+    else:
+        end = start
+
+    if end < start:
+        end = start
+
+    return (start.isoformat(), end.isoformat())
 
 def split_event_description(
     df: pd.DataFrame,
@@ -455,7 +495,7 @@ def split_event_description(
         # normalize month (remove trailing dot), take FIRST day if range is given
         month_tok = m.group(1).replace(".", "")
         day_first = m.group(2)
-        year = m.group(3) if m.lastindex and m.lastindex >= 3 else None
+        year = m.group(4)  # group 3 is the optional range end day
 
         date_text = (
             f"{month_tok} {day_first} {year}"
@@ -730,6 +770,130 @@ def apply_manual_event_location_overrides(
             out.loc[out[event_name_col] == event_name, event_location_col] = location
 
     return out
+
+
+# Per-battle event_date corrections, keyed by YouTube video id. Used for the rare
+# case where a battle's own YouTube description carries the wrong date and the
+# FlipTop website is authoritative. The date parsed from the description cannot be
+# trusted for these, so we pin them by hand (ISO date string).
+_EVENT_DATE_OVERRIDES = {
+    # Nikki vs K-Ram: the YouTube description dates this as Sept 30, but the
+    # FlipTop site lists it on Gubat 12 Day 1 (Sept 29, 2023).
+    "IdPP-JPtk4M": "2023-09-29",
+}
+
+
+def apply_manual_event_date_overrides(
+    df: pd.DataFrame,
+    id_col: str = "id",
+    date_col: str = "event_date",
+) -> pd.DataFrame:
+    """
+    Pin event_date for specific battles whose YouTube description is wrong.
+
+    Keyed by YouTube video id (matching either a scalar id or any id within a
+    consolidated multi-part battle's id list). The FlipTop website is treated as
+    authoritative for these hand-checked cases.
+    """
+    if id_col not in df.columns or date_col not in df.columns:
+        return df
+
+    out = df.copy()
+    for battle_id, iso in _EVENT_DATE_OVERRIDES.items():
+        mask = out[id_col].map(
+            lambda x: x == battle_id or (isinstance(x, list) and battle_id in x)
+        )
+        out.loc[mask, date_col] = pd.Timestamp(iso)
+
+    return out
+
+
+# Trailing day label on an event name: "(Day 2)", ", Day 2", or " Day 2".
+_EVENT_DAY_RE = re.compile(r"\s*[,(]?\s*\bday\s*(\d+)\b\s*\)?\s*$", re.IGNORECASE)
+
+
+def _split_event_day(name) -> tuple[object, Optional[int]]:
+    """
+    Split a trailing 'Day N' label off an event name.
+
+    Returns ``(clean_name, day)``. Handles the parenthesized website form
+    ("Ahon 16 (Day 2)") and the comma form from YouTube descriptions
+    ("Gubat 12, Day 1"). If there is no day label, ``day`` is None and the name
+    is returned trimmed (non-strings pass through untouched).
+    """
+    if not isinstance(name, str):
+        return (name, None)
+    m = _EVENT_DAY_RE.search(name)
+    if not m:
+        return (name.strip(), None)
+    clean = name[: m.start()].strip()
+    return (clean, int(m.group(1)))
+
+
+def normalize_event_day(
+    df: pd.DataFrame,
+    name_col: str = "event_name",
+    desc_col: str = "description",
+    date_col: str = "event_date",
+) -> pd.DataFrame:
+    """
+    Standardize multi-day event names and resolve per-day event dates.
+
+    Two things happen:
+
+      1. A trailing 'Day N' label is stripped from ``event_name`` (so
+         "Ahon 16 (Day 1)" and "Ahon 16 (Day 2)" both become "Ahon 16"), and the
+         day number is recorded in a new ``event_day`` column (``<NA>`` for
+         single-day events).
+
+      2. The date is corrected for the common source bug where a multi-day event
+         page carries a *range* ("December 13-14, 2025") on every day's entry, so
+         both Day 1 and Day 2 ended up pinned to the range's first day. When an
+         event's date currently equals the range start, it is moved to the N-th
+         day of the range (``start + (N-1)`` days, clamped to the range end).
+
+    Only dates that are currently pinned to the range start are touched, so rows
+    that already carry a correct per-day date (a single date in the source) and
+    rows with no date (e.g. COVID-era ``NaT``) are left exactly as they are.
+
+    Must run *after* ``apply_manual_event_location_overrides``, whose keys still
+    reference the day-suffixed event names.
+    """
+    if name_col not in df.columns:
+        return df
+
+    out = df.copy()
+
+    split = out[name_col].map(_split_event_day)
+    out[name_col] = split.map(lambda pair: pair[0])
+    out["event_day"] = split.map(lambda pair: pair[1]).astype("Int64")
+
+    if desc_col not in out.columns or date_col not in out.columns:
+        return out
+
+    def _resolve_date(row):
+        day = row["event_day"]
+        current = row[date_col]
+        if pd.isna(day) or pd.isna(current):
+            return current
+
+        start_iso, end_iso = _parse_event_date_range(row[desc_col])
+        if not start_iso:
+            return current
+
+        start = pd.Timestamp(start_iso)
+        # Only adjust dates still pinned to the range start (the first-day bug);
+        # a date that already differs has been correctly disambiguated.
+        if current != start:
+            return current
+
+        span = max((pd.Timestamp(end_iso) - start).days, 0)
+        offset = min(int(day) - 1, span)
+        return start + pd.Timedelta(days=offset)
+
+    out[date_col] = out.apply(_resolve_date, axis=1)
+    return out
+
 
 # ---------------------------------------------------------------------------
 # V. Mid level stage functions
@@ -1096,6 +1260,8 @@ def finalize_battles(
       - sort by upload_date (newest first)
       - drop yt_raw_title helper
       - apply a couple of manual location fixes
+      - normalize multi-day event names + per-day dates (adds event_day)
+      - pin event_date for battles whose YouTube description mis-dates them
       - select and order the final columns
     """
     work = df_with_meta.copy()
@@ -1137,9 +1303,20 @@ def finalize_battles(
     battles = battles.drop(columns=["yt_raw_title"], errors="ignore")
 
     # 7) Apply manual event_location fixes you had in the notebook
+    #    (must precede normalize_event_day, which strips the '(Day N)' suffix
+    #    these overrides key on).
     battles = apply_manual_event_location_overrides(battles)
 
-    # 8) Select and order final columns (keep only those that exist)
+    # 8) Standardize multi-day event names ("Ahon 16 (Day 2)" -> "Ahon 16",
+    #    event_day=2) and resolve the per-day event_date from the description's
+    #    date range.
+    battles = normalize_event_day(battles)
+
+    # 9) Pin event_date for battles whose YouTube description mis-dates them
+    #    (website-authoritative hand fixes).
+    battles = apply_manual_event_date_overrides(battles)
+
+    # 10) Select and order final columns (keep only those that exist)
     final_cols = [
         "id",
         "title",
@@ -1151,6 +1328,7 @@ def finalize_battles(
         "emcee2",
         "matchup",
         "event_name",
+        "event_day",
         "event_date",
         "event_location",
         "url",

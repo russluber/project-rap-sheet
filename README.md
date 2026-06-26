@@ -26,8 +26,9 @@ The main output is a cleaned `df_battles` table with one row per battle, includi
 | `emcee1` | string | Name of the first emcee in the battle (canonicalized) |
 | `emcee2` | string | Name of the second emcee in the battle (canonicalized) |
 | `matchup` | string | Cleaned and standardized `emcee1 vs emcee2` |
-| `event_name` | string | Name of the FlipTop event the battle took place in |
-| `event_date` | datetime | When the FlipTop event took place. Missing (`null`) for COVID-era events — see note below. |
+| `event_name` | string | Name of the FlipTop event the battle took place in (standardized — a `(Day N)` suffix is stripped) |
+| `event_day` | Int64 | For multi-day events, which day this battle was on (1/2/3…). `<NA>` for single-day events. |
+| `event_date` | datetime | The day the battle actually took place. Missing (`null`) for COVID-era events — see note below. |
 | `event_location` | string | Location of where the battle took place |
 | `url`| string | Link to the battle. A list of URLs for multi-part uploads. |
 
