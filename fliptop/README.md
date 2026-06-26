@@ -1,4 +1,4 @@
-# fliptop
+# FlipTop
 
 The core Python package for Project Rap Sheet. It implements the reproducible
 pipeline that turns raw FlipTop data into a clean, **one-row-per-battle** table

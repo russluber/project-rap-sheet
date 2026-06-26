@@ -1,4 +1,4 @@
-# notebooks
+# Notebooks
 
 This is a document where project assumptions, ideas, and tasks live. A journal of sorts to document the process.
 
