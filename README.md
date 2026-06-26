@@ -106,8 +106,9 @@ pip install -e ".[analysis]"  # + notebook/analysis stack (plotting, lifelines, 
 The whole pipeline is wrapped in a single command, `fliptop-refresh`:
 
 ```bash
-fliptop-refresh            # rebuild processed outputs from existing raw data
-fliptop-refresh --fetch    # fetch fresh raw data (YouTube + web) first, then rebuild
+fliptop-refresh                        # rebuild processed outputs from existing raw data
+fliptop-refresh --fetch                # fetch fresh raw data (YouTube + web) first, then rebuild
+fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (faster), then rebuild
 ```
 
 - The default (no flags) is fast, deterministic, and needs no network or API
@@ -116,6 +117,10 @@ fliptop-refresh --fetch    # fetch fresh raw data (YouTube + web) first, then re
 - `--fetch` first runs the two collection scripts in `scripts/` to refresh the
   raw data (this needs a YouTube API key — see `data/README.md`), then rebuilds.
   Override the channel or scrape years with `--channel`, `--start`, `--end`.
+- `--fetch` re-scrapes the whole FlipTop site (2010 → now) by default;
+  `--events-since YEAR` instead scrapes only recent events and **merges** them
+  into the existing data — much faster for routine top-ups. See
+  `scripts/README.md` for the trade-off.
 
 Under the hood the command runs three stages — fetch YouTube uploads, scrape
 FlipTop event metadata, then build the cleaned tables. You can also drive these

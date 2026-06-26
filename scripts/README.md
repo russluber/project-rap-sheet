@@ -36,9 +36,19 @@ fliptop-refresh --fetch    # fetch both raw sources, then rebuild df_battles + e
 fliptop-refresh            # rebuild only, from the raw data already on disk (no network)
 ```
 
+By default `--fetch` does a **full** website re-scrape (2010 → now), which is
+slow. For routine updates use the **incremental** form, which only scrapes
+recent years and *merges* them into the existing events CSV:
+
+```bash
+fliptop-refresh --fetch --events-since 2025   # scrape just 2025→now, merge, rebuild
+```
+
+(The YouTube fetch is always incremental — it only pulls videos you don't have
+yet — so the `--events-since` flag only changes the website scrape.)
+
 Run a script **directly** only when you want finer control — e.g. re-scraping a
-single year, pointing at a different channel, or writing to a scratch path. Both
-scripts are **incremental / idempotent**, so re-running them is safe.
+single year, pointing at a different channel, or writing to a scratch path.
 
 The end-to-end flow they fit into:
 
@@ -124,10 +134,26 @@ No API key needed — it's plain HTML scraping with `requests` + `BeautifulSoup`
 | `--request-sleep` | | `0.7` | base backoff inside the retry loop |
 | `--timeout` | | `30` | per-request timeout (seconds) |
 | `--quiet` | | off | reduce logging |
+| `--merge` | | off | **upsert** scraped rows into the existing CSV (by `video_id`) instead of overwriting it |
+| `--skip-known` | | off | skip event pages whose name is already in the CSV (past years only; current year always re-scraped). Requires `--merge` |
 
 ```bash
+# full overwrite (clean, reproducible — the default)
 python scripts/fetch_events_metadata_from_fliptop_web.py --start 2010 --end 2026
+
+# incremental — only recent years, merged into the existing CSV
+python scripts/fetch_events_metadata_from_fliptop_web.py \
+    --start 2025 --end 2026 --merge --skip-known
 ```
+
+**Overwrite vs. merge.** The default overwrites the CSV with exactly what the
+scrape found — a clean, reproducible full rebuild, but slow over all years, and
+if the site is down mid-run it can drop events you'd already captured. `--merge`
+upserts instead (keyed by `video_id`), so events outside the scraped range
+survive untouched and a narrowed `--start` is safe. The trade-off: merged data
+is path-dependent and stale rows (a matchup removed from a page) linger — so run
+a plain full overwrite periodically to reconcile. `fliptop-refresh
+--events-since YEAR` bundles `--start YEAR --merge --skip-known` for you.
 
 **Output** → [`data/raw/matchup_events_metadata.csv`](../data/raw/):
 

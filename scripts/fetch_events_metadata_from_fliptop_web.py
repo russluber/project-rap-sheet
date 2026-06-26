@@ -15,9 +15,20 @@ The output is a tidy CSV with one row per matchup:
 
     matchup, event_name, event_description, video_id
 
+By default the output CSV is overwritten with exactly what the scrape found
+(a clean, reproducible full rebuild). Pass --merge to instead upsert the scraped
+rows into the existing CSV by video_id, and --skip-known to avoid re-fetching
+event pages already recorded (past years only) - together these make a narrowed
+year range a fast, safe incremental update.
+
 Usage (from repo root):
 
+    # full overwrite scrape
     python scripts/fetch_events_metadata_from_fliptop_web.py --start 2010 --end 2026
+
+    # incremental: only recent years, merged into the existing CSV
+    python scripts/fetch_events_metadata_from_fliptop_web.py \\
+        --start 2025 --end 2026 --merge --skip-known
 """
 
 import time
@@ -25,6 +36,7 @@ import os
 import re
 import json
 import argparse
+from datetime import date
 from urllib.parse import urljoin
 from typing import Optional
 
@@ -271,6 +283,7 @@ def scrape_year(
     year: int,
     *,
     rename_map: Optional[dict] = None,
+    skip_event_names: Optional[set] = None,
     sleep: float = 0.6,
     base: str = DEFAULT_BASE,
     headers: Optional[dict] = DEFAULT_HEADERS,
@@ -285,7 +298,9 @@ def scrape_year(
     Returns a DataFrame with columns:
         matchup, event_name, event_description, video_id
 
-    If nothing is found, returns an empty DataFrame with that schema.
+    If ``skip_event_names`` is given, event pages whose listing-card name is
+    already in that set are not fetched (incremental scraping). If nothing is
+    found, returns an empty DataFrame with the schema above.
     """
     session = requests.Session()
     out_rows: list[dict] = []
@@ -300,10 +315,14 @@ def scrape_year(
         timeout=timeout,
     )
 
+    found = len(links)
+    links = _filter_known_links(links, skip_event_names)
     if verbose:
-        print(f"{year}: found {len(links)} event pages")
+        skipped = found - len(links)
+        suffix = f" ({skipped} already known, skipped)" if skipped else ""
+        print(f"{year}: found {found} event pages, scraping {len(links)}{suffix}")
 
-    for _, event_url in links:
+    for _event_name, event_url in links:
         try:
             out_rows.extend(
                 parse_event_live(
@@ -331,6 +350,7 @@ def scrape_years(
     year_end_inclusive: int,
     *,
     rename_map: Optional[dict] = None,
+    known_event_names: Optional[set] = None,
     base: str = DEFAULT_BASE,
     headers: Optional[dict] = DEFAULT_HEADERS,
     sleep: float = 0.6,
@@ -344,16 +364,24 @@ def scrape_years(
 
     Schema is guaranteed to be:
         matchup, event_name, event_description, video_id
+
+    If ``known_event_names`` is given, already-known events are skipped - but
+    only for years strictly before the current calendar year. The current year
+    is always fully re-scraped, so battles uploaded late to a recent event are
+    still picked up.
     """
     frames: list[pd.DataFrame] = []
+    current_year = date.today().year
 
     for y in range(year_start, year_end_inclusive + 1):
         if verbose:
             print(f"Scraping {y}...")
+        skip = known_event_names if (known_event_names is not None and y < current_year) else None
         frames.append(
             scrape_year(
                 y,
                 rename_map=rename_map,
+                skip_event_names=skip,
                 sleep=sleep,
                 base=base,
                 headers=headers,
@@ -386,6 +414,82 @@ def write_events_to_csv(df: pd.DataFrame, output_path: str) -> None:
     )
     df.to_csv(output_path, index=False, encoding="utf-8")
     print(f"Wrote {len(df)} rows to {output_path}")
+
+
+# ---------------------------------------------------------------------
+# Incremental helpers: merge into an existing CSV, skip already-known events
+# ---------------------------------------------------------------------
+
+EVENT_COLS = ["matchup", "event_name", "event_description", "video_id"]
+
+
+def _existing_event_names(path: str) -> set:
+    """Event names already present in an events CSV (empty set if none/unreadable)."""
+    if not os.path.exists(path):
+        return set()
+    try:
+        existing = pd.read_csv(path)
+    except Exception:
+        return set()
+    if "event_name" not in existing.columns:
+        return set()
+    return set(existing["event_name"].dropna().astype(str))
+
+
+def _filter_known_links(links: list, skip_event_names: Optional[set]) -> list:
+    """Drop ``(event_name, url)`` links whose event name is already known."""
+    if not skip_event_names:
+        return links
+    return [(name, url) for name, url in links if name not in skip_event_names]
+
+
+def _has_video_id(series: pd.Series) -> pd.Series:
+    """Boolean mask of rows whose video_id is a usable, non-empty value."""
+    s = series.astype("string").str.strip()
+    mask = s.notna() & (s != "") & (s.str.lower() != "nan")
+    return mask.fillna(False).astype(bool)
+
+
+def _merge_event_frames(existing: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+    """
+    Upsert ``new`` scraped rows into ``existing``, keyed by ``video_id``.
+
+    Rows that carry a video_id replace any existing row with the same id (the
+    newly scraped row wins); rows without a video_id (the scraper could not find
+    the embed) are kept from both sides and exact-deduplicated. Events outside
+    the scraped range therefore survive untouched - this is what makes a
+    narrowed-range scrape safe.
+    """
+    existing = existing.reindex(columns=EVENT_COLS)
+    new = new.reindex(columns=EVENT_COLS)
+
+    e_mask = _has_video_id(existing["video_id"])
+    n_mask = _has_video_id(new["video_id"])
+
+    keyed = (
+        pd.concat([existing[e_mask], new[n_mask]], ignore_index=True)
+        .drop_duplicates(subset="video_id", keep="last")
+    )
+    unkeyed = pd.concat(
+        [existing[~e_mask], new[~n_mask]], ignore_index=True
+    ).drop_duplicates()
+
+    return pd.concat([keyed, unkeyed], ignore_index=True)
+
+
+def merge_events_into_csv(df: pd.DataFrame, output_path: str) -> None:
+    """
+    Merge scraped events into an existing CSV instead of overwriting it.
+
+    Upserts by ``video_id`` (see ``_merge_event_frames``). If the file does not
+    exist yet this is identical to ``write_events_to_csv``.
+    """
+    if not os.path.exists(output_path):
+        write_events_to_csv(df, output_path)
+        return
+    existing = pd.read_csv(output_path)
+    merged = _merge_event_frames(existing, df)
+    write_events_to_csv(merged, output_path)
 
 
 # ---------------------------------------------------------------------
@@ -482,10 +586,31 @@ def main() -> None:
         help="Reduce logging.",
     )
 
+    parser.add_argument(
+        "--merge",
+        action="store_true",
+        help="Merge scraped rows into the existing output CSV (upsert by "
+             "video_id) instead of overwriting it. Safe for narrowed year ranges.",
+    )
+
+    parser.add_argument(
+        "--skip-known",
+        action="store_true",
+        help="Skip fetching event pages whose name is already in the output CSV "
+             "(past years only; the current year is always re-scraped). Requires "
+             "--merge.",
+    )
+
     args = parser.parse_args()
 
     if args.start > args.end:
         raise SystemExit("Error: --start must be <= --end")
+
+    if args.skip_known and not args.merge:
+        raise SystemExit(
+            "Error: --skip-known requires --merge (otherwise the overwrite would "
+            "drop every event that was skipped)."
+        )
 
     rename_map = _load_rename_map(args.rename_map)
 
@@ -495,10 +620,13 @@ def main() -> None:
         else DEFAULT_HEADERS
     )
 
+    known = _existing_event_names(args.output) if args.skip_known else None
+
     df = scrape_years(
         args.start,
         args.end,
         rename_map=rename_map,
+        known_event_names=known,
         base=args.base,
         headers=headers,
         sleep=args.sleep,
@@ -508,7 +636,10 @@ def main() -> None:
         verbose=not args.quiet,
     )
 
-    write_events_to_csv(df, args.output)
+    if args.merge:
+        merge_events_into_csv(df, args.output)
+    else:
+        write_events_to_csv(df, args.output)
 
 
 if __name__ == "__main__":

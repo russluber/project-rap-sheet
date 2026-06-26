@@ -324,14 +324,22 @@ fliptop-annotate --redo "A vs B" # re-annotate an existing battle (fix a mistake
 way to regenerate the processed datasets.
 
 ```bash
-fliptop-refresh            # rebuild df_battles.json + emcees.csv from existing raw data
-fliptop-refresh --fetch    # re-fetch raw data (YouTube + web) first, then rebuild
+fliptop-refresh                        # rebuild df_battles.json + emcees.csv from existing raw data
+fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first, then rebuild
+fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
 ```
 
 - `rebuild_processed()` builds `df_battles` once and writes **both** processed
   outputs from that single frame (fast, deterministic, no network).
 - `fetch_raw()` (only with `--fetch`) runs the two `scripts/` collectors as
-  subprocesses first; this needs a YouTube API key (see `data/README.md`).
+  subprocesses first; this needs a YouTube API key (see `data/README.md`). The
+  YouTube fetch is always incremental; the website events scrape is a **full
+  overwrite** (2010 → now) by default.
+- `--events-since YEAR` makes the events scrape incremental — only YEAR → now is
+  scraped and **merged** into the existing CSV (much faster for routine updates).
+  Run a plain `--fetch` periodically for a clean full reconcile. See
+  [`scripts/README.md`](../scripts/README.md) for the overwrite-vs-merge
+  trade-off.
 
 This is the recommended way to regenerate data. The Python API below is for when
 you want the table in memory or finer control.

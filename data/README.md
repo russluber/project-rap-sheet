@@ -176,14 +176,17 @@ is optional if you prefer env vars.
 ## Regenerating everything
 
 ```bash
-fliptop-refresh            # rebuild processed/ from the raw files already on disk
-fliptop-refresh --fetch    # re-scrape raw/ first (needs network + API key), then rebuild
+fliptop-refresh                        # rebuild processed/ from the raw files already on disk
+fliptop-refresh --fetch                # re-scrape raw/ first (needs network + API key), then rebuild
+fliptop-refresh --fetch --events-since 2025   # incremental events scrape (recent years only), then rebuild
 ```
 
 `processed/` is fully reproducible from `raw/` + `emcee_aliases.csv`. `raw/` is
-reproducible from the network via [`scripts/`](../scripts/). `annotations/` is
-**not** reproducible — it's hand-entered, so it's the one thing here worth
-guarding.
+reproducible from the network via [`scripts/`](../scripts/) — a full
+`--fetch` overwrites the events CSV with a clean scrape, while `--events-since`
+**merges** only recent events in (faster, but accumulates scrape history; see
+[`scripts/README.md`](../scripts/README.md)). `annotations/` is **not**
+reproducible — it's hand-entered, so it's the one thing here worth guarding.
 
 ---
 
