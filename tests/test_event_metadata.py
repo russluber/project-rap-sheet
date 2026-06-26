@@ -178,8 +178,9 @@ def test_normalize_event_day_fixes_day2_pinned_to_range_start():
         }
     )
     out = normalize_event_day(df)
+    # day suffix stripped; the day itself is not kept as a column
     assert out["event_name"].tolist() == ["Ahon 16", "Ahon 16"]
-    assert out["event_day"].tolist() == [1, 2]
+    assert "event_day" not in out.columns
     assert out["event_date"].tolist() == [
         pd.Timestamp("2025-12-13"),
         pd.Timestamp("2025-12-14"),
@@ -197,11 +198,10 @@ def test_normalize_event_day_leaves_already_disambiguated_date():
     )
     out = normalize_event_day(df)
     assert out["event_name"].iloc[0] == "Ahon 10"
-    assert out["event_day"].iloc[0] == 2
     assert out["event_date"].iloc[0] == pd.Timestamp("2019-12-14")
 
 
-def test_normalize_event_day_single_day_event_gets_na_day():
+def test_normalize_event_day_single_day_event_left_alone():
     df = pd.DataFrame(
         {
             "event_name": ["Tectonics"],
@@ -210,8 +210,9 @@ def test_normalize_event_day_single_day_event_gets_na_day():
         }
     )
     out = normalize_event_day(df)
-    assert pd.isna(out["event_day"].iloc[0])
+    assert out["event_name"].iloc[0] == "Tectonics"
     assert out["event_date"].iloc[0] == pd.Timestamp("2010-12-04")
+    assert "event_day" not in out.columns
 
 
 def test_normalize_event_day_never_unmasks_missing_date():
@@ -226,7 +227,6 @@ def test_normalize_event_day_never_unmasks_missing_date():
     )
     out = normalize_event_day(df)
     assert out["event_name"].iloc[0] == "Ahon 12"
-    assert out["event_day"].iloc[0] == 2
     assert pd.isna(out["event_date"].iloc[0])
 
 

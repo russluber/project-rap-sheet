@@ -842,15 +842,18 @@ def normalize_event_day(
     Two things happen:
 
       1. A trailing 'Day N' label is stripped from ``event_name`` (so
-         "Ahon 16 (Day 1)" and "Ahon 16 (Day 2)" both become "Ahon 16"), and the
-         day number is recorded in a new ``event_day`` column (``<NA>`` for
-         single-day events).
+         "Ahon 16 (Day 1)" and "Ahon 16 (Day 2)" both become "Ahon 16").
 
       2. The date is corrected for the common source bug where a multi-day event
          page carries a *range* ("December 13-14, 2025") on every day's entry, so
          both Day 1 and Day 2 ended up pinned to the range's first day. When an
          event's date currently equals the range start, it is moved to the N-th
          day of the range (``start + (N-1)`` days, clamped to the range end).
+
+    The day number (N) is used only internally here, to resolve the date and
+    strip the suffix; it is not kept as a column. ``event_name`` + ``event_date``
+    already specify the battle, and re-deriving the ordinal (rank of the date
+    within its event) is trivial if ever needed.
 
     Only dates that are currently pinned to the range start are touched, so rows
     that already carry a correct per-day date (a single date in the source) and
@@ -866,18 +869,16 @@ def normalize_event_day(
 
     split = out[name_col].map(_split_event_day)
     out[name_col] = split.map(lambda pair: pair[0])
-    out["event_day"] = split.map(lambda pair: pair[1]).astype("Int64")
+    days = split.map(lambda pair: pair[1])  # transient; never stored as a column
 
     if desc_col not in out.columns or date_col not in out.columns:
         return out
 
-    def _resolve_date(row):
-        day = row["event_day"]
-        current = row[date_col]
+    def _resolve_date(day, current, desc):
         if pd.isna(day) or pd.isna(current):
             return current
 
-        start_iso, end_iso = _parse_event_date_range(row[desc_col])
+        start_iso, end_iso = _parse_event_date_range(desc)
         if not start_iso:
             return current
 
@@ -891,7 +892,10 @@ def normalize_event_day(
         offset = min(int(day) - 1, span)
         return start + pd.Timedelta(days=offset)
 
-    out[date_col] = out.apply(_resolve_date, axis=1)
+    out[date_col] = [
+        _resolve_date(day, current, desc)
+        for day, current, desc in zip(days, out[date_col], out[desc_col])
+    ]
     return out
 
 
@@ -1260,7 +1264,7 @@ def finalize_battles(
       - sort by upload_date (newest first)
       - drop yt_raw_title helper
       - apply a couple of manual location fixes
-      - normalize multi-day event names + per-day dates (adds event_day)
+      - normalize multi-day event names + resolve per-day dates
       - pin event_date for battles whose YouTube description mis-dates them
       - select and order the final columns
     """
@@ -1307,9 +1311,8 @@ def finalize_battles(
     #    these overrides key on).
     battles = apply_manual_event_location_overrides(battles)
 
-    # 8) Standardize multi-day event names ("Ahon 16 (Day 2)" -> "Ahon 16",
-    #    event_day=2) and resolve the per-day event_date from the description's
-    #    date range.
+    # 8) Standardize multi-day event names ("Ahon 16 (Day 2)" -> "Ahon 16") and
+    #    resolve the per-day event_date from the description's date range.
     battles = normalize_event_day(battles)
 
     # 9) Pin event_date for battles whose YouTube description mis-dates them
@@ -1328,7 +1331,6 @@ def finalize_battles(
         "emcee2",
         "matchup",
         "event_name",
-        "event_day",
         "event_date",
         "event_location",
         "url",

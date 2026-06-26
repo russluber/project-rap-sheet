@@ -23,7 +23,6 @@ EXPECTED_COLUMNS = [
     "emcee2",
     "matchup",
     "event_name",
-    "event_day",
     "event_date",
     "event_location",
     "url",
