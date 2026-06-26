@@ -1,142 +1,258 @@
 # Notebooks
 
-This is a document where project assumptions, ideas, and tasks live. A journal of sorts to document the process.
+This folder is part **working notebooks**, part **journal**. The journal below is
+where project assumptions, decisions, and open tasks live — a running record of
+*why* the data looks the way it does. The notebooks themselves are exploratory;
+the reusable logic they settle on gets promoted into the
+[`fliptop`](../fliptop/) package.
 
-## Research Question
+> Notebooks *import* `fliptop`; they don't reimplement it. If something here
+> hardens into pipeline logic, it belongs in the package, not in a cell.
 
-The central question of this project revolves around FlipTop battle rap careers and their length.
+---
 
-> How long does a career in the Philippines' premier rap battle league FlipTop last?
+## Contents
 
-Who rises to the top? What determines who stays relevant over the years?
+- [Notebooks in this folder](#notebooks-in-this-folder)
+- [Research questions](#research-questions)
+- [What counts as a rap battle?](#what-counts-as-a-rap-battle)
+- [Keywords for inclusion / exclusion](#keywords-for-inclusion--exclusion)
+- [One-versus-one only](#one-versus-one-only)
+- [Dealing with aliases](#dealing-with-aliases)
+- [Standardizing emcee names](#standardizing-emcee-names)
+- [COVID-era event dates — ONGOING](#covid-era-event-dates--ongoing)
+- [Further-down-the-line questions](#further-down-the-line-questions)
 
-Here I'm thinking survival (time-to-event) analysis.
+---
 
-Another question I'm curious about is this:
-> Who has battled who? And what matchups haven't been done yet?
+## Notebooks in this folder
 
-I'm picturing a graph here. I want to understand how dense or sparse the network of rap battles are in FlipTop.
+| notebook | what it's for | status |
+| -------- | ------------- | ------ |
+| `wrangling.ipynb` | Loads `df_battles`, explores `event_name` / `event_location`, and is where the **COVID-era date & location sleuthing** actually happens (gathering month/year estimates and venue leads from external sources). | active scratchpad |
+| `imputation.ipynb` | An attempt to *infer* missing COVID-era `event_date`s from signals like `event_name` seasonality and `upload_date` lag. | abandoned — see below |
 
-Ideas:
-- Emcees are nodes
-- "Battled" as edges
-- Weight of the edge is how many times they've battled?
+> On `imputation.ipynb`, in my own words: *"This went nowhere honestly. Just an
+> artifact of something I tried to do."* The idea was to exploit the seasonality
+> of recurring FlipTop events to narrow down when the quarantine events happened.
+> It turned out less helpful than hoped — **external sources are still the better
+> bet** for recovering these dates. Kept around as a record of what I tried.
 
+---
 
-While the majority of the videos posted on the [FlipTop YouTube channel](https://www.youtube.com/@fliptopbattles) are rap battles, a number of them are video flyers, announcement videos, behind-the-scenes content, reaction videos, and the like. As such, it's important to filter out these videos so that we're left to analyze the data from the **rap battles** alone.
+## Research questions
 
-### But what constitutes a **rap battle**?
+The central question is about **FlipTop battle-rap careers and their length**:
 
-Good question.
+> How long does a career in the Philippines' premier rap battle league FlipTop
+> last?
 
-My criteria for what is considered a rap battle for the purposes of this project:
-1. The video needs to be *a capella* (no underlying beat to accompany emcees rapping).
-2. The video involves emcees performing written material (not all of their rounds are off-the-top freestyle). 
-    - The early days of FlipTop saw emcees testing each other's skills in the artform known as off-the-top freestyle, where emcees would take turns berating each other lyrically with material they thought of on the spot or in the moment of speaking. 
-3. To a lesser extent, the video needs to involve judging at the end (there needs to be stakes).
+Who rises to the top? What determines who stays relevant over the years? I'm
+thinking **survival (time-to-event) analysis** here.
 
-Note:
-- **By these criteria, earlier videos of FlipTop wouldn't be included. Need explanation for what I'm doing here.**
-    - I've changed my mind on this. I've included them alongside the freestyle battles whether a capella or with a beat.
-    - Actually, no. I include the freestyle,a capella battles from the early days but not the freestyle battles with accompanying beats.
+A second question is about the **shape of the rivalry network**:
 
+> Who has battled whom? And which matchups haven't happened yet?
 
+I'm picturing a graph, and want to understand how dense or sparse FlipTop's
+battle network is:
 
-### Keywords for Exclusion
-As a long-time viewer of these videos, there's a couple key words that makes filtering with these criteria in mind easier. 
-- Include:
-    - **vs** - most, if not all, of the a capella rap battles in the FlipTop YouTube channel have "vs" in the video title. 
-        - For the uninitiated: "vs" is short for "versus." 
-- Exclude:
-    - **tryout** - while these are battles, they are for the newcomers to the scene and is often not judged, especially in older videos.
-    - **beatbox** - this is another genre of battle separate from the a capella, judged battles.
-    - **flyer** and **promo** - these are advertisements and announcement videos for upcoming events.
-    - **Anygma Machine** - Anygma, the head of FlipTop as a company, sometimes reviews battles and gives his take on upcoming matches.
-        - A reference to the real [Enigma Machine](https://en.wikipedia.org/wiki/Enigma_machine) that the allies had to break in WW2.
-   - **[LIVE]** - live performances from the FlipTop Festival event that happened in 2020.
-   - **UnggoYan** - Emcees read comments left on videos of their previous battles
-   - **Pre-Battle Interviews** - self-explanatory
-   - **Salitang Ugat** - translation: "root word." These are interviews of notable emcees who tell the stories behind how they came up with their rap battle name.
-   - **Trailer** - promo video trailer for upcomming events
-   - **Video Flyer** - self-explanatory
-   - **Silip** - BTS videos added recently
-   - **Sound Check** - Pre-event check in with FlipTop event prep stuff
-   - **Tribute** - tribute to dead rappers
-   - **Tutok** - other BTS videos?
-   - **Abangan** - clips
+- **Nodes** — emcees
+- **Edges** — "has battled"
+- **Edge weight** — how many times the two have battled
 
-For the scope of this project, I will only consider the battles that are between two people. FlipTop has a variety of rap battle formats, not just two people insulting each other back and forth. Examples include: 
-- Royal Rumble (1v1v1v1v1)
-- 5 on 5,
-- Tag-team 2 vs 2 (Dos Por Dos) matches. 
+(The network is built in [`fliptop.structures`](../fliptop/structures.py).)
 
-The vast majority of the battles, though, are one versus one. Those battles will be the focus of this project.
+---
 
+## What counts as a rap battle?
 
+Most videos on the [FlipTop YouTube channel](https://www.youtube.com/@fliptopbattles)
+are rap battles, but plenty are video flyers, announcements, behind-the-scenes
+clips, reaction videos, and so on. To analyze *battles*, those have to be
+filtered out first.
 
-### Dealing with Aliases
-What to do about well-known emcees that have battled under aliases (not their usually emcee names)?
-- Poison13 as Markong Bungo
-- Tipsy D as Freak Sanchez
-- Goriong Talas as Ghostly
-- Emar Industriya as No. 144
-- Sayadd as Carlito
-- GL as 1ce Water
+My criteria for what counts as a rap battle for this project:
 
-I've decided to do away with these gimmick aliases. At the end of the day, what I'm interested in is the careers of the *people* behind the personas. So I will count these battles as battles under their main emcee names. Not the aliases.
+1. The video is **a cappella** (no underlying beat behind the emcees).
+2. The emcees perform **written material** (not purely off-the-top freestyle).
+   - The early days of FlipTop were more about testing each other with
+     off-the-top freestyle — emcees trading insults with material thought up on
+     the spot.
+3. To a lesser extent, the battle is **judged** at the end (there are stakes).
 
-### Standardizing Emcee Names 
-Sometimes, the naming of emcees in the video titles are inconsistent. For data analysis purposes, it's important that the names of the emcees are consistent across data points.
+> **A note on the early videos — a decision that evolved.**
+> By these criteria, some of FlipTop's earliest videos wouldn't qualify.
+> - First I leaned toward including them all, a cappella or with a beat.
+> - **Where I landed:** include the early **a cappella** freestyle battles, but
+>   **not** the freestyle battles that have an accompanying beat.
 
-An outline of how I standardized the names:
-- I took each emcee's most recent name if they had more than one spelling of their name or if they renamed themselves over time.
-- Aesthetically speaking, I arbitrarily picked whichever name looks more appealing to me e.g. "Daddy Joe D" vs "Daddie Joe D" vs "DaddieJoe D"
-- I cross-referenced less well-known emcees who have changed their names over the years by comparing faces across the videos.
-- `rename_map.py` is where these renaming conventions are formalized.
+This filtering is implemented in [`fliptop.battles`](../fliptop/battles.py) — see
+the [pipeline write-up](../fliptop/README.md#stage-1--clean-youtube-uploads--1v1-uploads)
+for exactly where rows get dropped.
 
+---
 
-### Actual Event Dates for COVID-era Battles -- ONGOING task
+## Keywords for inclusion / exclusion
 
-- Go back to before all this analysis and extract dates for actual event dates of the battles.
-- Hard task.
-- But also: The battle being uploaded to YouTube is *part* of the battlers' careers. It's like their music videos releasing after the audio has been released months before. So technically maybe we don't *need* to do all that very tricky text extraction and NLP.
+As a long-time viewer, I know a handful of title keywords that make filtering
+against the criteria above much easier. These back the `EXCLUDE_KEYWORDS` list
+and the `vs` filter in [`fliptop.battles`](../fliptop/battles.py).
 
-All COVID-era battles don't have `event_date`s to them. Obfuscated. In YouTube video descriptions as well as the FlipTop website, COVID-era battles have implausible `event_date`s and made-up `event_location`s.
+**Include**
 
-Events that I need to find actual dates for:
-1. Second Sight 8
-2. Unibersikulo 8
-3. Zoning 10
-4. Bwelta Balentong 7 (Day 1, Day 2)
-5. Ahon 11 (Day 1, Day 2)
-6. Grain Assault 11
-7. Second Sight 9
-8. Zoning 11
-9. Bwelta Balentong 8
-10. Zoning 12
-11. Unibersikulo 9
-12. Zoning 13
-13. Unibersikulo 10
-14. Ahon 12 (Day 1, Day 2)
+| keyword | why |
+| ------- | --- |
+| **vs** | Nearly every a cappella battle on the channel has "vs" (short for *versus*) in the title. |
 
-Second Sight 8 was the first event that happened during the COVID era. The last event in the COVID era was Ahon 12. Info here:
-- https://www.fliptop.com.ph/articles/an-unforgettable-second-sight-8
+**Exclude**
 
-Need to get `event_location` and `event_date` for COVID-era battles from external sources.
+| keyword | why it's not a 1v1 judged battle |
+| ------- | -------------------------------- |
+| **tryout** | Newcomer tryouts — often unjudged, especially in older videos. |
+| **beatbox** | A separate genre from the a cappella judged battles. |
+| **flyer** / **promo** | Advertisements and announcement videos for upcoming events. |
+| **Anygma Machine** | Anygma (FlipTop's head) reviewing battles / previewing matches. A nod to the WW2 [Enigma machine](https://en.wikipedia.org/wiki/Enigma_machine). |
+| **[LIVE]** | Live performances from the 2020 FlipTop Festival. |
+| **UnggoYan** | Emcees reacting to comments on their past battles. |
+| **Pre-Battle Interviews** | Self-explanatory. |
+| **Salitang Ugat** | "Root word" — interviews on how emcees came up with their battle names. |
+| **Trailer** | Promo trailers for upcoming events. |
+| **Video Flyer** | Self-explanatory. |
+| **Silip** | Recently-added behind-the-scenes videos. |
+| **Sound Check** | Pre-event check-ins with FlipTop event prep. |
+| **Tribute** | Tributes to rappers who've passed. |
+| **Tutok** | Other behind-the-scenes videos. |
+| **Abangan** | Teaser clips. |
 
-Possible avenues:
-- Contact FlipTop directly?
-- Emcee posts from COVID-era on FB?
+---
 
+## One-versus-one only
 
-### Further-down-the-line questions
-- One on one career statistics for each battler?
-- Make the project webpage? Graph explorer via D3.
-- Need more survival analysis stuff to try and find out.
+This project considers only battles **between two people**. FlipTop runs several
+formats beyond the classic 1v1, for example:
 
-Some questions I'm interested in:
-- Which emcees have had the biggest comebacks?
-- Basic stuff like most viewed battler.
-- Correlation between length of career and views over time? Do emcees get popular over time or something?
-- Winstreaks? Maybe I could manually go through each video and add another col to who won? Who has the longest winstreak?
+- **Royal Rumble** (1v1v1v1v1)
+- **5-on-5**
+- **Tag-team 2-vs-2** (Dos Por Dos)
 
+The vast majority of battles are one-on-one, and those are the focus. (The
+multi-emcee formats are dropped by the `keep_1v1` filter in the pipeline.)
+
+---
+
+## Dealing with aliases
+
+Some well-known emcees have battled under gimmick aliases rather than their usual
+names:
+
+| usual name | alias |
+| ---------- | ----- |
+| Poison13 | Markong Bungo |
+| Tipsy D | Freak Sanchez |
+| Goriong Talas | Ghostly |
+| Emar Industriya | No. 144 |
+| Sayadd | Carlito |
+| GL | 1ce Water |
+
+I've decided to **do away with these gimmick aliases**. What I care about is the
+careers of the *people* behind the personas, so I count these battles under each
+emcee's main name, not the alias.
+
+---
+
+## Standardizing emcee names
+
+Emcee names in the video titles are sometimes inconsistent. For analysis, the
+names need to be consistent across data points. How I standardized them:
+
+- For an emcee with multiple spellings or a rename over time, I took their **most
+  recent** name.
+- For purely aesthetic ties, I arbitrarily picked whichever looked best to me —
+  e.g. "Daddy Joe D" vs "Daddie Joe D" vs "DaddieJoe D".
+- For lesser-known emcees who changed names, I **cross-referenced faces** across
+  videos to confirm they were the same person.
+
+These conventions are formalized in
+[`fliptop.rename_map`](../fliptop/rename_map.py) and the mapping itself lives in
+[`data/emcee_aliases.csv`](../data/emcee_aliases.csv).
+
+---
+
+## COVID-era event dates — ONGOING
+
+All COVID-era ("quarantine") battles are missing `event_date`. FlipTop
+**obfuscated** these — both the YouTube descriptions and the FlipTop website carry
+implausible dates and made-up locations, presumably to avoid scrutiny while
+[quarantine lockdowns](https://en.wikipedia.org/wiki/Enhanced_community_quarantine_in_Luzon)
+were in force. Rather than record dates known to be wrong, the pipeline leaves
+`event_date` as `null` for this window.
+
+**Why bother recovering them?** Real event dates matter for estimating career
+lengths (a core goal of the project) — and it's just an interesting inference
+problem. That said: the **upload** to YouTube is itself part of an emcee's career
+(like a music video dropping after the audio), so in a pinch `upload_date` is a
+serviceable stand-in.
+
+**The events that need real dates.** Second Sight 8 was the first COVID-era event
+and Ahon 12 was the last ([context here](https://www.fliptop.com.ph/articles/an-unforgettable-second-sight-8)).
+The table below collects month/year estimates I pulled from
+[Wikipedia](https://en.wikipedia.org/wiki/FlipTop_Battle_League) (**unverified**),
+gathered in `wrangling.ipynb`:
+
+| # | event | estimate (unverified) |
+| - | ----- | --------------------- |
+| 1 | Second Sight 8 | not listed |
+| 2 | Unibersikulo 8 | not listed |
+| 3 | Zoning 10 | July 2020 |
+| 4 | Bwelta Balentong 7 (Day 1) | October 2020 |
+| 5 | Bwelta Balentong 7 (Day 2) | October 2020 |
+| 6 | Ahon 11 (Day 1) | October 2020 |
+| 7 | Ahon 11 (Day 2) | October 2020 |
+| 8 | Grain Assault 11 | May 2021 |
+| 9 | Second Sight 9 | June 2021 |
+| 10 | Zoning 11 | June 2021 |
+| 11 | Bwelta Balentong 8 | June 2021 |
+| 12 | Zoning 12 | July 2021 |
+| 13 | Unibersikulo 9 | September 2021 |
+| 14 | Zoning 13 | October 2021 |
+| 15 | Unibersikulo 10 | November 2021 |
+| 16 | Ahon 12 (Day 1) | December 2021 |
+| 17 | Ahon 12 (Day 2) | December 2021 |
+
+Second Sight 8 and Unibersikulo 8 aren't listed anywhere. As a backstop: the
+FlipTop Festival was February 7–8, 2020, and Zoning 10 lands ~July 2020 — so
+those two events most likely fall between **late February and June 2020**.
+
+**Leads being chased** (source links tracked in `wrangling.ipynb`):
+
+- Quarantine-battle and event posters on Facebook (Second Sight 8, Unibersikulo
+  8, the Quarantine Battles series).
+- Emcee posts pinning specific dates — e.g. K-Ram dating Bwelta Balentong 7 to
+  **October 24, 2020**.
+- **Locations** are partly recovered too: the quarantine venue "Baraks" (CIFRA
+  Building, Boni Ave, Mandaluyong) → normalize to *FlipTop Baraks, Mandaluyong
+  City*; and **Ahon 12** at *Jenerick Resort, Tanauan City, Batangas*.
+
+**Other avenues** if the above stalls: contacting FlipTop directly, or
+COVID-era emcee posts on Facebook.
+
+---
+
+## Further-down-the-line questions
+
+Ideas to revisit once the core dataset is solid:
+
+- Per-emcee one-on-one career statistics.
+- A project webpage — a battle-network explorer (maybe D3 over the graph).
+- More survival-analysis angles on career length.
+
+And some questions I'm curious about:
+
+- Which emcees have had the **biggest comebacks**?
+- The basics — e.g. most-viewed battler.
+- Does **career length correlate with views** over time? Do emcees get more
+  popular the longer they last?
+- **Win streaks** — now that battle results are recorded
+  ([`battle_results.csv`](../data/annotations/battle_results.csv) via
+  `fliptop-annotate`), who has the longest?
