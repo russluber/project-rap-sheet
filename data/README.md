@@ -9,7 +9,8 @@ data/
 ├── emcee_aliases.csv      # hand-maintained alias → canonical name map
 ├── raw/                   # original scraped sources (input to the pipeline)
 │   ├── youtube_videos.json
-│   └── matchup_events_metadata.csv
+│   ├── matchup_events_metadata.csv
+│   └── versetracker_event_dates.csv   # COVID-era event dates (date-imputation reference)
 ├── processed/             # clean tables built by the fliptop package
 │   ├── df_battles.json
 │   └── emcees.csv
@@ -95,6 +96,26 @@ linking each matchup to its event and YouTube video id. Written by
 | `event_description` | `FlipTop presents: Tectonics @ … Dec. 4, 2010. …` | the pipeline parses event **date** and **location** out of this text |
 | `video_id` | `5BiDPaDZHzo` | YouTube id (joins to `youtube_videos.json` `id`) |
 
+### `versetracker_event_dates.csv`
+
+A small reference table of **COVID-era event dates** recovered from
+[VerseTracker](https://versetracker.com/battles/fliptop), used to fill the
+`event_date`s the pipeline otherwise leaves blank for the quarantine window (see
+[`processed/`](#processed) below). Written by
+[`fetch_versetracker_event_dates.py`](../scripts/fetch_versetracker_event_dates.py).
+Unlike the other raw files this one is **scraped on demand and committed** — the
+dates are static — rather than refreshed by `fliptop-refresh --fetch`.
+
+| column | example | notes |
+| ------ | ------- | ----- |
+| `event_name` | `Ahon 12` | base name, **no** `(Day N)` suffix |
+| `event_date` | `2021-12-08` | ISO **first-day** date (the pipeline offsets per day for multi-day events) |
+| `source_url` | `https://versetracker.com/events/fliptop-ahon-12` | the page the date came from |
+
+> ⚠️ These dates are accurate to within ~days, not exact — VerseTracker appears to
+> use the event **flyer-post** date for some events. Battles dated from this file
+> are tagged `versetracker` in `df_battles`' `event_date_source` column.
+
 ---
 
 ## `processed/`
@@ -117,9 +138,12 @@ The full column-by-column schema is documented in the
   `event_date` carries the specific day the battle happened.
 - Dates (`upload_date`, `event_date`) are stored as **epoch milliseconds** in the
   JSON; pass `convert_dates=[…]` (or `pd.to_datetime`) when loading.
-- `event_date` is **`null` for COVID-era battles** — intentional; see the note in
-  the [root README](../README.md) and the
-  [imputation notebook](../notebooks/README.md#covid-era-event-dates--ongoing).
+- `event_date_source` tags where each date came from — `website` |
+  `description` | `versetracker` | `manual`. COVID-era ("quarantine") dates are
+  imputed from VerseTracker (tagged `versetracker`) and are approximate; slice on
+  this column for sensitivity checks. See the note in the
+  [root README](../README.md) and the
+  [imputation notebook](../notebooks/README.md#covid-era-event-dates--resolved).
 
 ### `emcees.csv`
 

@@ -27,17 +27,23 @@ The main output is a cleaned `df_battles` table with one row per battle, includi
 | `emcee2` | string | Name of the second emcee in the battle (canonicalized) |
 | `matchup` | string | Cleaned and standardized `emcee1 vs emcee2` |
 | `event_name` | string | Name of the FlipTop event the battle took place in (standardized — a `(Day N)` suffix is stripped) |
-| `event_date` | datetime | The day the battle actually took place (for multi-day events, the specific day). Missing (`null`) for COVID-era events — see note below. |
+| `event_date` | datetime | The day the battle actually took place (for multi-day events, the specific day). COVID-era dates are imputed from VerseTracker — see note below. |
+| `event_date_source` | string | Where `event_date` came from: `website`, `description`, `versetracker` (COVID-era imputation), or `manual` |
 | `event_location` | string | Location of where the battle took place |
 | `url`| string | Link to the battle. A list of URLs for multi-part uploads. |
 
 
 > **Note on COVID-era events.** FlipTop obfuscated the real dates and locations
-> of events held during the pandemic (roughly mid-2020 to early-2022), and the
+> of events held during the pandemic (roughly mid-2020 to early-2022), so the
 > YouTube/website metadata for those battles carries placeholder values. The
-> pipeline therefore leaves `event_date` empty for battles in that window rather
-> than record dates known to be wrong. Recovering the true dates from external
-> sources is a known open task, not a bug.
+> pipeline blanks those out, then **imputes** the real dates from
+> [VerseTracker](https://versetracker.com/battles/fliptop) (a third-party FlipTop
+> database) via [`scripts/fetch_versetracker_event_dates.py`](scripts/) and the
+> date-imputation step in the build. These imputed dates are accurate to within
+> ~days (VerseTracker appears to use the event flyer-post date for some events),
+> so they're flagged in the `event_date_source` column (`versetracker`) — slice
+> on it if a downstream analysis needs to treat them as approximate. See the
+> [imputation notebook journal](notebooks/README.md#covid-era-event-dates--resolved).
 
 The second objective is to analyze data about FlipTop rap battles. 
 
@@ -52,7 +58,8 @@ project-rap-sheet/
 │   ├── emcee_aliases.csv
 │   ├── raw/
 │   │   ├── youtube_videos.json
-│   │   └── matchup_events_metadata.csv
+│   │   ├── matchup_events_metadata.csv
+│   │   └── versetracker_event_dates.csv
 │   ├── processed/
 │   │   ├── df_battles.json
 │   │   └── emcees.csv
@@ -75,7 +82,8 @@ project-rap-sheet/
 ├── scripts/
 |   ├── README.md
 |   ├── fetch_youtube_channel_uploads.py
-|   └── fetch_events_metadata_from_fliptop_web.py
+|   ├── fetch_events_metadata_from_fliptop_web.py
+|   └── fetch_versetracker_event_dates.py
 ├── tests/
 ├── README.md
 ├── LICENSE

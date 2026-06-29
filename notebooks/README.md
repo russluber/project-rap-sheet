@@ -20,7 +20,7 @@ the reusable logic they settle on gets promoted into the
 - [One-versus-one only](#one-versus-one-only)
 - [Dealing with aliases](#dealing-with-aliases)
 - [Standardizing emcee names](#standardizing-emcee-names)
-- [COVID-era event dates — ONGOING](#covid-era-event-dates--ongoing)
+- [COVID-era event dates — RESOLVED](#covid-era-event-dates--resolved)
 - [Further-down-the-line questions](#further-down-the-line-questions)
 
 ---
@@ -37,6 +37,8 @@ the reusable logic they settle on gets promoted into the
 > of recurring FlipTop events to narrow down when the quarantine events happened.
 > It turned out less helpful than hoped — **external sources are still the better
 > bet** for recovering these dates. Kept around as a record of what I tried.
+> (That bet paid off: the dates are now sourced from **VerseTracker** — see
+> [COVID-era event dates](#covid-era-event-dates--resolved) below.)
 
 ---
 
@@ -179,14 +181,14 @@ These conventions are formalized in
 
 ---
 
-## COVID-era event dates — ONGOING
+## COVID-era event dates — RESOLVED
 
-All COVID-era ("quarantine") battles are missing `event_date`. FlipTop
+All 14 COVID-era ("quarantine") events were missing `event_date`. FlipTop
 **obfuscated** these — both the YouTube descriptions and the FlipTop website carry
 implausible dates and made-up locations, presumably to avoid scrutiny while
 [quarantine lockdowns](https://en.wikipedia.org/wiki/Enhanced_community_quarantine_in_Luzon)
-were in force. Rather than record dates known to be wrong, the pipeline leaves
-`event_date` as `null` for this window.
+were in force. The pipeline blanks those out (the COVID-window mask in
+`attach_event_metadata`).
 
 **Why bother recovering them?** Real event dates matter for estimating career
 lengths (a core goal of the project) — and it's just an interesting inference
@@ -194,48 +196,57 @@ problem. That said: the **upload** to YouTube is itself part of an emcee's caree
 (like a music video dropping after the audio), so in a pinch `upload_date` is a
 serviceable stand-in.
 
-**The events that need real dates.** Second Sight 8 was the first COVID-era event
-and Ahon 12 was the last ([context here](https://www.fliptop.com.ph/articles/an-unforgettable-second-sight-8)).
-The table below collects month/year estimates I pulled from
-[Wikipedia](https://en.wikipedia.org/wiki/FlipTop_Battle_League) (**unverified**),
-gathered in `wrangling.ipynb`:
+**How they were recovered — VerseTracker.** [VerseTracker](https://versetracker.com/battles/fliptop),
+a third-party FlipTop battle database, has a dated page per event. The pipeline
+now imputes the missing dates from it: [`scripts/fetch_versetracker_event_dates.py`](../scripts/fetch_versetracker_event_dates.py)
+scrapes one date per event into [`data/raw/versetracker_event_dates.csv`](../data/raw/),
+and `impute_event_dates_from_versetracker` fills the `NaT`s during the build (see
+the [pipeline write-up](../fliptop/README.md#covid-era-date-imputation-versetracker)).
+VerseTracker lists only the **first day** of a multi-day event, so the build
+offsets the Day-2 battles by `+1` using the `(Day N)` suffix from the FlipTop
+scrape. Every date is tagged in the new `event_date_source` column, so these
+(approximate) values can be sliced out for sensitivity checks.
 
-| # | event | estimate (unverified) |
-| - | ----- | --------------------- |
-| 1 | Second Sight 8 | not listed |
-| 2 | Unibersikulo 8 | not listed |
-| 3 | Zoning 10 | July 2020 |
-| 4 | Bwelta Balentong 7 (Day 1) | October 2020 |
-| 5 | Bwelta Balentong 7 (Day 2) | October 2020 |
-| 6 | Ahon 11 (Day 1) | October 2020 |
-| 7 | Ahon 11 (Day 2) | October 2020 |
-| 8 | Grain Assault 11 | May 2021 |
-| 9 | Second Sight 9 | June 2021 |
-| 10 | Zoning 11 | June 2021 |
-| 11 | Bwelta Balentong 8 | June 2021 |
-| 12 | Zoning 12 | July 2021 |
-| 13 | Unibersikulo 9 | September 2021 |
-| 14 | Zoning 13 | October 2021 |
-| 15 | Unibersikulo 10 | November 2021 |
-| 16 | Ahon 12 (Day 1) | December 2021 |
-| 17 | Ahon 12 (Day 2) | December 2021 |
+Second Sight 8 was the first COVID-era event and Ahon 12 was the last
+([context here](https://www.fliptop.com.ph/articles/an-unforgettable-second-sight-8)).
+The table below contrasts the unverified month/year estimates I first pulled from
+[Wikipedia](https://en.wikipedia.org/wiki/FlipTop_Battle_League) (in
+`wrangling.ipynb`) with the dates now sourced from VerseTracker:
 
-Second Sight 8 and Unibersikulo 8 aren't listed anywhere. As a backstop: the
-FlipTop Festival was February 7–8, 2020, and Zoning 10 lands ~July 2020 — so
-those two events most likely fall between **late February and June 2020**.
+| event | early estimate (Wikipedia) | VerseTracker (used) |
+| ----- | -------------------------- | ------------------- |
+| Second Sight 8 | not listed | 2020-07-26 |
+| Unibersikulo 8 | not listed | 2020-09-01 |
+| Zoning 10 | July 2020 | 2020-09-30 |
+| Bwelta Balentong 7 (Day 1 / Day 2) | October 2020 | 2020-10-30 / 2020-10-31 |
+| Ahon 11 (Day 1 / Day 2) | October 2020 | 2020-12-26 / 2020-12-27 |
+| Grain Assault 11 | May 2021 | 2021-02-06 |
+| Second Sight 9 | June 2021 | 2021-03-27 |
+| Zoning 11 | June 2021 | 2021-05-13 |
+| Bwelta Balentong 8 | June 2021 | 2021-06-15 |
+| Zoning 12 | July 2021 | 2021-07-11 |
+| Unibersikulo 9 | September 2021 | 2021-09-01 |
+| Zoning 13 | October 2021 | 2021-10-11 |
+| Unibersikulo 10 | November 2021 | 2021-11-18 |
+| Ahon 12 (Day 1 / Day 2) | December 2021 | 2021-12-08 / 2021-12-09 |
 
-**Leads being chased** (source links tracked in `wrangling.ipynb`):
+**Caveat — VerseTracker's dates are proxies, accurate to ~days, not exact.** They
+appear to use the event **flyer-post** date for some events, which conflicts with
+better evidence in a few cases:
 
-- Quarantine-battle and event posters on Facebook (Second Sight 8, Unibersikulo
-  8, the Quarantine Battles series).
-- Emcee posts pinning specific dates — e.g. K-Ram dating Bwelta Balentong 7 to
-  **October 24, 2020**.
-- **Locations** are partly recovered too: the quarantine venue "Baraks" (CIFRA
-  Building, Boni Ave, Mandaluyong) → normalize to *FlipTop Baraks, Mandaluyong
-  City*; and **Ahon 12** at *Jenerick Resort, Tanauan City, Batangas*.
+- **Bwelta Balentong 7**: VerseTracker says 2020-10-30, but K-Ram (a battler)
+  posted with his opponent on **2020-10-24** — the flyer was posted Oct 30. So
+  the true Day-2 date is likely ~Oct 24, not Oct 31.
+- **Ahon 11**: VerseTracker says 2020-12-26 vs the Wikipedia "October 2020" note.
+- **Ahon 12**: VerseTracker's 2021-12-08 *matches* independent vlog evidence
+  (vlogs dated Dec 12–13 confirm the event was just before). ✓
 
-**Other avenues** if the above stalls: contacting FlipTop directly, or
-COVID-era emcee posts on Facebook.
+To override any specific battle with a better-sourced date, add its YouTube video
+id to `_EVENT_DATE_OVERRIDES` in [`battles.py`](../fliptop/battles.py) — that
+hand-pin runs last and wins over the VerseTracker value (and is tagged `manual`).
+Locations were recovered separately: the quarantine venue "Baraks" (CIFRA
+Building, Boni Ave, Mandaluyong) → *FlipTop Baraks, Mandaluyong City*; and
+**Ahon 12** at *Jenerick Resort, Tanauan City, Batangas*.
 
 ---
 

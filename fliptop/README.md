@@ -123,12 +123,17 @@ and finally extracts the matchup:
 joins it onto the uploads by **YouTube video id**. Two special behaviors:
 
 - **COVID-era mask.** Event dates inside `2020-05-01 … 2022-04-27` are set to
-  `NaT` on purpose — FlipTop obfuscated those dates, so recording them would be
-  worse than leaving them blank. (Recovering the real dates is a known open
-  task.)
+  `NaT` on purpose — FlipTop obfuscated those dates, so the scraped values are
+  wrong. These are recovered later in Stage 3 from VerseTracker (see
+  [COVID-era date imputation](#covid-era-date-imputation-versetracker)).
 - **Post-COVID fallback.** For battles after the COVID window whose event date
   is still missing, `fill_metadata_from_yt_description` recovers event name /
   date / location from the YouTube description.
+
+This stage also seeds **`event_date_source`**, a provenance tag that records
+where each date came from — `website` initially, cleared inside the COVID window,
+`description` for the post-COVID fallback. Stage 3 then tags `versetracker` and
+`manual` as it imputes/overrides.
 
 `clean_event_location` also normalizes known messiness: prefers the text after
 `@`, fixes the country separator (`City. Philippines` / `Metro Manila
@@ -146,7 +151,13 @@ Davao variants.
 - sorts newest-upload-first,
 - applies `apply_manual_event_location_overrides` (hand-fixed locations for a
   handful of events the scrape got wrong, keyed by event name),
+- **`impute_event_dates_from_versetracker`** fills the COVID-masked `event_date`s
+  (see [below](#covid-era-date-imputation-versetracker)) — before
+  `normalize_event_day`, so the `(Day N)` suffix is still available,
 - **`normalize_event_day`** standardizes multi-day events (see below),
+- **`apply_manual_event_date_overrides`** pins specific battles whose YouTube
+  description mis-dates them (keyed by video id; runs last, so a hand-pin always
+  wins),
 - selects and orders the final columns.
 
 #### Multi-day events (`normalize_event_day`)
@@ -171,6 +182,35 @@ within its event. This runs *after* the location overrides, which still key on
 the day-suffixed names. One known limitation: cross-month ranges
 (`"Nov 30 – Dec 1"`) aren't parsed as a range yet.
 
+#### COVID-era date imputation (VerseTracker)
+
+The COVID-era mask in Stage 2 leaves a window of battles with no `event_date`
+(FlipTop obfuscated those dates). `impute_event_dates_from_versetracker` fills
+them from a small reference file,
+[`data/raw/versetracker_event_dates.csv`](../data/raw/), scraped from VerseTracker
+by [`scripts/fetch_versetracker_event_dates.py`](../scripts/fetch_versetracker_event_dates.py)
+and loaded by `load_versetracker_event_dates`.
+
+- For each row whose `event_date` is `NaT`, it strips any `(Day N)` off the event
+  name (`_split_event_day`) and, if the base name is in the reference map, sets
+  the date to the mapped **first-day** date plus `(N − 1)` days. VerseTracker
+  lists only the first day, so the per-day offset is applied here (Ahon 11,
+  Ahon 12, Bwelta Balentong 7).
+- It only fills `NaT` rows — an existing date is **never** overwritten — and tags
+  each filled row `versetracker` in `event_date_source`.
+- It runs **before** `normalize_event_day` (which strips the `(Day N)` suffix it
+  needs), and `apply_manual_event_date_overrides` runs **after**, so any
+  hand-pinned `_EVENT_DATE_OVERRIDES` entry still wins over a VerseTracker value.
+
+The reference CSV is optional: if it's absent, `load_versetracker_event_dates`
+returns `{}` and the step is a no-op (those battles simply stay `NaT`). The build
+auto-loads it from `raw_dir`; pass `build_df_battles(..., vt_event_dates={})` to
+disable imputation explicitly.
+
+> ⚠️ VerseTracker's dates are accurate to ~days, not exact (it appears to use the
+> flyer-post date for some events). They're flagged via `event_date_source` so the
+> approximate dates can be sliced out for sensitivity analysis.
+
 ---
 
 ## `df_battles` schema
@@ -186,7 +226,8 @@ the day-suffixed names. One known limitation: cross-month ranges
 | `emcee1`, `emcee2` | string | canonicalized names |
 | `matchup` | string | `emcee1 vs emcee2` |
 | `event_name` | string | standardized — the `(Day N)` suffix is stripped (see below) |
-| `event_date` | datetime | the battle's actual day (the specific day for multi-day events); **null for COVID-era battles** (intentional) |
+| `event_date` | datetime | the battle's actual day (the specific day for multi-day events); COVID-era dates are imputed from VerseTracker (see above) |
+| `event_date_source` | string | provenance of `event_date`: `website` \| `description` \| `versetracker` \| `manual` |
 | `event_location` | string | |
 | `url` | string or list | a **list** for multi-part battles |
 
@@ -414,6 +455,7 @@ pytest
 
 Tests use small hand-built DataFrames for the unit transforms, plus end-to-end
 invariant checks against the committed raw data (schema, no null emcees,
-multi-part `id`/`url` are lists, `event_date` null across the COVID window,
+multi-part `id`/`url` are lists, the COVID window is masked before imputation and
+fully dated after it, `event_date_source` is tagged from a known vocabulary,
 excluded ids disjoint from final battles, …). See `tests/README`-style headers
 in each `tests/test_*.py` for what each file covers.

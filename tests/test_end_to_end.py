@@ -24,6 +24,7 @@ EXPECTED_COLUMNS = [
     "matchup",
     "event_name",
     "event_date",
+    "event_date_source",
     "event_location",
     "url",
 ]
@@ -57,9 +58,31 @@ def test_scalar_ids_are_unique(df_battles):
     assert not scalar_ids.duplicated().any()
 
 
-def test_event_date_is_null_within_covid_window(df_battles):
-    in_window = df_battles["upload_date"].between(COVID_START, COVID_END)
-    assert df_battles.loc[in_window, "event_date"].isna().all()
+def test_covid_window_dates_masked_before_imputation(raw_data_dir):
+    # With the VerseTracker imputation disabled, attach_event_metadata's COVID
+    # mask still clears every in-window event_date (the obfuscated-date period).
+    from fliptop.battles import build_df_battles
+
+    masked = build_df_battles(raw_dir=raw_data_dir, vt_event_dates={})
+    in_window = masked["upload_date"].between(COVID_START, COVID_END)
+    assert in_window.any()
+    assert masked.loc[in_window, "event_date"].isna().all()
+
+
+def test_versetracker_imputation_fills_all_event_dates(df_battles):
+    # The default build imputes the COVID-masked dates from VerseTracker; every
+    # quarantine event is covered, so no battle is left without an event_date.
+    assert df_battles["event_date"].notna().all()
+
+
+def test_event_date_source_is_tagged(df_battles):
+    # Every dated battle carries a provenance tag from a known vocabulary, and
+    # the COVID imputation + the hand-pin override both leave their mark.
+    src = df_battles["event_date_source"]
+    assert src.notna().all()
+    assert set(src.unique()) <= {"website", "description", "versetracker", "manual"}
+    assert (src == "versetracker").sum() > 0  # COVID-era events were imputed
+    assert (src == "manual").sum() >= 1       # the Nikki vs K-Ram hand-pin
 
 
 def test_emcee1_and_emcee2_differ(df_battles):

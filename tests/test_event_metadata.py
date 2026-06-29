@@ -16,6 +16,8 @@ from fliptop.battles import (
     apply_manual_event_location_overrides,
     clean_event_location,
     extract_event_name_from_description,
+    impute_event_dates_from_versetracker,
+    load_versetracker_event_dates,
     normalize_event_day,
     split_event_description,
 )
@@ -231,6 +233,105 @@ def test_normalize_event_day_never_unmasks_missing_date():
 
 
 # ---------------------------------------------------------------------------
+# impute_event_dates_from_versetracker
+# ---------------------------------------------------------------------------
+
+VT = {
+    "Ahon 12": pd.Timestamp("2021-12-08"),
+    "Zoning 10": pd.Timestamp("2020-09-30"),
+}
+
+
+def test_impute_single_day_uses_mapped_date():
+    df = pd.DataFrame(
+        {"event_name": ["Zoning 10"], "event_date": [pd.NaT]}
+    )
+    out = impute_event_dates_from_versetracker(df, VT)
+    assert out["event_date"].iloc[0] == pd.Timestamp("2020-09-30")
+
+
+def test_impute_multi_day_offsets_from_day_suffix():
+    df = pd.DataFrame(
+        {
+            "event_name": ["Ahon 12 (Day 1)", "Ahon 12 (Day 2)"],
+            "event_date": [pd.NaT, pd.NaT],
+        }
+    )
+    out = impute_event_dates_from_versetracker(df, VT)
+    assert out["event_date"].tolist() == [
+        pd.Timestamp("2021-12-08"),  # day 1 = base
+        pd.Timestamp("2021-12-09"),  # day 2 = base + 1
+    ]
+    # filled rows are tagged with their provenance
+    assert out["event_date_source"].tolist() == ["versetracker", "versetracker"]
+
+
+def test_impute_tags_only_filled_rows():
+    df = pd.DataFrame(
+        {
+            "event_name": ["Zoning 10", "Not In Map"],
+            "event_date": [pd.NaT, pd.NaT],
+        }
+    )
+    out = impute_event_dates_from_versetracker(df, VT)
+    assert out["event_date_source"].iloc[0] == "versetracker"   # filled -> tagged
+    assert pd.isna(out["event_date_source"].iloc[1])            # unknown -> untagged
+
+
+def test_impute_leaves_existing_dates_untouched():
+    df = pd.DataFrame(
+        {"event_name": ["Zoning 10"], "event_date": pd.to_datetime(["2020-01-01"])}
+    )
+    out = impute_event_dates_from_versetracker(df, VT)
+    assert out["event_date"].iloc[0] == pd.Timestamp("2020-01-01")  # not overwritten
+
+
+def test_impute_unknown_event_stays_nat():
+    df = pd.DataFrame({"event_name": ["Not In Map"], "event_date": [pd.NaT]})
+    out = impute_event_dates_from_versetracker(df, VT)
+    assert pd.isna(out["event_date"].iloc[0])
+
+
+def test_impute_empty_map_is_noop():
+    df = pd.DataFrame({"event_name": ["Ahon 12 (Day 1)"], "event_date": [pd.NaT]})
+    assert pd.isna(impute_event_dates_from_versetracker(df, {})["event_date"].iloc[0])
+    assert pd.isna(impute_event_dates_from_versetracker(df, None)["event_date"].iloc[0])
+
+
+# ---------------------------------------------------------------------------
+# load_versetracker_event_dates
+# ---------------------------------------------------------------------------
+
+def test_load_versetracker_event_dates_reads_map(tmp_path):
+    p = tmp_path / "vt.csv"
+    pd.DataFrame(
+        {
+            "event_name": ["Ahon 12", "Zoning 10"],
+            "event_date": ["2021-12-08", "2020-09-30"],
+            "source_url": ["u1", "u2"],
+        }
+    ).to_csv(p, index=False)
+    out = load_versetracker_event_dates(p)
+    assert out == {
+        "Ahon 12": pd.Timestamp("2021-12-08"),
+        "Zoning 10": pd.Timestamp("2020-09-30"),
+    }
+
+
+def test_load_versetracker_event_dates_missing_file_is_empty(tmp_path):
+    assert load_versetracker_event_dates(tmp_path / "nope.csv") == {}
+
+
+def test_load_versetracker_event_dates_drops_unparseable_dates(tmp_path):
+    p = tmp_path / "vt.csv"
+    pd.DataFrame(
+        {"event_name": ["Good", "Bad"], "event_date": ["2021-12-08", "not a date"]}
+    ).to_csv(p, index=False)
+    out = load_versetracker_event_dates(p)
+    assert out == {"Good": pd.Timestamp("2021-12-08")}
+
+
+# ---------------------------------------------------------------------------
 # apply_manual_event_date_overrides
 # ---------------------------------------------------------------------------
 
@@ -246,6 +347,9 @@ def test_manual_event_date_override_pins_known_battle():
     assert out["event_date"].iloc[0] == pd.Timestamp("2023-09-29")  # corrected
     assert out["event_date"].iloc[1] == pd.Timestamp("2020-01-01")  # untouched
     assert out["event_date"].iloc[2] == pd.Timestamp("2020-01-01")  # list id, untouched
+    # the pinned row is tagged "manual"; others are left untagged
+    assert out["event_date_source"].iloc[0] == "manual"
+    assert pd.isna(out["event_date_source"].iloc[1])
 
 
 # ---------------------------------------------------------------------------

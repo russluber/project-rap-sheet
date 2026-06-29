@@ -1,9 +1,9 @@
 # Scripts
 
 Standalone **data-collection** scripts — the "Extract" step of the project.
-They reach out to the network (the YouTube Data API and the FlipTop website) and
-populate [`data/raw/`](../data/raw/) with the two raw sources everything else is
-built from.
+They reach out to the network (the YouTube Data API, the FlipTop website, and
+VerseTracker) and populate [`data/raw/`](../data/raw/) with the sources
+everything else is built from.
 
 They run *before* the cleaning pipeline in [`fliptop/`](../fliptop/): the scripts
 fetch raw data, then `fliptop-refresh` cleans it into
@@ -20,6 +20,7 @@ scripts/  ──fetch──►  data/raw/  ──build (fliptop)──►  data/
 - [When to run these](#when-to-run-these)
 - [`fetch_youtube_channel_uploads.py`](#fetch_youtube_channel_uploadspy)
 - [`fetch_events_metadata_from_fliptop_web.py`](#fetch_events_metadata_from_fliptop_webpy)
+- [`fetch_versetracker_event_dates.py`](#fetch_versetracker_event_datespy)
 - [Being a polite scraper](#being-a-polite-scraper)
 
 ---
@@ -57,6 +58,12 @@ The end-to-end flow they fit into:
 3. The pipeline in [`fliptop/battles.py`](../fliptop/battles.py) cleans those
    files into [`data/processed/df_battles.json`](../data/processed/) (the rebuild
    step `fliptop-refresh` runs by default).
+
+**`fetch_versetracker_event_dates.py` is the exception** — it is *not* bundled
+into `fliptop-refresh --fetch`. The COVID-era event dates it recovers are
+effectively static, so you run it **by hand, once**, to (re)build the reference
+file, then commit that file. After that the build just reads the CSV. Re-run it
+only if new quarantine-era battles surface (i.e. `event_date` is `NaT` again).
 
 ---
 
@@ -170,15 +177,79 @@ a plain full overwrite periodically to reconcile. `fliptop-refresh
 
 ---
 
+## `fetch_versetracker_event_dates.py`
+
+Recovers the **event dates the pipeline can't get elsewhere** — the COVID-era
+("quarantine") events, whose real dates FlipTop obfuscated — by scraping
+[VerseTracker](https://versetracker.com/battles/fliptop), a third-party FlipTop
+battle database. Output feeds the date imputation in
+[`fliptop.battles`](../fliptop/battles.py) (see the
+[fliptop README](../fliptop/README.md#covid-era-date-imputation-versetracker)).
+
+**How it works.** Each event has a VerseTracker page at
+`versetracker.com/events/fliptop-<slug>`, where the slug is the event name
+lowercased with non-alphanumerics turned to hyphens (`Ahon 12` →
+`fliptop-ahon-12`). The script builds that URL per event, fetches the page, and
+reads the single date out of `div.event-date` (e.g. `December 8, 2021` →
+`2021-12-08`). By **default** it targets exactly the events whose `event_date` is
+currently `NaT` (it builds `df_battles` with imputation off to find them); pass
+`--events` to scrape an explicit list instead. A 404 or unparseable date is
+logged as a `[warn]` and skipped.
+
+> VerseTracker lists only the **first day** of a multi-day event. The pipeline,
+> not this script, applies the per-day offset (`Day N = first day + (N−1)`) using
+> the `(Day N)` suffix from the FlipTop scrape — so this CSV holds one first-day
+> date per event.
+
+No API key needed — plain HTML scraping with `requests` + `BeautifulSoup`.
+
+| flag | required | default | meaning |
+| ---- | -------- | ------- | ------- |
+| `--events` | | NaT events in `df_battles` | explicit event names to scrape, e.g. `--events "Ahon 12" "Zoning 10"` |
+| `--output` | | `data/raw/versetracker_event_dates.csv` | where to write the CSV |
+| `--base` | | `https://versetracker.com` | site root |
+| `--user-agent` | | a project UA string | `User-Agent` header to send |
+| `--sleep` | | `0.6` | seconds between event-page requests |
+| `--retries` | | `2` | retries per request (on top of the first try) |
+| `--request-sleep` | | `0.7` | base backoff inside the retry loop |
+| `--timeout` | | `30` | per-request timeout (seconds) |
+| `--quiet` | | off | reduce logging |
+
+```bash
+# scrape every event currently missing an event_date (the usual case)
+python scripts/fetch_versetracker_event_dates.py
+
+# or scrape a specific set
+python scripts/fetch_versetracker_event_dates.py --events "Ahon 12" "Zoning 10"
+```
+
+**Output** → [`data/raw/versetracker_event_dates.csv`](../data/raw/):
+
+| column | example | notes |
+| ------ | ------- | ----- |
+| `event_name` | `Ahon 12` | base name, **no** `(Day N)` suffix |
+| `event_date` | `2021-12-08` | ISO first-day date |
+| `source_url` | `https://versetracker.com/events/fliptop-ahon-12` | the page it came from (provenance) |
+
+> ⚠️ VerseTracker's date is sometimes a proxy (it appears to use the event
+> **flyer-post** date for some events — e.g. Bwelta Balentong 7), so treat these
+> as accurate to within days, not exact. They are tagged `versetracker` in
+> `df_battles`' `event_date_source` column; override a specific battle via
+> `_EVENT_DATE_OVERRIDES` in `battles.py` if you find a better source. This
+> scraper also depends on VerseTracker's current HTML (`div.event-date`); if the
+> site is redesigned, update `parse_event_date`.
+
+---
+
 ## Being a polite scraper
 
-Both scripts are written to go easy on the upstream services, and you should keep
-it that way if you tweak them:
+All three scripts are written to go easy on the upstream services, and you should
+keep it that way if you tweak them:
 
-- **Incremental** — the YouTube fetch skips ids it already has; re-running adds
-  only new videos.
+- **Incremental / narrow** — the YouTube fetch skips ids it already has; the
+  VerseTracker scraper only hits the handful of events still missing a date.
 - **Paced** — short `time.sleep` pauses between API pages and event-page
   requests.
-- **Resilient** — the web scraper retries with backoff and skips a bad event
-  page (logging a `[warn]`) rather than aborting the whole run.
-- **Identifiable** — the scraper sends a descriptive `User-Agent`.
+- **Resilient** — the web and VerseTracker scrapers retry with backoff and skip a
+  bad/missing page (logging a `[warn]`) rather than aborting the whole run.
+- **Identifiable** — the scrapers send a descriptive `User-Agent`.

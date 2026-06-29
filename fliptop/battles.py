@@ -787,13 +787,15 @@ def apply_manual_event_date_overrides(
     df: pd.DataFrame,
     id_col: str = "id",
     date_col: str = "event_date",
+    source_col: str = "event_date_source",
 ) -> pd.DataFrame:
     """
     Pin event_date for specific battles whose YouTube description is wrong.
 
     Keyed by YouTube video id (matching either a scalar id or any id within a
     consolidated multi-part battle's id list). The FlipTop website is treated as
-    authoritative for these hand-checked cases.
+    authoritative for these hand-checked cases. Pinned rows are tagged
+    ``"manual"`` in ``source_col``.
     """
     if id_col not in df.columns or date_col not in df.columns:
         return df
@@ -804,6 +806,10 @@ def apply_manual_event_date_overrides(
             lambda x: x == battle_id or (isinstance(x, list) and battle_id in x)
         )
         out.loc[mask, date_col] = pd.Timestamp(iso)
+        if mask.any():
+            if source_col not in out.columns:
+                out[source_col] = pd.Series(pd.NA, index=out.index, dtype="object")
+            out.loc[mask, source_col] = "manual"
 
     return out
 
@@ -896,6 +902,82 @@ def normalize_event_day(
         _resolve_date(day, current, desc)
         for day, current, desc in zip(days, out[date_col], out[desc_col])
     ]
+    return out
+
+
+def load_versetracker_event_dates(path: PathLike) -> dict[str, pd.Timestamp]:
+    """
+    Load the VerseTracker event-date reference file as a ``{event_name: date}`` map.
+
+    The file is produced by ``scripts/fetch_versetracker_event_dates.py`` and has
+    one row per event keyed by the base name (no "(Day N)" suffix) with the ISO
+    first-day date. A missing or malformed file yields ``{}`` so the pipeline
+    still runs without it.
+    """
+    path = Path(path)
+    if not path.exists():
+        return {}
+
+    df = pd.read_csv(path)
+    if "event_name" not in df.columns or "event_date" not in df.columns:
+        return {}
+
+    dates = pd.to_datetime(df["event_date"], errors="coerce")
+    return {
+        str(name).strip(): date
+        for name, date in zip(df["event_name"], dates)
+        if pd.notna(date) and isinstance(name, str)
+    }
+
+
+def impute_event_dates_from_versetracker(
+    df: pd.DataFrame,
+    vt_dates: Optional[Mapping[str, pd.Timestamp]] = None,
+    name_col: str = "event_name",
+    date_col: str = "event_date",
+    source_col: str = "event_date_source",
+) -> pd.DataFrame:
+    """
+    Fill ``NaT`` ``event_date`` values from the VerseTracker reference map.
+
+    For each row whose date is missing, strip any trailing "Day N" off the event
+    name (reusing :func:`_split_event_day`); if the clean name is in ``vt_dates``,
+    set the date to the mapped first-day date plus ``(N - 1)`` days. Single-day
+    events (no day label) use the mapped date unchanged.
+
+    VerseTracker lists only the first day of a multi-day event, so the per-day
+    offset (consecutive days) is applied here from the "(Day N)" suffix. Only
+    ``NaT`` rows are touched - an existing date is never overwritten - and events
+    absent from the map are left ``NaT``. Rows actually filled are tagged
+    ``"versetracker"`` in ``source_col`` (see :func:`attach_event_metadata`).
+
+    Must run *before* :func:`normalize_event_day`, which strips the "(Day N)"
+    suffix this relies on.
+    """
+    if not vt_dates or name_col not in df.columns or date_col not in df.columns:
+        return df
+
+    out = df.copy()
+    missing = out[date_col].isna()
+    if not missing.any():
+        return out
+
+    def _imputed(name):
+        if not isinstance(name, str):
+            return pd.NaT
+        clean, day = _split_event_day(name)
+        base = vt_dates.get(clean)
+        if base is None:
+            return pd.NaT
+        offset = (int(day) - 1) if day else 0
+        return base + pd.Timedelta(days=offset)
+
+    imputed = out.loc[missing, name_col].map(_imputed)
+    out.loc[missing, date_col] = imputed
+
+    if source_col not in out.columns:
+        out[source_col] = pd.Series(pd.NA, index=out.index, dtype="object")
+    out.loc[imputed.index[imputed.notna()], source_col] = "versetracker"
     return out
 
 
@@ -1119,14 +1201,21 @@ def attach_event_metadata(
     # If right_key was 'video_id', we do not need it in the final table
     if right_key in out.columns and right_key != left_key:
         out = out.drop(columns=[right_key])
-    
+
+    # 4b) Track where each event_date came from. The website scrape is the
+    # baseline; later stages overwrite this tag as they clear/fill/override.
+    if "event_date" in out.columns:
+        out["event_date_source"] = pd.Series(pd.NA, index=out.index, dtype="object")
+        out.loc[out["event_date"].notna(), "event_date_source"] = "website"
+
     # 5) Apply COVID window mask and post-COVID description-based fill
     if "upload_date" in out.columns and "event_date" in out.columns:
-        # a) Clear event_date during the COVID window
+        # a) Clear event_date during the COVID window (its source is now stale)
         start = pd.Timestamp("2020-05-01")
         end = pd.Timestamp("2022-04-27")
         covid_mask = out["upload_date"].between(start, end)
         out.loc[covid_mask, "event_date"] = pd.NaT
+        out.loc[covid_mask, "event_date_source"] = pd.NA
 
         # b) For rows after 2022-05-01 with missing event_date, use descriptions
         post_covid_mask = out["event_date"].isna() & (out["upload_date"] > "2022-05-01")
@@ -1136,6 +1225,9 @@ def attach_event_metadata(
             cols_to_update = ["event_name", "event_date", "event_location_clean"]
             cols_to_update = [c for c in cols_to_update if c in subset.columns]
             out.loc[post_covid_mask, cols_to_update] = subset[cols_to_update].values
+            # Tag the rows the description fill actually dated.
+            filled = post_covid_mask & out["event_date"].notna()
+            out.loc[filled, "event_date_source"] = "description"
 
     return out
 
@@ -1218,6 +1310,7 @@ def consolidate_battle_parts(df: pd.DataFrame) -> pd.DataFrame:
     add("matchup", "first")
     add("event_name", "first")
     add("event_date", "first")
+    add("event_date_source", "first")
     add("event_location", "first")
 
     # Group by the base title (battle identity)
@@ -1252,6 +1345,7 @@ def consolidate_battle_parts(df: pd.DataFrame) -> pd.DataFrame:
 
 def finalize_battles(
     df_with_meta: pd.DataFrame,
+    vt_event_dates: Optional[Mapping[str, pd.Timestamp]] = None,
 ) -> pd.DataFrame:
     """
     Final tidy up step to produce df_battles.
@@ -1264,11 +1358,22 @@ def finalize_battles(
       - sort by upload_date (newest first)
       - drop yt_raw_title helper
       - apply a couple of manual location fixes
+      - impute missing (COVID-masked) event_dates from VerseTracker
       - normalize multi-day event names + resolve per-day dates
       - pin event_date for battles whose YouTube description mis-dates them
       - select and order the final columns
+
+    ``vt_event_dates`` is an optional ``{event_name: first-day date}`` map (see
+    :func:`load_versetracker_event_dates`); when given, it fills NaT event_dates
+    before the day suffix is stripped.
     """
     work = df_with_meta.copy()
+
+    # 0) Ensure the provenance column exists even on edge paths (e.g. an empty
+    #    events table) where attach_event_metadata returned before creating it.
+    if "event_date_source" not in work.columns and "event_date" in work.columns:
+        work["event_date_source"] = pd.Series(pd.NA, index=work.index, dtype="object")
+        work.loc[work["event_date"].notna(), "event_date_source"] = "website"
 
     # 1) Drop raw / helper columns you don't want in df_battles
     # (these are from your notebook; safe to ignore if not present)
@@ -1311,6 +1416,11 @@ def finalize_battles(
     #    these overrides key on).
     battles = apply_manual_event_location_overrides(battles)
 
+    # 7b) Impute COVID-masked event_dates from VerseTracker. Runs before
+    #     normalize_event_day so the '(Day N)' suffix is still available to
+    #     offset multi-day events; only fills NaT, never overwrites a date.
+    battles = impute_event_dates_from_versetracker(battles, vt_event_dates)
+
     # 8) Standardize multi-day event names ("Ahon 16 (Day 2)" -> "Ahon 16") and
     #    resolve the per-day event_date from the description's date range.
     battles = normalize_event_day(battles)
@@ -1332,6 +1442,7 @@ def finalize_battles(
         "matchup",
         "event_name",
         "event_date",
+        "event_date_source",
         "event_location",
         "url",
     ]
@@ -1350,7 +1461,9 @@ def build_df_battles(
     raw_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
     events_csv_name: str = "matchup_events_metadata.csv",
+    versetracker_csv_name: str = "versetracker_event_dates.csv",
     rename_map: Optional[RenameMap] = None,
+    vt_event_dates: Optional[Mapping[str, pd.Timestamp]] = None,
 ) -> pd.DataFrame:
     """
     Build the complete df_battles table from raw files.
@@ -1363,8 +1476,16 @@ def build_df_battles(
         File name of the YouTube uploads JSON.
     events_csv_name:
         File name of the scraped events CSV.
+    versetracker_csv_name:
+        File name of the VerseTracker event-date reference CSV used to impute
+        COVID-masked event_dates.
     rename_map:
         Optional emcee rename map for canonicalization.
+    vt_event_dates:
+        Optional ``{event_name: first-day date}`` map for date imputation. If
+        ``None`` (default) it is loaded from ``raw_dir / versetracker_csv_name``;
+        pass an explicit dict (e.g. ``{}``) to override - ``{}`` disables the
+        imputation entirely.
 
     Returns
     -------
@@ -1373,12 +1494,15 @@ def build_df_battles(
     """
     raw_dir = Path(raw_dir)
 
+    if vt_event_dates is None:
+        vt_event_dates = load_versetracker_event_dates(raw_dir / versetracker_csv_name)
+
     df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
     df_events = load_event_metadata(raw_dir / events_csv_name)
 
     df_1v1 = make_df_1v1_uploads(df_yt, rename_map=rename_map)
     df_with_meta = attach_event_metadata(df_1v1, df_events)
-    df_battles = finalize_battles(df_with_meta)
+    df_battles = finalize_battles(df_with_meta, vt_event_dates=vt_event_dates)
 
     return df_battles
 
