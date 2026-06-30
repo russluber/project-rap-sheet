@@ -1,19 +1,16 @@
 # Project Rap Sheet
 
-A reproducible data pipeline for cleaning and organizing FlipTop rap battle data.
+A reproducible pipeline for cleaning and organizing FlipTop rap battle data.
 
 ## Overview
 
 The first objective of this project is to create a database for FlipTop rap battles. To this end, this project builds a clean battle-level dataset from three raw sources:
 
-1. `youtube_videos.json`  
-   Raw YouTube upload metadata collected from the [FlipTop channel](https://www.youtube.com/@fliptopbattles).
+1. `youtube_videos.json` - raw YouTube upload metadata collected from the [FlipTop channel](https://www.youtube.com/@fliptopbattles).
 
-2. `matchup_events_metadata.csv`  
-   Raw event and matchup metadata scraped from the [FlipTop website](https://www.fliptop.com.ph/videos/battle).
+2. `matchup_events_metadata.csv` - raw event and matchup metadata scraped from the [FlipTop website](https://www.fliptop.com.ph/videos/battle).
 
-3. `versetracker_event_dates.csv`
-    Raw event and event date data scraped from [Verse Tracker](https://versetracker.com/battles/fliptop)
+3. `versetracker_event_dates.csv` - raw event and event date data scraped from [Verse Tracker](https://versetracker.com/battles/fliptop).
 
 The main output is a cleaned `df_battles` table with one row per battle, including:
 
@@ -150,8 +147,8 @@ fliptop-annotate            # walk through battles that aren't annotated yet
 fliptop-annotate --limit 20 # do a batch of 20
 ```
 
-It is incremental and resumable — after a refresh you only annotate the *new*
+It is incremental and resumable. After a refresh you only annotate *new*
 battles, and quitting mid-session loses nothing. Join the results onto
 `df_battles` on demand with `fliptop.annotations.merge_results(df_battles)`;
-the published `df_battles.json` is intentionally left without result columns.
+the published `df_battles.json` is intentionally left without result columns (for now).
 See `fliptop/README.md` for details.
