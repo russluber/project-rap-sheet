@@ -35,6 +35,12 @@ import isodate
 import pandas as pd
 from dateutil import parser as dateparse
 
+from .overrides import (
+    load_event_date_overrides,
+    load_event_location_overrides,
+    load_event_location_patterns,
+    load_location_aliases,
+)
 from .rename_map import load_rename_map
 
 # ---------------------------------------------------------------------------
@@ -547,6 +553,7 @@ def clean_event_location(
     df: pd.DataFrame,
     raw_loc_col: str = "event_location",
     new_col: str = "event_location_clean",
+    aliases: Mapping[str, str] | None = None,
 ) -> pd.DataFrame:
     """
     Clean up event location strings.
@@ -563,9 +570,16 @@ def clean_event_location(
       - Strip out obvious "FlipTop ..." prefixes if they survive.
 
       - Normalize whitespace and strip trailing punctuation.
+
+      - Finally, canonicalize known location values (e.g. Davao variants) via the
+        ``aliases`` map, loaded from data/overrides/location_aliases.csv when not
+        supplied.
     """
     if raw_loc_col not in df:
         return df
+
+    if aliases is None:
+        aliases = load_location_aliases()
 
     def _clean_loc(val):
         if not isinstance(val, str):
@@ -611,13 +625,9 @@ def clean_event_location(
         # abbreviation periods (St., Dr., J.P., ...) are left untouched.
         txt = re.sub(r"(?<=\w)[ .]+Philippines\b", ", Philippines", txt)
 
-        # Normalize known Davao variants.
-        if re.fullmatch(r"Davao City,\s*Metro Manila,\s*Philippines", txt):
-            return "Davao City, Philippines"
-        if txt == "Davao City":
-            return "Davao City, Philippines"
-
-        return txt
+        # Canonicalize known location values (e.g. Davao variants). Whitespace is
+        # already normalized above, so an exact-match lookup suffices.
+        return aliases.get(txt, txt)
 
     return df.assign(
         **{new_col: df[raw_loc_col].map(_clean_loc)}
@@ -716,70 +726,45 @@ def apply_manual_event_location_overrides(
     df: pd.DataFrame,
     event_name_col: str = "event_name",
     event_location_col: str = "event_location",
+    overrides: Mapping[str, str] | None = None,
+    patterns: Iterable[tuple[str, str]] | None = None,
 ) -> pd.DataFrame:
     """
     Apply hand-maintained event location overrides after final cleanup.
 
-    Rules:
-      - Any event_location containing "D' mention" becomes
-        "FlipTop Baraks, Mandaluyong City, Philippines"
-      - Per-event fixes (keyed by event_name) for battles whose location could
-        not be extracted correctly from the source description:
-          * Ahon 12 (Day 1/2): the obfuscated COVID-era location.
-          * Grafilipinas: the description put a promo blurb after the first '@'
-            and the real venue after a second '@', past the date.
-          * Process of Illumination 4: a no-'@' description leaked the event
-            name into the location.
+    Two hand-maintained tables (loaded from data/overrides/ when not supplied):
+
+      - ``patterns`` (event_location_patterns.csv): any event_location *containing*
+        the substring is replaced wholesale (e.g. "D' mention ..." -> the FlipTop
+        Baraks venue).
+      - ``overrides`` (event_locations.csv): per-event fixes keyed by exact
+        event_name, for battles whose location could not be extracted correctly
+        from the source description (COVID-era obfuscation, or a no-'@' description
+        that leaked the event name into the location).
+
+    See the ``note`` column in each CSV for the per-row rationale.
     """
+    if overrides is None:
+        overrides = load_event_location_overrides()
+    if patterns is None:
+        patterns = load_event_location_patterns()
+
     out = df.copy()
 
     if event_location_col in out.columns:
-        d_mention_mask = out[event_location_col].astype("string").str.contains(
-            "D' mention",
-            regex=False,
-            na=False,
-        )
-        out.loc[
-            d_mention_mask,
-            event_location_col,
-        ] = "FlipTop Baraks, Mandaluyong City, Philippines"
-
-    # Per-event location overrides, keyed by exact event_name. Several of these
-    # are "event name leaked into the location" cases: the source description had
-    # no '@' delimiter, so the event name ended up as the leading segment of the
-    # extracted location.
-    event_location_overrides = {
-        "Ahon 12 (Day 1)": "Jenerick Resort, Tanauan City, Batangas, Philippines",
-        "Ahon 12 (Day 2)": "Jenerick Resort, Tanauan City, Batangas, Philippines",
-        "Grafilipinas (FlipTop x Meiday x Wall Lords)": (
-            "Marikina River Banks, Marikina City, Metro Manila, Philippines"
-        ),
-        "Process of Illumination 4": (
-            "B-Side, Malugay Street, Makati City, Metro Manila, Philippines"
-        ),
-        "Bara Ko, Barako": "Naic Covered Court, Naic, Cavite, Philippines",
-        "Ahon 3": "San Juan Gym, San Juan City, Metro Manila, Philippines",
-        'Masamang Damo (Batas - "Ako" Video Launch)': (
-            "Tavern Asia, BF Homes, Paranaque City, Philippines"
-        ),
-    }
+        for substring, location in patterns:
+            mask = out[event_location_col].astype("string").str.contains(
+                substring,
+                regex=False,
+                na=False,
+            )
+            out.loc[mask, event_location_col] = location
 
     if {event_name_col, event_location_col} <= set(out.columns):
-        for event_name, location in event_location_overrides.items():
+        for event_name, location in overrides.items():
             out.loc[out[event_name_col] == event_name, event_location_col] = location
 
     return out
-
-
-# Per-battle event_date corrections, keyed by YouTube video id. Used for the rare
-# case where a battle's own YouTube description carries the wrong date and the
-# FlipTop website is authoritative. The date parsed from the description cannot be
-# trusted for these, so we pin them by hand (ISO date string).
-_EVENT_DATE_OVERRIDES = {
-    # Nikki vs K-Ram: the YouTube description dates this as Sept 30, but the
-    # FlipTop site lists it on Gubat 12 Day 1 (Sept 29, 2023).
-    "IdPP-JPtk4M": "2023-09-29",
-}
 
 
 def apply_manual_event_date_overrides(
@@ -787,20 +772,26 @@ def apply_manual_event_date_overrides(
     id_col: str = "id",
     date_col: str = "event_date",
     source_col: str = "event_date_source",
+    overrides: Mapping[str, str] | None = None,
 ) -> pd.DataFrame:
     """
     Pin event_date for specific battles whose YouTube description is wrong.
 
-    Keyed by YouTube video id (matching either a scalar id or any id within a
-    consolidated multi-part battle's id list). The FlipTop website is treated as
-    authoritative for these hand-checked cases. Pinned rows are tagged
-    ``"manual"`` in ``source_col``.
+    Per-battle corrections keyed by YouTube video id (matching either a scalar id
+    or any id within a consolidated multi-part battle's id list), loaded from
+    data/overrides/event_dates.csv when not supplied. Used for the rare case where
+    a battle's own description mis-dates it and the FlipTop website is authoritative;
+    the date parsed from the description cannot be trusted for these. Pinned rows
+    are tagged ``"manual"`` in ``source_col``.
     """
     if id_col not in df.columns or date_col not in df.columns:
         return df
 
+    if overrides is None:
+        overrides = load_event_date_overrides()
+
     out = df.copy()
-    for battle_id, iso in _EVENT_DATE_OVERRIDES.items():
+    for battle_id, iso in overrides.items():
         mask = out[id_col].map(
             lambda x: x == battle_id or (isinstance(x, list) and battle_id in x)
         )

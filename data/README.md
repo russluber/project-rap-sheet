@@ -11,6 +11,11 @@ data/
 │   ├── youtube_videos.json
 │   ├── matchup_events_metadata.csv
 │   └── versetracker_event_dates.csv   # COVID-era event dates (date-imputation reference)
+├── overrides/             # hand-maintained corrections applied during the build
+│   ├── event_locations.csv
+│   ├── event_location_patterns.csv
+│   ├── location_aliases.csv
+│   └── event_dates.csv
 ├── processed/             # clean tables built by the fliptop package
 │   ├── df_battles.json
 │   └── emcees.csv
@@ -21,15 +26,16 @@ data/
 ```
 
 **Data flow.** `raw/` is produced by [`scripts/`](../scripts/); `processed/` is
-built from `raw/` (plus `emcee_aliases.csv`) by the
+built from `raw/` (plus `emcee_aliases.csv` and the `overrides/` tables) by the
 [`fliptop`](../fliptop/) package; `annotations/` is filled in by hand via
 `fliptop-annotate` and joined onto the processed table only on demand.
 
 ```
 scripts/ ─► raw/ ─┐
-                  ├─► fliptop (build) ─► processed/
-emcee_aliases.csv ┘                          │
-                                  annotations/ ─(join on demand)─┘
+emcee_aliases.csv ┤
+overrides/ ───────┼─► fliptop (build) ─► processed/
+                  │                          │
+                  └──────────── annotations/ ─(join on demand)─┘
 ```
 
 ---
@@ -38,6 +44,7 @@ emcee_aliases.csv ┘                          │
 
 - [`emcee_aliases.csv`](#emcee_aliasescsv)
 - [`raw/`](#raw)
+- [`overrides/`](#overrides)
 - [`processed/`](#processed)
 - [`annotations/`](#annotations)
 - [`secret/`](#secret)
@@ -115,6 +122,28 @@ dates are static — rather than refreshed by `fliptop-refresh --fetch`.
 > ⚠️ These dates are accurate to within ~days, not exact — VerseTracker appears to
 > use the event **flyer-post** date for some events. Battles dated from this file
 > are tagged `versetracker` in `df_battles`' `event_date_source` column.
+
+---
+
+## `overrides/`
+
+Small, hand-maintained **correction tables** the build applies to fix things the
+raw sources get wrong — kept as CSVs (like `emcee_aliases.csv`) so they're edited
+as data, not code. Each has a free-text `note` column recording *why* the row
+exists; it's ignored on load. Loaded and validated by
+[`fliptop.overrides`](../fliptop/overrides.py); a missing file is treated as an
+empty table, so the pipeline still runs without them.
+
+| file | key → value | match | fixes |
+| ---- | ----------- | ----- | ----- |
+| `event_locations.csv` | `event_name` → `event_location` | exact event name | battles whose venue couldn't be extracted (COVID-era obfuscation, or a no-`@` description that leaked the event name into the location) |
+| `event_location_patterns.csv` | `contains` → `event_location` | substring of the location | a location string that carries junk around the real venue (e.g. `D' mention …`) |
+| `location_aliases.csv` | `location` → `canonical` | exact value | normalize known location strings (e.g. Davao variants) |
+| `event_dates.csv` | `id` → `event_date` | exact YouTube id | a battle whose own description mis-dates it, where the FlipTop site is authoritative (tagged `manual` in `df_battles`) |
+
+To register a correction, add a row (with a `note`). Matching is exact and
+case-sensitive except `event_location_patterns.csv`, which matches any location
+*containing* the substring.
 
 ---
 
@@ -205,7 +234,8 @@ fliptop-refresh --fetch                # re-scrape raw/ first (needs network + A
 fliptop-refresh --fetch --events-since 2025   # incremental events scrape (recent years only), then rebuild
 ```
 
-`processed/` is fully reproducible from `raw/` + `emcee_aliases.csv`. `raw/` is
+`processed/` is fully reproducible from `raw/` + `emcee_aliases.csv` +
+`overrides/`. `raw/` is
 reproducible from the network via [`scripts/`](../scripts/) — a full
 `--fetch` overwrites the events CSV with a clean scrape, while `--events-since`
 **merges** only recent events in (faster, but accumulates scrape history; see

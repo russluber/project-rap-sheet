@@ -1,0 +1,3 @@
+location,canonical,note
+Davao City,"Davao City, Philippines",normalize Davao variants
+"Davao City, Metro Manila, Philippines","Davao City, Philippines",normalize Davao variants (Metro Manila is incorrect)

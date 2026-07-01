@@ -60,6 +60,11 @@ project-rap-sheet/
 │   │   ├── youtube_videos.json
 │   │   ├── matchup_events_metadata.csv
 │   │   └── versetracker_event_dates.csv
+│   ├── overrides/
+│   │   ├── event_locations.csv
+│   │   ├── event_location_patterns.csv
+│   │   ├── location_aliases.csv
+│   │   └── event_dates.csv
 │   ├── processed/
 │   │   ├── df_battles.json
 │   │   └── emcees.csv
@@ -72,6 +77,7 @@ project-rap-sheet/
 │   ├── __init__.py
 │   ├── battles.py
 │   ├── rename_map.py
+│   ├── overrides.py
 │   ├── structures.py
 │   ├── refresh.py
 │   ├── annotations.py
