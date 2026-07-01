@@ -1,11 +1,25 @@
 name: CI
 
 # Run the linter and the test suite on every push and pull request to main.
+#
+# paths-ignore skips CI for changes that can't affect code or tests: the
+# hand-entered annotations store (fliptop-annotate output), the generated
+# processed outputs, and docs. Note it does NOT skip data/raw/, emcee_aliases.csv,
+# or data/overrides/ - those feed the build and are covered by tests, so a change
+# there should still be checked.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'data/annotations/**'
+      - 'data/processed/**'
+      - '**/*.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'data/annotations/**'
+      - 'data/processed/**'
+      - '**/*.md'
 
 # Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
 concurrency:
