@@ -42,7 +42,6 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -79,7 +78,7 @@ _VIDEO_ID_RE = re.compile(r"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})")
 # Battle identity
 # ---------------------------------------------------------------------------
 
-def battle_key(id_value) -> Optional[str]:
+def battle_key(id_value) -> str | None:
     """
     Canonical scalar key for a battle.
 
@@ -93,7 +92,7 @@ def battle_key(id_value) -> Optional[str]:
     return str(id_value)
 
 
-def extract_video_id(url: str) -> Optional[str]:
+def extract_video_id(url: str) -> str | None:
     """Pull the YouTube video id out of a watch / youtu.be URL (or None)."""
     if not isinstance(url, str):
         return None
@@ -247,7 +246,7 @@ def upsert_result(results: pd.DataFrame, row: dict) -> pd.DataFrame:
 
 def pending_battles(
     df_battles: pd.DataFrame,
-    results: Optional[pd.DataFrame] = None,
+    results: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Battles from df_battles not yet in the results store, newest upload first.
@@ -271,7 +270,7 @@ def pending_battles(
 
 def merge_results(
     df_battles: pd.DataFrame,
-    results: Optional[pd.DataFrame] = None,
+    results: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
     Left-join the results store onto df_battles by battle key (analysis helper).

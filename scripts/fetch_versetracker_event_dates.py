@@ -36,18 +36,16 @@ Usage (from repo root):
     python scripts/fetch_versetracker_event_dates.py --events "Ahon 12" "Zoning 10"
 """
 
+import argparse
 import os
 import re
 import time
-import argparse
-from typing import Optional
+from pathlib import Path
 
-import requests
 import pandas as pd
+import requests
 from bs4 import BeautifulSoup
 from dateutil import parser as dateparse
-
-from pathlib import Path
 
 # Project root is one level above this script's directory
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -81,7 +79,7 @@ def event_url(name: str, *, base: str = DEFAULT_BASE) -> str:
     return f"{base}/events/{event_slug(name)}"
 
 
-def parse_event_date(soup: BeautifulSoup) -> Optional[str]:
+def parse_event_date(soup: BeautifulSoup) -> str | None:
     """
     Pull the ISO event date out of a VerseTracker event page.
 
@@ -105,11 +103,11 @@ def _get_soup(
     url: str,
     session: requests.Session,
     *,
-    headers: Optional[dict] = None,
+    headers: dict | None = None,
     retries: int = 2,
     sleep: float = 0.7,
     timeout: int = 30,
-) -> Optional[BeautifulSoup]:
+) -> BeautifulSoup | None:
     """
     GET a URL and return a BeautifulSoup document, or None on a 404.
 
@@ -180,11 +178,11 @@ def fetch_event_date(
     session: requests.Session,
     *,
     base: str = DEFAULT_BASE,
-    headers: Optional[dict] = None,
+    headers: dict | None = None,
     retries: int = 2,
     request_sleep: float = 0.7,
     timeout: int = 30,
-) -> Optional[dict]:
+) -> dict | None:
     """
     Fetch one event's date row, or None if the page or date is missing.
 
@@ -211,7 +209,7 @@ def scrape_event_dates(
     names: list[str],
     *,
     base: str = DEFAULT_BASE,
-    headers: Optional[dict] = DEFAULT_HEADERS,
+    headers: dict | None = DEFAULT_HEADERS,
     sleep: float = 0.6,
     retries: int = 2,
     request_sleep: float = 0.7,

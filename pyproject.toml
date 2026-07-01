@@ -34,9 +34,10 @@ analysis = [
     "scikit-survival",
     "pyvis",
 ]
-# Developer tooling (tests). Kept out of the runtime and analysis installs.
+# Developer tooling (tests + lint). Kept out of the runtime and analysis installs.
 dev = [
     "pytest",
+    "ruff",
 ]
 
 [project.scripts]
@@ -48,3 +49,19 @@ packages = ["fliptop"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# Research notebooks carry exploratory imports / long cells; don't lint them.
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+# A focused, high-signal set: pyflakes/pycodestyle for real errors, isort for
+# import order, and bugbear/comprehension/simplify/pyupgrade for consistency.
+select = ["E", "F", "W", "I", "B", "C4", "SIM", "UP"]
+ignore = [
+    "E501",  # long lines are mostly prose in docstrings/comments; not worth reflowing
+    "B905",  # zip() strict=: the zipped sequences are equal-length by construction here
+    "B023",  # loop-variable closures below are invoked within the same iteration (safe)
+]

@@ -27,8 +27,8 @@ Typical usage:
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import networkx as nx
 import pandas as pd

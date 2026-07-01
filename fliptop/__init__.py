@@ -52,9 +52,9 @@ _LAZY = {
 }
 
 if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
-    from .battles import build_df_battles, build_excluded_uploads
-    from .structures import build_emcees_table, write_emcees_table, build_battle_network
     from .annotations import merge_results
+    from .battles import build_df_battles, build_excluded_uploads
+    from .structures import build_battle_network, build_emcees_table, write_emcees_table
 
 
 def __getattr__(name: str):

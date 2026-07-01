@@ -26,17 +26,16 @@ The pipeline has three main stages:
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Iterable, Mapping, Optional
-
-import pandas as pd
-import isodate
 import re
+from collections.abc import Iterable, Mapping
 from datetime import timedelta
-from .rename_map import load_rename_map
+from pathlib import Path
 
+import isodate
+import pandas as pd
 from dateutil import parser as dateparse
 
+from .rename_map import load_rename_map
 
 # ---------------------------------------------------------------------------
 # I. Types and simple aliases
@@ -371,7 +370,7 @@ def add_matchup_and_split(df: pd.DataFrame) -> pd.DataFrame:
 
 def apply_emcee_rename(
     df: pd.DataFrame,
-    rename_map: Optional[RenameMap] = None,
+    rename_map: RenameMap | None = None,
 ) -> pd.DataFrame:
     """
     Canonicalize emcee names using an alias to canonical mapping.
@@ -428,7 +427,7 @@ _DATE_RANGE = re.compile(
 )
 
 
-def _parse_event_date_range(text) -> tuple[Optional[str], Optional[str]]:
+def _parse_event_date_range(text) -> tuple[str | None, str | None]:
     """
     Find the first ``Month D[-D2], YYYY`` in ``text`` and return
     ``(start_iso, end_iso)`` as ISO date strings, or ``(None, None)`` if none.
@@ -818,7 +817,7 @@ def apply_manual_event_date_overrides(
 _EVENT_DAY_RE = re.compile(r"\s*[,(]?\s*\bday\s*(\d+)\b\s*\)?\s*$", re.IGNORECASE)
 
 
-def _split_event_day(name) -> tuple[object, Optional[int]]:
+def _split_event_day(name) -> tuple[object, int | None]:
     """
     Split a trailing 'Day N' label off an event name.
 
@@ -932,7 +931,7 @@ def load_versetracker_event_dates(path: PathLike) -> dict[str, pd.Timestamp]:
 
 def impute_event_dates_from_versetracker(
     df: pd.DataFrame,
-    vt_dates: Optional[Mapping[str, pd.Timestamp]] = None,
+    vt_dates: Mapping[str, pd.Timestamp] | None = None,
     name_col: str = "event_name",
     date_col: str = "event_date",
     source_col: str = "event_date_source",
@@ -988,7 +987,7 @@ def impute_event_dates_from_versetracker(
 
 def make_df_1v1_uploads(
     df_yt: pd.DataFrame,
-    rename_map: Optional[RenameMap] = None,
+    rename_map: RenameMap | None = None,
 ) -> pd.DataFrame:
     """
     From raw YouTube uploads to a clean table of 1v1 battle uploads.
@@ -1345,7 +1344,7 @@ def consolidate_battle_parts(df: pd.DataFrame) -> pd.DataFrame:
 
 def finalize_battles(
     df_with_meta: pd.DataFrame,
-    vt_event_dates: Optional[Mapping[str, pd.Timestamp]] = None,
+    vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
 ) -> pd.DataFrame:
     """
     Final tidy up step to produce df_battles.
@@ -1462,8 +1461,8 @@ def build_df_battles(
     youtube_json_name: str = "youtube_videos.json",
     events_csv_name: str = "matchup_events_metadata.csv",
     versetracker_csv_name: str = "versetracker_event_dates.csv",
-    rename_map: Optional[RenameMap] = None,
-    vt_event_dates: Optional[Mapping[str, pd.Timestamp]] = None,
+    rename_map: RenameMap | None = None,
+    vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
 ) -> pd.DataFrame:
     """
     Build the complete df_battles table from raw files.
@@ -1512,7 +1511,7 @@ def write_df_battles(
     raw_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
     events_csv_name: str = "matchup_events_metadata.csv",
-    rename_map: Optional[RenameMap] = None,
+    rename_map: RenameMap | None = None,
     fmt: str = "json",
 ) -> Path:
     """

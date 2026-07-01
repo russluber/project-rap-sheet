@@ -109,6 +109,28 @@ pip install -e .              # core pipeline only
 pip install -e ".[analysis]"  # + notebook/analysis stack (plotting, lifelines, …)
 ```
 
+## Development
+
+Install the developer tooling (tests + linter) and run the checks that CI runs:
+
+```bash
+pip install -e ".[dev]"   # pytest + ruff
+
+pytest                    # run the test suite
+ruff check .              # lint
+ruff check --fix .        # lint and auto-fix what's safe
+```
+
+Every push and pull request to `main` runs the same lint and test suite on
+Python 3.11 and 3.12 via GitHub Actions (see `.github/workflows/ci.yml`).
+
+Optionally, install the git hooks so lint runs before each commit:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
 ## Usage
 
 The whole pipeline is wrapped in a single command, `fliptop-refresh`:
