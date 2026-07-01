@@ -53,7 +53,7 @@ def load_rename_map(path: PathLike = ALIASES_CSV) -> dict[str, str]:
 
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        if reader.fieldnames is None or not EXPECTED_COLUMNS <= set(reader.fieldnames):
+        if reader.fieldnames is None or not set(reader.fieldnames) >= EXPECTED_COLUMNS:
             raise ValueError(
                 f"{path}: expected columns {sorted(EXPECTED_COLUMNS)}, "
                 f"got {reader.fieldnames}"

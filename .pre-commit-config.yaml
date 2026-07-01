@@ -1,0 +1,25 @@
+# Optional local git hooks that mirror CI, so lint issues are caught before push.
+#
+#   pip install pre-commit
+#   pre-commit install
+#
+# Run against everything once with:  pre-commit run --all-files
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff
+        args: [--fix]
+        exclude: ^notebooks/
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      # Skip the committed data files (multi-MB CSV/JSON) for the text fixers.
+      - id: end-of-file-fixer
+        exclude: ^data/
+      - id: trailing-whitespace
+        exclude: ^data/
+      - id: check-toml
+      - id: check-yaml
+      - id: check-merge-conflict

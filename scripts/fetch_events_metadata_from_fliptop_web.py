@@ -31,20 +31,18 @@ Usage (from repo root):
         --start 2025 --end 2026 --merge --skip-known
 """
 
-import time
+import argparse
+import json
 import os
 import re
-import json
-import argparse
+import time
 from datetime import date
-from urllib.parse import urljoin
-from typing import Optional
-
-import requests
-import pandas as pd
-from bs4 import BeautifulSoup
-
 from pathlib import Path
+from urllib.parse import urljoin
+
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
 
 # Project root is one level above this script's directory
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -61,7 +59,7 @@ _VS = re.compile(r"\s+vs\s+", re.I)
 # Utility helpers
 # ---------------------------------------------------------------------
 
-def _canon(name: str, rename_map: Optional[dict]) -> str:
+def _canon(name: str, rename_map: dict | None) -> str:
     """
     Canonicalize an emcee name using an optional rename map.
 
@@ -80,7 +78,7 @@ def _get_soup(
     url: str,
     session: requests.Session,
     *,
-    headers: Optional[dict] = None,
+    headers: dict | None = None,
     retries: int = 2,
     sleep: float = 0.7,
     timeout: int = 30,
@@ -125,7 +123,7 @@ def event_links_for_year(
     session: requests.Session,
     *,
     base: str = DEFAULT_BASE,
-    headers: Optional[dict] = None,
+    headers: dict | None = None,
     retries: int = 2,
     request_sleep: float = 0.7,
     timeout: int = 30,
@@ -175,8 +173,8 @@ def parse_event_live(
     event_url: str,
     session: requests.Session,
     *,
-    rename_map: Optional[dict] = None,
-    headers: Optional[dict] = None,
+    rename_map: dict | None = None,
+    headers: dict | None = None,
     retries: int = 2,
     request_sleep: float = 0.7,
     timeout: int = 30,
@@ -282,11 +280,11 @@ def parse_event_live(
 def scrape_year(
     year: int,
     *,
-    rename_map: Optional[dict] = None,
-    skip_event_names: Optional[set] = None,
+    rename_map: dict | None = None,
+    skip_event_names: set | None = None,
     sleep: float = 0.6,
     base: str = DEFAULT_BASE,
-    headers: Optional[dict] = DEFAULT_HEADERS,
+    headers: dict | None = DEFAULT_HEADERS,
     retries: int = 2,
     request_sleep: float = 0.7,
     timeout: int = 30,
@@ -349,10 +347,10 @@ def scrape_years(
     year_start: int,
     year_end_inclusive: int,
     *,
-    rename_map: Optional[dict] = None,
-    known_event_names: Optional[set] = None,
+    rename_map: dict | None = None,
+    known_event_names: set | None = None,
     base: str = DEFAULT_BASE,
-    headers: Optional[dict] = DEFAULT_HEADERS,
+    headers: dict | None = DEFAULT_HEADERS,
     sleep: float = 0.6,
     retries: int = 2,
     request_sleep: float = 0.7,
@@ -436,7 +434,7 @@ def _existing_event_names(path: str) -> set:
     return set(existing["event_name"].dropna().astype(str))
 
 
-def _filter_known_links(links: list, skip_event_names: Optional[set]) -> list:
+def _filter_known_links(links: list, skip_event_names: set | None) -> list:
     """Drop ``(event_name, url)`` links whose event name is already known."""
     if not skip_event_names:
         return links
@@ -496,11 +494,11 @@ def merge_events_into_csv(df: pd.DataFrame, output_path: str) -> None:
 # CLI
 # ---------------------------------------------------------------------
 
-def _load_rename_map(path: Optional[str]) -> Optional[dict]:
+def _load_rename_map(path: str | None) -> dict | None:
     """Load a rename map JSON if provided."""
     if not path:
         return None
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         obj = json.load(f)
     if not isinstance(obj, dict):
         raise ValueError("rename map JSON must be an object or dict")

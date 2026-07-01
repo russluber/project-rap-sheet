@@ -15,11 +15,11 @@ Usage (from repo root):
     python scripts/fetch_youtube_channel_uploads.py --channel UCBdHwFIE4AJWSa3Wxdu7bAQ --output data/raw/youtube_videos.json
 """
 
-import os
-import json
-import time
 import argparse
-from typing import List, Dict, Set, Any, Optional
+import json
+import os
+import time
+from typing import Any
 
 import requests
 
@@ -49,7 +49,7 @@ def load_api_key(secret_path: str = DEFAULT_SECRET_PATH) -> str:
         return env_key
 
     if os.path.exists(secret_path):
-        with open(secret_path, "r", encoding="utf-8") as f:
+        with open(secret_path, encoding="utf-8") as f:
             data = json.load(f)
         key = data.get("YT_API_KEY")
         if key:
@@ -82,24 +82,24 @@ def get_uploads_playlist_id(channel_id: str, api_key: str) -> str:
         resp = requests.get(url, params=params, timeout=30)
         resp.raise_for_status()
     except requests.RequestException as e:
-        raise RuntimeError(f"Failed to fetch uploads playlist: {e}")
+        raise RuntimeError(f"Failed to fetch uploads playlist: {e}") from e
 
     data = resp.json()
     try:
         return data["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
-    except (KeyError, IndexError):
+    except (KeyError, IndexError) as e:
         raise ValueError(
             f"Could not retrieve uploads playlist ID for channel {channel_id}."
-        )
+        ) from e
 
 
-def get_all_upload_video_ids(uploads_playlist_id: str, api_key: str) -> List[str]:
+def get_all_upload_video_ids(uploads_playlist_id: str, api_key: str) -> list[str]:
     """
     Retrieve all video IDs from the given uploads playlist.
 
     Uses paging with maxResults=50 until there is no nextPageToken.
     """
-    video_ids: List[str] = []
+    video_ids: list[str] = []
     url = f"{YOUTUBE_API_BASE}/playlistItems"
     params = {
         "part": "contentDetails",
@@ -113,7 +113,7 @@ def get_all_upload_video_ids(uploads_playlist_id: str, api_key: str) -> List[str
             resp = requests.get(url, params=params, timeout=30)
             resp.raise_for_status()
         except requests.RequestException as e:
-            raise RuntimeError(f"Failed to fetch video IDs: {e}")
+            raise RuntimeError(f"Failed to fetch video IDs: {e}") from e
 
         data = resp.json()
         for item in data.get("items", []):
@@ -132,11 +132,11 @@ def get_all_upload_video_ids(uploads_playlist_id: str, api_key: str) -> List[str
 
 
 def fetch_video_metadata(
-    video_ids: List[str],
+    video_ids: list[str],
     api_key: str,
-    existing_ids: Optional[Set[str]] = None,
+    existing_ids: set[str] | None = None,
     sleep: float = 0.2,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Fetch detailed metadata for each video ID.
 
@@ -149,7 +149,7 @@ def fetch_video_metadata(
     if existing_ids is None:
         existing_ids = set()
 
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     url = f"{YOUTUBE_API_BASE}/videos"
 
     # YouTube API allows up to 50 IDs per call
@@ -170,7 +170,7 @@ def fetch_video_metadata(
             resp = requests.get(url, params=params, timeout=30)
             resp.raise_for_status()
         except requests.RequestException as e:
-            raise RuntimeError(f"Failed to fetch video metadata: {e}")
+            raise RuntimeError(f"Failed to fetch video metadata: {e}") from e
 
         data = resp.json()
         for item in data.get("items", []):
@@ -203,7 +203,7 @@ def fetch_video_metadata(
 # JSON I/O helpers
 # ---------------------------------------------------------------------------
 
-def load_existing_metadata(path: str) -> List[Dict[str, Any]]:
+def load_existing_metadata(path: str) -> list[dict[str, Any]]:
     """
     Load existing video metadata from JSON file, if it exists.
 
@@ -213,7 +213,7 @@ def load_existing_metadata(path: str) -> List[Dict[str, Any]]:
         return []
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         if isinstance(data, list):
             return data
@@ -222,7 +222,7 @@ def load_existing_metadata(path: str) -> List[Dict[str, Any]]:
         return []
 
 
-def save_metadata(path: str, records: List[Dict[str, Any]]) -> None:
+def save_metadata(path: str, records: list[dict[str, Any]]) -> None:
     """
     Save the list of metadata records to JSON with UTF-8 and nice indentation.
     """
@@ -259,7 +259,7 @@ def fetch_channel_uploads(
     print(f"Found {len(video_ids)} total videos in uploads playlist.")
 
     existing_data = load_existing_metadata(output_path)
-    existing_ids: Set[str] = {v.get("id") for v in existing_data if v.get("id")}
+    existing_ids: set[str] = {v.get("id") for v in existing_data if v.get("id")}
     print(f"Existing metadata contains {len(existing_ids)} videos.")
 
     new_records = fetch_video_metadata(video_ids, api_key, existing_ids=existing_ids)

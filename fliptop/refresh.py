@@ -33,7 +33,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import PROJECT_ROOT, PROCESSED_DATA_DIR, RAW_DATA_DIR
+from . import PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
 from .battles import build_df_battles, save_df_battles
 from .structures import write_emcees_table
 
