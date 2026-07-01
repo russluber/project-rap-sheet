@@ -19,6 +19,7 @@ reimplement it.
 - [`df_battles` schema](#df_battles-schema)
 - [Auditing what gets filtered out](#auditing-what-gets-filtered-out)
 - [Derived structures](#derived-structures) (`structures.py`)
+- [Output validation gate](#output-validation-gate) (`validate.py`)
 - [Canonical emcee names](#canonical-emcee-names) (`rename_map.py`)
 - [Battle results / annotations](#battle-results--annotations) (`annotations.py`, `annotate.py`)
 - [Refreshing the datasets](#refreshing-the-datasets) (`refresh.py`)
@@ -64,7 +65,9 @@ fliptop/
 ├── __init__.py         # package init: shared data-dir paths + lazy public API
 ├── battles.py          # the pipeline: raw sources -> df_battles
 ├── rename_map.py       # loads/validates the alias map from data/emcee_aliases.csv
+├── overrides.py        # loads/validates the correction tables in data/overrides/
 ├── structures.py       # structures derived from df_battles (emcee table + battle network)
+├── validate.py         # output data-quality gate for df_battles
 ├── annotations.py      # battle-results store (winner/judging/notes) + helpers
 ├── annotate.py         # fliptop-annotate CLI: interactively record battle results
 └── refresh.py          # fliptop-refresh CLI: rebuild (and optionally re-fetch) the datasets
@@ -137,8 +140,8 @@ where each date came from — `website` initially, cleared inside the COVID wind
 
 `clean_event_location` also normalizes known messiness: prefers the text after
 `@`, fixes the country separator (`City. Philippines` / `Metro Manila
-Philippines` → `, Philippines`), collapses doubled words, and applies a few
-Davao variants.
+Philippines` → `, Philippines`), collapses doubled words, and applies known
+location aliases (e.g. Davao variants) from `data/overrides/location_aliases.csv`.
 
 ### Stage 3 — consolidate, tidy, finalize
 
@@ -149,15 +152,15 @@ Davao variants.
   …) into one row: `id` and `url` become **ordered lists**, `duration_seconds`
   is summed, `upload_date` is the earliest part, `duration_hms` is recomputed.
 - sorts newest-upload-first,
-- applies `apply_manual_event_location_overrides` (hand-fixed locations for a
-  handful of events the scrape got wrong, keyed by event name),
+- applies `apply_manual_event_location_overrides` (hand-fixed locations from
+  `data/overrides/`, for events the scrape got wrong),
 - **`impute_event_dates_from_versetracker`** fills the COVID-masked `event_date`s
   (see [below](#covid-era-date-imputation-versetracker)) — before
   `normalize_event_day`, so the `(Day N)` suffix is still available,
 - **`normalize_event_day`** standardizes multi-day events (see below),
 - **`apply_manual_event_date_overrides`** pins specific battles whose YouTube
-  description mis-dates them (keyed by video id; runs last, so a hand-pin always
-  wins),
+  description mis-dates them (from `data/overrides/event_dates.csv`, keyed by
+  video id; runs last, so a hand-pin always wins),
 - selects and orders the final columns.
 
 #### Multi-day events (`normalize_event_day`)
@@ -200,7 +203,8 @@ and loaded by `load_versetracker_event_dates`.
   each filled row `versetracker` in `event_date_source`.
 - It runs **before** `normalize_event_day` (which strips the `(Day N)` suffix it
   needs), and `apply_manual_event_date_overrides` runs **after**, so any
-  hand-pinned `_EVENT_DATE_OVERRIDES` entry still wins over a VerseTracker value.
+  hand-pinned entry in `data/overrides/event_dates.csv` still wins over a
+  VerseTracker value.
 
 The reference CSV is optional: if it's absent, `load_versetracker_event_dates`
 returns `{}` and the step is a no-op (those battles simply stay `NaT`). The build
@@ -359,6 +363,33 @@ fliptop-annotate --redo "A vs B" # re-annotate an existing battle (fix a mistake
 
 ---
 
+## Output validation gate
+
+`validate.py` guards the built table. `build_df_battles` is a long chain of
+heuristic filters, merges, and overrides, so a change in a raw source's shape (a
+re-scrape, a YouTube API tweak) can silently produce a malformed table that still
+writes cleanly to disk. `validate_df_battles(df)` returns a list of
+human-readable problems (empty == ok), checking the invariants the pipeline is
+supposed to guarantee:
+
+- every expected column is present (`fliptop.battles.FINAL_COLUMNS`, the single
+  source of truth for the output schema);
+- one row per battle — the scalar battle key (first id for multi-part battles) is
+  present and unique;
+- every battle has two non-blank emcees;
+- `event_date_source` is drawn from the known vocabulary (`website` |
+  `description` | `versetracker` | `manual`; missing is allowed for undated
+  battles);
+- `event_date` is within a plausible window (≥ 2010, not in the future).
+
+`fliptop-refresh` runs the gate after every build and **aborts before writing**
+if anything fails, so a regression fails loudly instead of overwriting the
+processed data with a broken table. `summarize_df_battles(df)` produces the
+one-line build summary (battle count + `event_date_source` breakdown) printed on
+each refresh.
+
+---
+
 ## Refreshing the datasets
 
 `refresh.py` implements **`fliptop-refresh`** (a console script), the one-command
@@ -370,8 +401,9 @@ fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first
 fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
 ```
 
-- `rebuild_processed()` builds `df_battles` once and writes **both** processed
-  outputs from that single frame (fast, deterministic, no network).
+- `rebuild_processed()` builds `df_battles` once, runs the
+  [validation gate](#output-validation-gate), and (if it passes) writes **both**
+  processed outputs from that single frame (fast, deterministic, no network).
 - `fetch_raw()` (only with `--fetch`) runs the two `scripts/` collectors as
   subprocesses first; this needs a YouTube API key (see `data/README.md`). The
   YouTube fetch is always incremental; the website events scrape is a **full
@@ -401,6 +433,7 @@ from fliptop import (
     write_emcees_table,
     build_battle_network,    # df_battles -> networkx graph
     merge_results,           # join battle results onto df_battles
+    validate_df_battles,     # data-quality gate for a built df_battles
 )
 ```
 

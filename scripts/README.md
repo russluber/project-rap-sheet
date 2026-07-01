@@ -234,8 +234,8 @@ python scripts/fetch_versetracker_event_dates.py --events "Ahon 12" "Zoning 10"
 > ⚠️ VerseTracker's date is sometimes a proxy (it appears to use the event
 > **flyer-post** date for some events — e.g. Bwelta Balentong 7), so treat these
 > as accurate to within days, not exact. They are tagged `versetracker` in
-> `df_battles`' `event_date_source` column; override a specific battle via
-> `_EVENT_DATE_OVERRIDES` in `battles.py` if you find a better source. This
+> `df_battles`' `event_date_source` column; override a specific battle by adding
+> a row to `data/overrides/event_dates.csv` if you find a better source. This
 > scraper also depends on VerseTracker's current HTML (`div.event-date`); if the
 > site is redesigned, update `parse_event_date`.
 

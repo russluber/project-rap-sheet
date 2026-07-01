@@ -1333,6 +1333,27 @@ def consolidate_battle_parts(df: pd.DataFrame) -> pd.DataFrame:
     return final_df
 
 
+# The columns build_df_battles emits, in order. Single source of truth for the
+# output schema: finalize_battles selects/orders by it, and fliptop.validate
+# checks the built table against it.
+FINAL_COLUMNS = [
+    "id",
+    "title",
+    "description",
+    "upload_date",
+    "duration_seconds",
+    "duration_hms",
+    "emcee1",
+    "emcee2",
+    "matchup",
+    "event_name",
+    "event_date",
+    "event_date_source",
+    "event_location",
+    "url",
+]
+
+
 def finalize_battles(
     df_with_meta: pd.DataFrame,
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
@@ -1420,23 +1441,7 @@ def finalize_battles(
     battles = apply_manual_event_date_overrides(battles)
 
     # 10) Select and order final columns (keep only those that exist)
-    final_cols = [
-        "id",
-        "title",
-        "description",
-        "upload_date",
-        "duration_seconds",
-        "duration_hms",
-        "emcee1",
-        "emcee2",
-        "matchup",
-        "event_name",
-        "event_date",
-        "event_date_source",
-        "event_location",
-        "url",
-    ]
-    existing_cols = [c for c in final_cols if c in battles.columns]
+    existing_cols = [c for c in FINAL_COLUMNS if c in battles.columns]
     battles = battles[existing_cols]
 
     return battles

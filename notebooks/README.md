@@ -241,8 +241,9 @@ better evidence in a few cases:
 - **Ahon 12**: VerseTracker's 2021-12-08 *matches* independent vlog evidence
   (vlogs dated Dec 12–13 confirm the event was just before). ✓
 
-To override any specific battle with a better-sourced date, add its YouTube video
-id to `_EVENT_DATE_OVERRIDES` in [`battles.py`](../fliptop/battles.py) — that
+To override any specific battle with a better-sourced date, add a row (its
+YouTube video id → ISO date) to
+[`data/overrides/event_dates.csv`](../data/overrides/event_dates.csv) — that
 hand-pin runs last and wins over the VerseTracker value (and is tagged `manual`).
 Locations were recovered separately: the quarantine venue "Baraks" (CIFRA
 Building, Boni Ave, Mandaluyong) → *FlipTop Baraks, Mandaluyong City*; and

@@ -36,6 +36,7 @@ from pathlib import Path
 from . import PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
 from .battles import build_df_battles, save_df_battles
 from .structures import write_emcees_table
+from .validate import summarize_df_battles, validate_df_battles
 
 # Default FlipTop YouTube channel (see scripts/fetch_youtube_channel_uploads.py).
 DEFAULT_CHANNEL = "UCBdHwFIE4AJWSa3Wxdu7bAQ"
@@ -106,9 +107,16 @@ def _run_script(script_path: Path, args: list[str]) -> None:
 def rebuild_processed(
     raw_dir: Path = RAW_DATA_DIR,
     processed_dir: Path = PROCESSED_DATA_DIR,
+    validate: bool = True,
 ) -> tuple[Path, Path]:
     """
     Build df_battles once and write both processed outputs from it.
+
+    A data-quality gate runs after the build and before anything is written: if
+    ``validate`` is set (the default) and the table violates any invariant (see
+    ``fliptop.validate.validate_df_battles``), a ``ValueError`` is raised and no
+    output files are touched, so a regression can't silently overwrite the
+    processed data with a broken table.
 
     Returns
     -------
@@ -117,6 +125,15 @@ def rebuild_processed(
     processed_dir.mkdir(parents=True, exist_ok=True)
 
     df_battles = build_df_battles(raw_dir=raw_dir)
+    print(f"[validate] {summarize_df_battles(df_battles)}")
+
+    if validate:
+        problems = validate_df_battles(df_battles)
+        if problems:
+            raise ValueError(
+                "df_battles failed validation; refusing to write:\n"
+                + "\n".join(f"  - {p}" for p in problems)
+            )
 
     battles_path = save_df_battles(
         df_battles, processed_dir / "df_battles.json", fmt="json"
