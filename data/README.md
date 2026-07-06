@@ -161,6 +161,9 @@ The project's core table: **one row per battle**, as newline-delimited JSON
 The full column-by-column schema is documented in the
 [fliptop README](../fliptop/README.md#df_battles-schema). A few file-format notes:
 
+- Process of Illumination and tryout events are excluded after event metadata is
+  attached; they remain visible in `build_excluded_uploads` with an exclusion
+  reason.
 - `id` and `url` are a **single value** for normal battles and a **list** for
   consolidated multi-part (`pt. 1`, `pt. 2`, …) uploads.
 - `event_name` is standardized (no `(Day N)` suffix); for a multi-day event,

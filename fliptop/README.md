@@ -84,6 +84,7 @@ three stages and returns the final table.
 build_df_battles
   ├─ make_df_1v1_uploads      Stage 1: raw YouTube uploads -> clean 1v1 uploads
   ├─ attach_event_metadata    Stage 2: merge event name / date / location
+  ├─ drop_excluded_events              remove excluded event categories
   └─ finalize_battles         Stage 3: consolidate parts, tidy, override, order
 ```
 
@@ -103,8 +104,8 @@ take a DataFrame and return a new one), which keeps them easy to read and test.
 | `copy_yt_title` | preserve the original title (with `pt. N`) as `yt_raw_title` |
 | `strip_pt_suffix_from_title` | drop the `pt. N` suffix from the working title |
 
-then the **three filters** that decide what counts as a battle (this is the only
-place rows are dropped):
+then the **three title/format filters** that make the first decision about what
+counts as a battle:
 
 | filter | keeps / drops |
 | ------ | ------------- |
@@ -137,6 +138,12 @@ This stage also seeds **`event_date_source`**, a provenance tag that records
 where each date came from — `website` initially, cleared inside the COVID window,
 `description` for the post-COVID fallback. Stage 3 then tags `versetracker` and
 `manual` as it imputes/overrides.
+
+After metadata attachment, `drop_excluded_events` removes rows whose
+`event_name` contains `Process of Illumination` or `tryout` (case-insensitive).
+These categories cannot be filtered reliably during Stage 1 because many of
+their YouTube titles contain neither phrase. The event exclusions are separate
+from `EXCLUDE_KEYWORDS`, which remains title-only.
 
 `clean_event_location` also normalizes known messiness: prefers the text after
 `@`, fixes the country separator (`City. Philippines` / `Metro Manila
@@ -243,10 +250,12 @@ disable imputation explicitly.
 ## Auditing what gets filtered out
 
 To verify the filters aren't dropping real battles, `build_excluded_uploads(raw_dir)`
-returns every upload the Stage-1 filters removed, tagged with the reason
-(`no 'vs' token`, `non-battle keyword`, `not 1v1`) and, for keyword drops, the
-matched keyword. It reruns the *exact same* filter functions as the pipeline
-(via `prepare_uploads`), so the audit can never drift from real behavior.
+returns every upload the pipeline removed, tagged with the reason (`no 'vs'
+token`, `non-battle keyword`, `not 1v1`, or `excluded event`) and, for keyword
+drops, the matched title or event keyword. It reruns the same title/format
+filters, attaches the event metadata, and then applies the same event-name
+filter as the build. The audit includes `event_name` when available and retains
+the first reason that excluded an upload.
 
 ```python
 from fliptop import RAW_DATA_DIR, build_excluded_uploads, DATA_DIR

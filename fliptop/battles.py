@@ -20,7 +20,7 @@ Typical notebook usage:
 The pipeline has three main stages:
 
 1. From raw YouTube uploads to clean 1v1 battle uploads.
-2. Attach event metadata from the scraped event file.
+2. Attach event metadata and remove excluded event categories.
 3. Consolidate multi part uploads into one row per battle.
 """
 
@@ -207,6 +207,15 @@ EXCLUDE_KEYWORDS = [
 
 EXCLUDE_RE = re.compile("|".join(re.escape(w) for w in EXCLUDE_KEYWORDS), flags=re.IGNORECASE)
 
+# Event names are unavailable during the title filters above. These domain-level
+# exclusions run after event metadata is attached so they also catch uploads
+# whose YouTube titles do not identify them as tryouts / POI.
+EXCLUDE_EVENT_KEYWORDS = ["process of illumination", "tryout"]
+EXCLUDE_EVENT_RE = re.compile(
+    "|".join(re.escape(w) for w in EXCLUDE_EVENT_KEYWORDS),
+    flags=re.IGNORECASE,
+)
+
 
 def filter_titles_with_vs(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -224,6 +233,16 @@ def drop_non_battles(df: pd.DataFrame) -> pd.DataFrame:
     if "title" not in df:
         return df
     return df[~df["title"].str.contains(EXCLUDE_RE, na=False)]
+
+
+def drop_excluded_events(
+    df: pd.DataFrame,
+    event_col: str = "event_name",
+) -> pd.DataFrame:
+    """Drop rows whose event name matches a known excluded event category."""
+    if event_col not in df:
+        return df
+    return df[~df[event_col].astype("string").str.contains(EXCLUDE_EVENT_RE, na=False)]
 
 
 def keep_1v1(df: pd.DataFrame) -> pd.DataFrame:
@@ -1056,18 +1075,20 @@ def prepare_uploads(df_yt: pd.DataFrame) -> pd.DataFrame:
 def build_excluded_uploads(
     raw_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
+    events_csv_name: str = "matchup_events_metadata.csv",
 ) -> pd.DataFrame:
     """
-    Return the raw uploads that the 1v1 filtering drops, tagged with the reason.
+    Return the raw uploads that the pipeline drops, tagged with the reason.
 
     Audit helper: lets you eyeball everything the pipeline excludes so real
-    battles are not silently filtered out. It reruns the exact same filter
-    functions as `make_df_1v1_uploads` (via `prepare_uploads`), in the same
-    order, recording which stage removed each video:
+    battles are not silently filtered out. It reruns the title/format filters
+    in the same order, then attaches event metadata and applies the event-name
+    exclusions, recording the first stage that removed each video:
 
         - "no 'vs' token"      (filter_titles_with_vs)
         - "non-battle keyword" (drop_non_battles; the matched word is recorded)
         - "not 1v1"            (keep_1v1)
+        - "excluded event"     (drop_excluded_events; event keyword recorded)
 
     Returns
     -------
@@ -1075,7 +1096,9 @@ def build_excluded_uploads(
         One row per excluded upload, with id, both titles, upload_date, url,
         `excluded_reason`, and `matched_keyword` (for non-battle drops).
     """
-    df_yt = load_youtube_uploads(Path(raw_dir) / youtube_json_name)
+    raw_dir = Path(raw_dir)
+    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
+    df_events = load_event_metadata(raw_dir / events_csv_name)
     pre = prepare_uploads(df_yt)
 
     def _dropped(before: pd.DataFrame, after: pd.DataFrame, reason: str) -> pd.DataFrame:
@@ -1086,29 +1109,57 @@ def build_excluded_uploads(
     after_vs = filter_titles_with_vs(pre)
     after_nonbattle = drop_non_battles(after_vs)
     after_1v1 = keep_1v1(after_nonbattle)
+    with_event_meta = attach_event_metadata(after_1v1, df_events)
+    after_event_filter = drop_excluded_events(with_event_meta)
 
     excluded = pd.concat(
         [
             _dropped(pre, after_vs, "no 'vs' token"),
             _dropped(after_vs, after_nonbattle, "non-battle keyword"),
             _dropped(after_nonbattle, after_1v1, "not 1v1"),
+            _dropped(with_event_meta, after_event_filter, "excluded event"),
         ],
         ignore_index=True,
     )
 
-    # Record which exclusion keyword matched, to make non-battle drops auditable.
-    def _matched_keyword(title):
-        if not isinstance(title, str):
+    # Add event names to early-stage drops too, without changing which filter
+    # receives credit for excluding them.
+    event_key = "video_id" if "video_id" in df_events.columns else "id"
+    if event_key in df_events.columns and "event_name" in df_events.columns:
+        event_lookup = (
+            df_events[[event_key, "event_name"]]
+            .drop_duplicates(subset=[event_key])
+            .rename(columns={event_key: "id", "event_name": "_event_name_lookup"})
+        )
+        excluded = excluded.merge(event_lookup, on="id", how="left")
+        if "event_name" in excluded.columns:
+            excluded["event_name"] = excluded["event_name"].fillna(
+                excluded["_event_name_lookup"]
+            )
+        else:
+            excluded["event_name"] = excluded["_event_name_lookup"]
+        excluded = excluded.drop(columns=["_event_name_lookup"])
+
+    # Record the title or event keyword responsible for keyword-based drops.
+    def _matched_keyword(row):
+        if row["excluded_reason"] == "non-battle keyword":
+            value, pattern = row.get("title"), EXCLUDE_RE
+        elif row["excluded_reason"] == "excluded event":
+            value, pattern = row.get("event_name"), EXCLUDE_EVENT_RE
+        else:
             return pd.NA
-        m = EXCLUDE_RE.search(title)
+        if not isinstance(value, str):
+            return pd.NA
+        m = pattern.search(value)
         return m.group(0) if m else pd.NA
 
-    excluded["matched_keyword"] = excluded["title"].map(_matched_keyword)
+    excluded["matched_keyword"] = excluded.apply(_matched_keyword, axis=1)
 
     cols = [
         "id",
         "yt_raw_title",
         "title",
+        "event_name",
         "upload_date",
         "url",
         "excluded_reason",
@@ -1497,6 +1548,7 @@ def build_df_battles(
 
     df_1v1 = make_df_1v1_uploads(df_yt, rename_map=rename_map)
     df_with_meta = attach_event_metadata(df_1v1, df_events)
+    df_with_meta = drop_excluded_events(df_with_meta)
     df_battles = finalize_battles(df_with_meta, vt_event_dates=vt_event_dates)
 
     return df_battles

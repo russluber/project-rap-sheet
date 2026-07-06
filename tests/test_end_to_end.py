@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from fliptop import annotations as ann
 from fliptop.battles import write_df_battles
 
 EXPECTED_COLUMNS = [
@@ -43,6 +44,15 @@ def test_no_null_emcees(df_battles):
     assert df_battles["emcee2"].notna().all()
 
 
+def test_excluded_event_categories_are_absent(df_battles):
+    excluded = df_battles["event_name"].astype("string").str.contains(
+        r"Process of Illumination|tryout",
+        case=False,
+        na=False,
+    )
+    assert not excluded.any()
+
+
 def test_id_and_url_are_lists_iff_multipart(df_battles):
     # id and url are lists for consolidated multi-part battles and scalars
     # otherwise; both columns must agree on which rows are multi-part.
@@ -56,6 +66,22 @@ def test_scalar_ids_are_unique(df_battles):
         df_battles["id"].apply(lambda x: isinstance(x, str)), "id"
     ]
     assert not scalar_ids.duplicated().any()
+
+
+def test_all_annotations_reference_a_final_battle(df_battles):
+    battle_keys = set(df_battles["id"].map(ann.battle_key))
+    results = ann.load_results()
+    assert set(results["id"]) <= battle_keys
+
+
+def test_known_draw_annotations_remain_valid():
+    results = ann.load_results().set_index("id")
+
+    for battle_id in ("5mYgPAwGqf8", "Vz5SzkRo5Fc"):
+        row = results.loc[battle_id].to_dict()
+        assert row["battle_type"] == "judged"
+        assert row["winner"] == ann.NA
+        assert ann.validate_result_row({"id": battle_id, **row}) == []
 
 
 def test_covid_window_dates_masked_before_imputation(raw_data_dir):

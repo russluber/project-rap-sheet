@@ -15,12 +15,40 @@ from fliptop.battles import (
     apply_manual_event_date_overrides,
     apply_manual_event_location_overrides,
     clean_event_location,
+    drop_excluded_events,
     extract_event_name_from_description,
     impute_event_dates_from_versetracker,
     load_versetracker_event_dates,
     normalize_event_day,
     split_event_description,
 )
+
+# ---------------------------------------------------------------------------
+# event exclusions
+# ---------------------------------------------------------------------------
+
+def test_drop_excluded_events_matches_categories_case_insensitively():
+    df = pd.DataFrame(
+        {
+            "id": ["poi", "tryout", "keep", "missing"],
+            "event_name": [
+                "PROCESS OF ILLUMINATION 6 (Visayas)",
+                "Mindfields Mindanao TrYoUtS",
+                "Ahon 15",
+                pd.NA,
+            ],
+        }
+    )
+
+    out = drop_excluded_events(df)
+
+    assert out["id"].tolist() == ["keep", "missing"]
+
+
+def test_drop_excluded_events_without_event_column_is_noop():
+    df = pd.DataFrame({"id": ["a", "b"]})
+    pd.testing.assert_frame_equal(drop_excluded_events(df), df)
+
 
 # ---------------------------------------------------------------------------
 # split_event_description
