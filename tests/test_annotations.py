@@ -56,11 +56,11 @@ def test_validate_votes_and_overtime():
 def test_validate_result_row_judged_with_score_requires_integer_votes():
     ok = ann.make_result_row(
         id="x", winner="A", battle_type="judged",
-        votes_winner=5, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no",
+        votes_emcee1=5, votes_emcee2=0, votes_nv=0, votes_ot=0, overtime="no",
     )
     assert ann.validate_result_row(ok) == []
 
-    bad = dict(ok, votes_winner=ann.NA)  # half-filled tally (some NA, some int)
+    bad = dict(ok, votes_emcee1=ann.NA)  # half-filled tally (some NA, some int)
     assert ann.validate_result_row(bad)
 
 
@@ -72,9 +72,17 @@ def test_validate_result_row_judged_score_unknown_is_all_na_votes():
     assert ann.validate_result_row(bad)
 
 
-def test_validate_result_row_judged_requires_a_winner():
-    bad = ann.make_result_row(id="x", winner=ann.NA, battle_type="judged")
-    assert ann.validate_result_row(bad)
+def test_validate_result_row_judged_without_winner_is_a_draw():
+    draw = ann.make_result_row(id="x", winner=ann.NA, battle_type="judged")
+    assert ann.validate_result_row(draw) == []
+
+    assert ann.validate_result_row(dict(draw, votes_emcee1="2"))
+    assert ann.validate_result_row(dict(draw, overtime="no"))
+
+
+def test_validate_result_row_judged_rejects_blank_winner():
+    row = ann.make_result_row(id="x", winner="A", battle_type="judged")
+    assert ann.validate_result_row(dict(row, winner=""))
 
 
 def test_validate_result_row_promo_has_no_winner_and_no_votes():
@@ -82,7 +90,7 @@ def test_validate_result_row_promo_has_no_winner_and_no_votes():
     assert "promo" in ann.BATTLE_TYPES
     assert ann.validate_result_row(ok) == []
 
-    assert ann.validate_result_row(dict(ok, votes_winner="5"))  # promo never has votes
+    assert ann.validate_result_row(dict(ok, votes_emcee1="5"))  # promo never has votes
     assert ann.validate_result_row(dict(ok, winner="A"))        # promo never has a winner
 
 
@@ -94,29 +102,65 @@ def test_save_keeps_explicit_markers_and_sorts(tmp_path):
     path = tmp_path / "battle_results.csv"
     rows = [
         ann.make_result_row(id="b", winner=ann.NA, battle_type="promo"),
+        ann.make_result_row(id="c", winner=ann.NA, battle_type="judged", notes="draw"),
         ann.make_result_row(
             id="a", winner="Y", battle_type="judged",
-            votes_winner=4, votes_loser=1, votes_nv=0, votes_ot=0, overtime="no",
+            votes_emcee1=1, votes_emcee2=4, votes_nv=0, votes_ot=0, overtime="no",
         ),
     ]
     ann.save_results(pd.DataFrame(rows, columns=ann.RESULTS_COLUMNS), path)
     loaded = ann.load_results(path)
 
     assert list(loaded.columns) == ann.RESULTS_COLUMNS
-    assert loaded["id"].tolist() == ["a", "b"]            # sorted on write
+    assert loaded["id"].tolist() == ["a", "b", "c"]       # sorted on write
     # no blank cells anywhere
     assert (loaded.map(lambda v: str(v).strip() != "")).all().all()
     # explicit markers survive the round-trip (not coerced to NaN)
     nd = loaded[loaded["id"] == "b"].iloc[0]
-    assert nd["votes_winner"] == "NA" and nd["notes"] == "none"
+    assert nd["votes_emcee1"] == "NA" and nd["notes"] == "none"
+    draw = loaded[loaded["id"] == "c"].iloc[0]
+    assert draw["battle_type"] == "judged" and draw["winner"] == "NA"
+
+
+def test_load_rejects_legacy_results_schema(tmp_path):
+    path = tmp_path / "battle_results.csv"
+    legacy = pd.DataFrame(
+        [
+            {
+                "id": "a",
+                "winner": "X",
+                "battle_type": "judged",
+                "votes_winner": "5",
+                "votes_loser": "0",
+                "votes_nv": "0",
+                "votes_ot": "0",
+                "overtime": "no",
+                "notes": "none",
+            }
+        ]
+    )
+    legacy.to_csv(path, index=False)
+
+    with pytest.raises(ValueError, match="results schema does not match"):
+        ann.load_results(path)
+
+
+def test_load_rejects_current_columns_in_wrong_order(tmp_path):
+    path = tmp_path / "battle_results.csv"
+    row = ann.make_result_row(id="a", winner="X")
+    wrong_order = ["winner", *[c for c in ann.RESULTS_COLUMNS if c != "winner"]]
+    pd.DataFrame([row], columns=wrong_order).to_csv(path, index=False)
+
+    with pytest.raises(ValueError, match="columns are out of order"):
+        ann.load_results(path)
 
 
 def test_upsert_replaces_existing_id():
     row1 = ann.make_result_row(id="a", winner="X", battle_type="judged",
-                               votes_winner=5, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no")
+                               votes_emcee1=5, votes_emcee2=0, votes_nv=0, votes_ot=0, overtime="no")
     results = pd.DataFrame([row1], columns=ann.RESULTS_COLUMNS)
     row2 = ann.make_result_row(id="a", winner="Y", battle_type="judged",
-                               votes_winner=4, votes_loser=1, votes_nv=0, votes_ot=0, overtime="no")
+                               votes_emcee1=1, votes_emcee2=4, votes_nv=0, votes_ot=0, overtime="no")
     results = ann.upsert_result(results, row2)
     assert len(results) == 1 and results.iloc[0]["winner"] == "Y"
 
@@ -144,7 +188,7 @@ def _battles():
 def test_pending_excludes_battles_in_store():
     results = pd.DataFrame(
         [ann.make_result_row(id="a", winner="Loonie", battle_type="judged",
-                             votes_winner=5, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no")],
+                             votes_emcee1=5, votes_emcee2=0, votes_nv=0, votes_ot=0, overtime="no")],
         columns=ann.RESULTS_COLUMNS,
     )
     keys = set(ann.pending_battles(_battles(), results)["battle_key"])
@@ -156,11 +200,11 @@ def test_merge_results_adds_columns_without_mutating_input():
     battles = _battles()
     results = pd.DataFrame(
         [ann.make_result_row(id="c1", winner="Shehyee", battle_type="judged",
-                             votes_winner=7, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no")],
+                             votes_emcee1=7, votes_emcee2=0, votes_nv=0, votes_ot=0, overtime="no")],
         columns=ann.RESULTS_COLUMNS,
     )
     merged = ann.merge_results(battles, results)
     assert "winner" not in battles.columns          # input untouched
     row = merged[merged["battle_key"] == "c1"].iloc[0]
-    assert row["winner"] == "Shehyee" and row["votes_winner"] == "7"
+    assert row["winner"] == "Shehyee" and row["votes_emcee1"] == "7"
     assert merged[merged["battle_key"] == "a"]["winner"].isna().all()  # unannotated -> NaN

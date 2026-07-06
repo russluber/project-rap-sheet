@@ -164,11 +164,12 @@ stages directly; see `scripts/README.md` (collection) and `fliptop/README.md`
 (building in Python). The `notebooks/wrangling.ipynb` notebook walks through the
 build interactively.
 
-### Recording battle results (who won)
+### Recording battle results
 
-Win/loss data is collected by hand and kept **separate** from `df_battles` in an
-append-only, id-keyed store (`data/annotations/battle_results.csv`). Use the
-interactive tool to record results:
+Wins, judged draws, and promos are collected by hand and kept **separate** from
+`df_battles` in an append-only, id-keyed store
+(`data/annotations/battle_results.csv`). Use the interactive tool to record
+results:
 
 ```bash
 fliptop-annotate            # walk through battles that aren't annotated yet
@@ -176,7 +177,8 @@ fliptop-annotate --limit 20 # do a batch of 20
 ```
 
 It is incremental and resumable. After a refresh you only annotate *new*
-battles, and quitting mid-session loses nothing. Join the results onto
+battles, and quitting mid-session loses nothing. At the result prompt, `d`
+records a judged draw and `p` records a promo with no judging. Join the results onto
 `df_battles` on demand with `fliptop.annotations.merge_results(df_battles)`;
 the published `df_battles.json` is intentionally left without result columns (for now).
 See `fliptop/README.md` for details.

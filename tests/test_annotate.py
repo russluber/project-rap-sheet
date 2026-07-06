@@ -70,18 +70,77 @@ def test_resolve_targets_returns_rematches_newest_first():
 def test_current_result_str_reports_stored_and_missing():
     results = pd.DataFrame(
         [ann.make_result_row(id="aaaaaaaaaaa", winner="Loonie", battle_type="judged",
-                             votes_winner=5, votes_loser=0, votes_nv=0, votes_ot=0, overtime="no")],
+                             votes_emcee1=5, votes_emcee2=0, votes_nv=0, votes_ot=0, overtime="no")],
         columns=ann.RESULTS_COLUMNS,
     )
-    assert "Loonie wins 5-0" in annotate._current_result_str(results, "aaaaaaaaaaa")
-    assert annotate._current_result_str(results, "bbbbbbbbbbb") == "not yet recorded"
+    assert "Loonie wins 5-0" in annotate._current_result_str(
+        results, "aaaaaaaaaaa", "Loonie", "Abra"
+    )
+    assert (
+        annotate._current_result_str(results, "bbbbbbbbbbb", "Abra", "Shehyee")
+        == "not yet recorded"
+    )
 
 
-def test_summarize_promo_reports_no_winner():
+def test_summarize_promo_reports_no_judging():
     row = ann.make_result_row(id="aaaaaaaaaaa", winner=ann.NA, battle_type="promo")
-    assert annotate._summarize(row) == "promo (no winner)"
+    assert annotate._summarize(row) == "promo (no judging)"
+
+
+def test_summarize_draw_distinguishes_it_from_promo():
+    row = ann.make_result_row(id="aaaaaaaaaaa", winner=ann.NA, battle_type="judged")
+    assert annotate._summarize(row) == "draw (judged, no winner)"
 
 
 def test_summarize_judged_without_score_reports_unknown():
     row = ann.make_result_row(id="aaaaaaaaaaa", winner="Loonie", battle_type="judged")
     assert annotate._summarize(row) == "Loonie wins (score unknown)"
+
+
+def test_prompt_winner_accepts_draw(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda _: "d")
+    assert annotate._prompt_winner("Loonie", "Abra") is annotate._DRAW
+
+
+def test_collect_draw_does_not_prompt_for_score(monkeypatch):
+    def fail():
+        raise AssertionError("draw must not prompt for a score")
+
+    monkeypatch.setattr(annotate, "_prompt_score", fail)
+    fields = annotate._collect_judging(annotate._DRAW, "Loonie", "Abra")
+    assert fields == {"winner": ann.NA, "battle_type": "judged"}
+
+
+def test_collect_judging_maps_winner_loser_score_to_emcee_order(monkeypatch):
+    monkeypatch.setattr(annotate, "_prompt_score", lambda: (5, 0))
+    monkeypatch.setattr(annotate, "_prompt_yes_no", lambda *args: "no")
+
+    fields = annotate._collect_judging("Abra", "Loonie", "Abra")
+
+    assert fields["votes_emcee1"] == 0
+    assert fields["votes_emcee2"] == 5
+    assert fields["winner"] == "Abra"
+
+
+def test_summarize_maps_emcee_order_back_to_winner_loser_score():
+    row = ann.make_result_row(
+        id="aaaaaaaaaaa",
+        winner="Abra",
+        battle_type="judged",
+        votes_emcee1=0,
+        votes_emcee2=5,
+        votes_nv=0,
+        votes_ot=0,
+        overtime="no",
+    )
+    assert annotate._summarize(row, "Loonie", "Abra") == "Abra wins 5-0"
+
+
+def test_prompt_notes_preserves_current_note_on_blank(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda _: "")
+    assert annotate._prompt_notes("existing note") == "existing note"
+
+
+def test_prompt_notes_replaces_current_note(monkeypatch):
+    monkeypatch.setattr("builtins.input", lambda _: "replacement")
+    assert annotate._prompt_notes("existing note") == "replacement"

@@ -308,23 +308,24 @@ picks it up.
 
 ## Battle results / annotations
 
-Who won each battle (and the judges' tally) is collected **by hand** and kept
-**separate** from `df_battles`, in an append-only CSV keyed by battle `id`:
+Battle results (including draws and promos) and judges' tallies are collected
+**by hand** and kept **separate** from `df_battles`, in an append-only CSV keyed
+by battle `id`:
 
 ```
 data/annotations/battle_results.csv
-columns: id, winner, battle_type,
-         votes_winner, votes_loser, votes_nv, votes_ot, overtime, notes
+columns: id, battle_type, winner,
+         votes_emcee1, votes_emcee2, votes_nv, votes_ot, overtime, notes
 ```
 
-Every battle is one of two kinds — which the host announces — and the rest is
-recorded as explicit, structured fields:
+Every battle is one of two kinds — which the host announces. A draw is a judged
+battle with no winner, not a third battle type:
 
 | column | meaning |
 | ------ | ------- |
-| `battle_type` | `judged` (a real, decided battle) \| `promo` (exhibition bout, no winner by design) |
-| `winner` | the winning emcee for a judged battle, else `NA` (promo) |
-| `votes_winner` / `votes_loser` | judges voting for the winner / loser |
+| `battle_type` | `judged` (decision or draw) \| `promo` (no judging) |
+| `winner` | the winning emcee; `NA` for a judged draw or promo |
+| `votes_emcee1` / `votes_emcee2` | judges voting for each emcee, in `df_battles` participant order |
 | `votes_nv` | judges who did not vote (NV) |
 | `votes_ot` | judges who voted to go to overtime |
 | `overtime` | `yes` \| `no` — did the battle go to an OT round? |
@@ -336,7 +337,10 @@ as text with explicit markers (`NA` where not applicable, `none` for empty
 notes), so the CSV has **no blank cells**; convert the vote columns with
 `pd.to_numeric` for analysis. A judged battle whose score was never recorded
 keeps its `winner` but has `NA` in every vote column — that's how "winner known,
-score unknown" is represented (no separate status for it).
+score unknown" is represented (no separate status for it). A judged row with
+`winner=NA` is a draw; a promo row also has no winner, but `battle_type`
+distinguishes it. Draw rulings that do not fit the structured fields belong in
+`notes`.
 
 **`annotations.py`** — the store and its helpers:
 
@@ -349,9 +353,11 @@ score unknown" is represented (no separate status for it).
   consolidated multi-part battles).
 
 **`annotate.py`** — the `fliptop-annotate` console script: an interactive tool
-that walks un-annotated battles, lets you pick the winner by `1`/`2`, validates
-input, and **writes after every entry** (crash-safe and resumable — quit any
-time and it picks up where you left off).
+that walks un-annotated battles, lets you pick the winner by `1`/`2`, record a
+judged draw with `d`, or record a promo with `p`. It validates input and
+**writes after every entry** (crash-safe and resumable — quit any time and it
+picks up where you left off). When using `--redo`, leaving notes blank preserves
+the existing note.
 
 ```bash
 fliptop-annotate                 # go through all pending battles

@@ -195,15 +195,16 @@ demand via `fliptop.annotations.merge_results`.
 
 ### `battle_results.csv`
 
-Who won each battle (and the judges' tally), keyed by battle `id` and written by
-`fliptop-annotate`. Every battle is one of two kinds — which the host announces:
+The result of each battle (and the judges' tally), keyed by battle `id` and
+written by `fliptop-annotate`. Every battle is one of two kinds — which the host
+announces:
 
 | column | values | notes |
 | ------ | ------ | ----- |
 | `id` | YouTube id | the battle key (first part id for multi-part battles) |
-| `battle_type` | `judged` \| `promo` | `promo` = exhibition bout, **no winner** by design |
-| `winner` | emcee name \| `NA` | the winner for a judged battle; `NA` for promo |
-| `votes_winner` / `votes_loser` | int \| `NA` | judges voting for the winner / loser |
+| `battle_type` | `judged` \| `promo` | `judged` includes decisions and draws; `promo` has no judging |
+| `winner` | emcee name \| `NA` | `NA` for a judged draw or promo |
+| `votes_emcee1` / `votes_emcee2` | int \| `NA` | judges voting for each emcee, in `df_battles` participant order |
 | `votes_nv` | int \| `NA` | judges who did not vote (NV) |
 | `votes_ot` | int \| `NA` | judges who voted to go to overtime |
 | `overtime` | `yes` \| `no` \| `NA` | did it go to an OT round? |
@@ -211,9 +212,11 @@ Who won each battle (and the judges' tally), keyed by battle `id` and written by
 
 The tally is always the **final (post-overtime)** result; panel size varies
 (5 / 7 / 9) and is just the sum of the vote columns. A judged battle whose score
-wasn't recorded keeps its `winner` but has `NA` in every vote column. See the
-[annotations docs](../fliptop/README.md#battle-results--annotations) for the full
-design and validation rules.
+wasn't recorded keeps its `winner` but has `NA` in every vote column. A judged
+draw has `winner=NA`; a promo also has `winner=NA` but is distinguished by
+`battle_type`. Draw details that do not fit the structured tally live in
+`notes`. See the [annotations docs](../fliptop/README.md#battle-results--annotations)
+for the full design and validation rules.
 
 ---
 

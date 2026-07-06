@@ -7,26 +7,28 @@ separate from the auto-built df_battles table.
 The authoritative store is an append-only CSV keyed by battle ``id``:
 
     data/annotations/battle_results.csv
-    columns: id, winner, battle_type,
-             votes_winner, votes_loser, votes_nv, votes_ot, overtime, notes
+    columns: id, battle_type, winner,
+             votes_emcee1, votes_emcee2, votes_nv, votes_ot, overtime, notes
 
-A battle is one of two kinds, which the host announces, and the rest of the
-fields are recorded as explicit, structured values:
+A battle is one of two kinds, which the host announces. A draw is a judged
+battle with no winner:
 
     battle_type      "judged" | "promo"
-                     "judged" = a real, decided battle with a winner.
-                     "promo"  = exhibition/promo bout with no winner by design.
-    winner           the winning emcee for a judged battle, else "NA" (promo).
-    votes_winner     judges who voted for the winner   (int, else "NA")
-    votes_loser      judges who voted for the loser     (int, else "NA")
+                     "judged" = judges decided the result (winner or draw).
+                     "promo"  = exhibition/promo bout with no judging.
+    winner           the winning emcee; "NA" for a draw or promo.
+    votes_emcee1     judges who voted for emcee1        (int, else "NA")
+    votes_emcee2     judges who voted for emcee2        (int, else "NA")
     votes_nv         judges who did not vote (NV)        (int, else "NA")
     votes_ot         judges who voted to go to overtime  (int, else "NA")
     overtime         did the battle go to an OT round?   "yes" | "no" | "NA"
     notes            free text, or the literal "none"
 
-A judged battle whose score was not recorded keeps its ``winner`` but stores
-"NA" in every vote column (and ``overtime``); the vote columns being "NA" is
-exactly what marks "winner known, score unknown".
+A decided battle whose score was not recorded keeps its ``winner`` but stores
+"NA" in every vote column (and ``overtime``). A draw stores ``winner="NA"`` and
+also leaves the structured judging fields as "NA"; unusual rulings belong in
+``notes``. A promo likewise has no winner or judging fields, but is distinguished
+from a draw by ``battle_type``.
 
 The recorded vote tally is always the *final* (post-overtime) tally. Panel size
 is not fixed (5 / 7 / 9 judges) and is simply the sum of the vote columns. All
@@ -54,17 +56,17 @@ RESULTS_PATH = ANNOTATIONS_DIR / "battle_results.csv"
 
 RESULTS_COLUMNS = [
     "id",
-    "winner",
     "battle_type",
-    "votes_winner",
-    "votes_loser",
+    "winner",
+    "votes_emcee1",
+    "votes_emcee2",
     "votes_nv",
     "votes_ot",
     "overtime",
     "notes",
 ]
 
-VOTE_COLUMNS = ["votes_winner", "votes_loser", "votes_nv", "votes_ot"]
+VOTE_COLUMNS = ["votes_emcee1", "votes_emcee2", "votes_nv", "votes_ot"]
 
 BATTLE_TYPES = ("judged", "promo")
 NA = "NA"          # explicit not-applicable marker (no blank cells)
@@ -136,11 +138,12 @@ def validate_result_row(row: dict) -> list[str]:
 
     Enforces the cross-field rules:
 
-    * promo  - no winner: ``winner`` and every vote column and ``overtime`` are
-      all the NA marker.
-    * judged - a real winner. The score is either fully recorded (every vote
-      column an integer and ``overtime`` yes/no) or not recorded at all (every
-      vote column NA and ``overtime`` NA); a half-filled tally is rejected.
+    * promo - ``winner``, every vote column, and ``overtime`` are all NA.
+    * judged draw - ``winner``, every vote column, and ``overtime`` are all NA.
+    * judged decision - a real winner. The score is either fully recorded
+      (every vote column an integer and ``overtime`` yes/no) or not recorded at
+      all (every vote column NA and ``overtime`` NA); a half-filled tally is
+      rejected.
     """
     problems: list[str] = []
     battle_type = str(row.get("battle_type", "")).strip()
@@ -161,9 +164,16 @@ def validate_result_row(row: dict) -> list[str]:
                 problems.append(f"{col} must be {NA!r} for a promo battle")
         return problems
 
-    # judged
-    if winner == NA or not winner:
-        problems.append("winner must be a real emcee for a judged battle")
+    # A completed judged row without a winner is a draw. Draw tallies stay in
+    # notes because the announced rulings are not consistently score-shaped.
+    if winner == NA:
+        for col, v in zip(VOTE_COLUMNS + ["overtime"], votes + [overtime]):
+            if v != NA:
+                problems.append(f"{col} must be {NA!r} for a draw")
+        return problems
+
+    if not winner:
+        problems.append(f"winner must be a real emcee or {NA!r} for a judged battle")
 
     all_int = all(v.isdigit() for v in votes)
     all_na = all(v == NA for v in votes)
@@ -185,6 +195,28 @@ def validate_result_row(row: dict) -> list[str]:
 # Store I/O
 # ---------------------------------------------------------------------------
 
+def _require_results_schema(results: pd.DataFrame, source: PathLike) -> None:
+    """Raise clearly rather than silently dropping or inventing result columns."""
+    actual = list(results.columns)
+    if actual == RESULTS_COLUMNS:
+        return
+
+    missing = [col for col in RESULTS_COLUMNS if col not in actual]
+    unexpected = [col for col in actual if col not in RESULTS_COLUMNS]
+    details = []
+    if missing:
+        details.append(f"missing: {', '.join(missing)}")
+    if unexpected:
+        details.append(f"unexpected: {', '.join(unexpected)}")
+    if not missing and not unexpected:
+        details.append("columns are out of order")
+    detail = "; ".join(details)
+    raise ValueError(
+        f"{source}: results schema does not match the current format ({detail}). "
+        f"Expected columns, in order: {', '.join(RESULTS_COLUMNS)}"
+    )
+
+
 def load_results(path: PathLike = RESULTS_PATH) -> pd.DataFrame:
     """Load the results store as text, or an empty frame with the right schema."""
     path = Path(path)
@@ -192,17 +224,16 @@ def load_results(path: PathLike = RESULTS_PATH) -> pd.DataFrame:
         return pd.DataFrame(columns=RESULTS_COLUMNS)
     # keep_default_na=False so the literal "NA"/"none" markers stay as text.
     df = pd.read_csv(path, dtype=str, keep_default_na=False)
-    for col in RESULTS_COLUMNS:
-        if col not in df.columns:
-            df[col] = ""
-    return df[RESULTS_COLUMNS]
+    _require_results_schema(df, path)
+    return df
 
 
 def save_results(results: pd.DataFrame, path: PathLike = RESULTS_PATH) -> Path:
     """Write the results store as CSV (sorted by id for stable diffs)."""
     path = Path(path)
+    _require_results_schema(results, path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    out = results.reindex(columns=RESULTS_COLUMNS).sort_values("id")
+    out = results.sort_values("id")
     out.to_csv(path, index=False)
     return path
 
@@ -210,10 +241,10 @@ def save_results(results: pd.DataFrame, path: PathLike = RESULTS_PATH) -> Path:
 def make_result_row(
     *,
     id: str,
-    winner: str = NA,
     battle_type: str = "judged",
-    votes_winner=NA,
-    votes_loser=NA,
+    winner: str = NA,
+    votes_emcee1=NA,
+    votes_emcee2=NA,
     votes_nv=NA,
     votes_ot=NA,
     overtime: str = NA,
@@ -222,10 +253,10 @@ def make_result_row(
     """Build a fully-populated (no blank cells) result row."""
     return {
         "id": id,
-        "winner": winner if winner else NA,
         "battle_type": battle_type,
-        "votes_winner": str(votes_winner),
-        "votes_loser": str(votes_loser),
+        "winner": winner if winner else NA,
+        "votes_emcee1": str(votes_emcee1),
+        "votes_emcee2": str(votes_emcee2),
         "votes_nv": str(votes_nv),
         "votes_ot": str(votes_ot),
         "overtime": overtime,
@@ -276,8 +307,10 @@ def merge_results(
     Left-join the results store onto df_battles by battle key (analysis helper).
 
     Returns a new frame with the result columns added; does not mutate the
-    input and does not touch df_battles.json. Vote columns remain text (with
-    'NA' where not applicable); convert with pd.to_numeric for analysis.
+    input and does not touch df_battles.json. ``votes_emcee1`` and
+    ``votes_emcee2`` correspond to the battle table's participant order. Vote
+    columns remain text (with 'NA' where not applicable); convert with
+    pd.to_numeric for analysis.
     """
     if results is None:
         results = load_results()

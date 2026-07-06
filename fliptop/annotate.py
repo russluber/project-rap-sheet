@@ -15,9 +15,10 @@ you left off, only ever showing battles you have not done.
     fliptop-annotate --open          # open each battle's URL in the browser
 
 For each battle you record either the winner and the final (post-overtime)
-judges' tally, or that it was a promo bout with no winner (press ``p``). The
-common case is two keystrokes (winner, then a score like 5-0); the no-vote /
-overtime-vote / overtime follow-ups are only asked if you opt in.
+judges' tally, a judged draw (press ``d``), or a promo bout with no judging
+(press ``p``). The common case is two keystrokes (winner, then a score like
+5-0); the no-vote / overtime-vote / overtime follow-ups are only asked if you
+opt in.
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ from .battles import build_df_battles
 # sentinels returned by the winner prompt
 _QUIT = object()
 _SKIP = object()
+_DRAW = object()
 _PROMO = object()
 
 
@@ -44,16 +46,19 @@ def _watch_url(battle_key: str) -> str:
 
 
 def _prompt_winner(emcee1: str, emcee2: str):
-    """Return winner name, or a _QUIT / _SKIP / _PROMO sentinel."""
+    """Return winner name, or a _QUIT / _SKIP / _DRAW / _PROMO sentinel."""
     while True:
         raw = input(
-            f"  Winner [1={emcee1}  2={emcee2}  p=promo (no winner)  s=skip  q=quit]: "
+            f"  Winner [1={emcee1}  2={emcee2}  d=draw  "
+            "p=promo (no judging)  s=skip  q=quit]: "
         ).strip()
         low = raw.casefold()
         if low == "q":
             return _QUIT
         if low in ("", "s"):
             return _SKIP
+        if low == "d":
+            return _DRAW
         if low == "p":
             return _PROMO
         if raw == "1":
@@ -62,7 +67,7 @@ def _prompt_winner(emcee1: str, emcee2: str):
             return emcee2
         if ann.validate_winner(raw, emcee1, emcee2):
             return emcee1 if raw.casefold() == emcee1.casefold() else emcee2
-        print("    ! enter 1, 2, an emcee name, p, s, or q")
+        print("    ! enter 1, 2, an emcee name, d, p, s, or q")
 
 
 def _prompt_score():
@@ -99,10 +104,27 @@ def _prompt_yes_no(label: str, default: str = "no") -> str:
         print("    ! y or n")
 
 
-def _collect_judging(winner) -> dict:
+def _winner_loser_to_emcee_votes(
+    winner: str,
+    emcee1: str,
+    emcee2: str,
+    votes_winner: int,
+    votes_loser: int,
+) -> tuple[int, int]:
+    """Translate the input-friendly winner/loser score into participant order."""
+    if winner.casefold() == emcee1.casefold():
+        return votes_winner, votes_loser
+    if winner.casefold() == emcee2.casefold():
+        return votes_loser, votes_winner
+    raise ValueError(f"winner {winner!r} is neither {emcee1!r} nor {emcee2!r}")
+
+
+def _collect_judging(winner, emcee1: str, emcee2: str) -> dict:
     """Prompt the structured judging fields; returns kwargs for make_result_row."""
     if winner is _PROMO:
         return {"winner": ann.NA, "battle_type": "promo"}
+    if winner is _DRAW:
+        return {"winner": ann.NA, "battle_type": "judged"}
 
     score = _prompt_score()
     if score is None:
@@ -110,6 +132,9 @@ def _collect_judging(winner) -> dict:
         return {"winner": winner, "battle_type": "judged"}
 
     vw, vl = score
+    votes_emcee1, votes_emcee2 = _winner_loser_to_emcee_votes(
+        winner, emcee1, emcee2, vw, vl
+    )
     nv, ot, overtime = 0, 0, "no"
     if _prompt_yes_no("Any no-votes / OT-votes / overtime?", "no") == "yes":
         nv = _prompt_int("no-votes (judges who didn't vote)", 0)
@@ -119,20 +144,30 @@ def _collect_judging(winner) -> dict:
     return {
         "winner": winner,
         "battle_type": "judged",
-        "votes_winner": vw,
-        "votes_loser": vl,
+        "votes_emcee1": votes_emcee1,
+        "votes_emcee2": votes_emcee2,
         "votes_nv": nv,
         "votes_ot": ot,
         "overtime": overtime,
     }
 
 
-def _summarize(row: dict) -> str:
+def _summarize(row: dict, emcee1: str | None = None, emcee2: str | None = None) -> str:
     if row["battle_type"] == "promo":
-        return "promo (no winner)"
-    if str(row["votes_winner"]) == ann.NA:
+        return "promo (no judging)"
+    if row["winner"] == ann.NA:
+        return "draw (judged, no winner)"
+    if str(row["votes_emcee1"]) == ann.NA:
         return f"{row['winner']} wins (score unknown)"
-    tally = f"{row['votes_winner']}-{row['votes_loser']}"
+
+    if emcee1 is not None and row["winner"].casefold() == emcee1.casefold():
+        votes_winner, votes_loser = row["votes_emcee1"], row["votes_emcee2"]
+    elif emcee2 is not None and row["winner"].casefold() == emcee2.casefold():
+        votes_winner, votes_loser = row["votes_emcee2"], row["votes_emcee1"]
+    else:
+        raise ValueError("emcee names are required to summarize a recorded score")
+
+    tally = f"{votes_winner}-{votes_loser}"
     extra = []
     if str(row["votes_nv"]) != "0":
         extra.append(f"{row['votes_nv']} NV")
@@ -144,12 +179,33 @@ def _summarize(row: dict) -> str:
     return f"{row['winner']} wins {tally}{suffix}"
 
 
-def _current_result_str(results: pd.DataFrame, key: str) -> str:
+def _current_result_str(
+    results: pd.DataFrame,
+    key: str,
+    emcee1: str,
+    emcee2: str,
+) -> str:
     """Human-readable summary of the currently-stored result for a battle id."""
     match = results[results["id"] == key]
     if match.empty:
         return "not yet recorded"
-    return _summarize(match.iloc[0].to_dict())
+    return _summarize(match.iloc[0].to_dict(), emcee1, emcee2)
+
+
+def _current_note(results: pd.DataFrame, key: str) -> str | None:
+    """Return the stored note for a battle, or None when it has no result row."""
+    match = results[results["id"] == key]
+    if match.empty:
+        return None
+    return str(match.iloc[0]["notes"])
+
+
+def _prompt_notes(current: str | None = None) -> str:
+    """Prompt for notes, preserving the current value on a blank redo response."""
+    if current is None:
+        return input("  Notes (optional): ").strip()
+    raw = input(f"  Notes [{current}]: ").strip()
+    return raw if raw else current
 
 
 def resolve_targets(df_battles: pd.DataFrame, term: str) -> pd.DataFrame:
@@ -196,7 +252,12 @@ def redo(term: str) -> None:
                 if "upload_date" in r and pd.notna(r["upload_date"])
                 else "?"
             )
-            current = _current_result_str(results, r["battle_key"])
+            current = _current_result_str(
+                results,
+                r["battle_key"],
+                str(r["emcee1"]),
+                str(r["emcee2"]),
+            )
             print(f"  [{i + 1}] {r['emcee1']} vs {r['emcee2']}   uploaded {date}   {r.get('event_name', '')}")
             print(f"        currently: {current}")
             print(f"        {_watch_url(r['battle_key'])}")
@@ -210,20 +271,20 @@ def redo(term: str) -> None:
     key = row["battle_key"]
     print(f"\n{emcee1} vs {emcee2}   ({row.get('event_name', '')})")
     print(f"  {_watch_url(key)}")
-    print(f"  current: {_current_result_str(results, key)}\n")
+    print(f"  current: {_current_result_str(results, key, emcee1, emcee2)}\n")
 
     winner = _prompt_winner(emcee1, emcee2)
     if winner is _QUIT or winner is _SKIP:
         print("No change made.")
         return
 
-    fields = _collect_judging(winner)
-    notes = input("  Notes (optional): ").strip()
+    fields = _collect_judging(winner, emcee1, emcee2)
+    notes = _prompt_notes(_current_note(results, key))
     result_row = ann.make_result_row(id=key, notes=notes, **fields)
 
     results = ann.upsert_result(results, result_row)
     ann.save_results(results)
-    print(f"  [saved] {_summarize(result_row)}")
+    print(f"  [saved] {_summarize(result_row, emcee1, emcee2)}")
 
 
 def run(*, limit: int | None = None, event: str | None = None, open_urls: bool = False) -> None:
@@ -268,14 +329,14 @@ def run(*, limit: int | None = None, event: str | None = None, open_urls: bool =
             print("  (skipped)\n")
             continue
 
-        fields = _collect_judging(winner)
-        notes = input("  Notes (optional): ").strip()
+        fields = _collect_judging(winner, emcee1, emcee2)
+        notes = _prompt_notes()
         result_row = ann.make_result_row(id=row["battle_key"], notes=notes, **fields)
 
         results = ann.upsert_result(results, result_row)
         ann.save_results(results)  # persist after every entry
         done_this_run += 1
-        print(f"  [saved] {_summarize(result_row)}\n")
+        print(f"  [saved] {_summarize(result_row, emcee1, emcee2)}\n")
 
     remaining = len(ann.pending_battles(df))
     print(f"\nDone. Recorded {done_this_run} this run; {remaining} still pending.")
