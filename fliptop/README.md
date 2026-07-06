@@ -315,7 +315,7 @@ by battle `id`:
 ```
 data/annotations/battle_results.csv
 columns: id, battle_type, winner,
-         votes_emcee1, votes_emcee2, votes_nv, votes_ot, overtime, notes
+         votes_winner, votes_loser, votes_nv, votes_ot, overtime, notes
 ```
 
 Every battle is one of two kinds — which the host announces. A draw is a judged
@@ -325,7 +325,7 @@ battle with no winner, not a third battle type:
 | ------ | ------- |
 | `battle_type` | `judged` (decision or draw) \| `promo` (no judging) |
 | `winner` | the winning emcee; `NA` for a judged draw or promo |
-| `votes_emcee1` / `votes_emcee2` | judges voting for each emcee, in `df_battles` participant order |
+| `votes_winner` / `votes_loser` | judges voting for the winner / loser |
 | `votes_nv` | judges who did not vote (NV) |
 | `votes_ot` | judges who voted to go to overtime |
 | `overtime` | `yes` \| `no` — did the battle go to an OT round? |

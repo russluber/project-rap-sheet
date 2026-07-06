@@ -204,7 +204,7 @@ announces:
 | `id` | YouTube id | the battle key (first part id for multi-part battles) |
 | `battle_type` | `judged` \| `promo` | `judged` includes decisions and draws; `promo` has no judging |
 | `winner` | emcee name \| `NA` | `NA` for a judged draw or promo |
-| `votes_emcee1` / `votes_emcee2` | int \| `NA` | judges voting for each emcee, in `df_battles` participant order |
+| `votes_winner` / `votes_loser` | int \| `NA` | judges voting for the winner / loser |
 | `votes_nv` | int \| `NA` | judges who did not vote (NV) |
 | `votes_ot` | int \| `NA` | judges who voted to go to overtime |
 | `overtime` | `yes` \| `no` \| `NA` | did it go to an OT round? |

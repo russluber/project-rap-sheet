@@ -8,7 +8,7 @@ The authoritative store is an append-only CSV keyed by battle ``id``:
 
     data/annotations/battle_results.csv
     columns: id, battle_type, winner,
-             votes_emcee1, votes_emcee2, votes_nv, votes_ot, overtime, notes
+             votes_winner, votes_loser, votes_nv, votes_ot, overtime, notes
 
 A battle is one of two kinds, which the host announces. A draw is a judged
 battle with no winner:
@@ -17,8 +17,8 @@ battle with no winner:
                      "judged" = judges decided the result (winner or draw).
                      "promo"  = exhibition/promo bout with no judging.
     winner           the winning emcee; "NA" for a draw or promo.
-    votes_emcee1     judges who voted for emcee1        (int, else "NA")
-    votes_emcee2     judges who voted for emcee2        (int, else "NA")
+    votes_winner     judges who voted for the winner     (int, else "NA")
+    votes_loser      judges who voted for the loser      (int, else "NA")
     votes_nv         judges who did not vote (NV)        (int, else "NA")
     votes_ot         judges who voted to go to overtime  (int, else "NA")
     overtime         did the battle go to an OT round?   "yes" | "no" | "NA"
@@ -58,15 +58,15 @@ RESULTS_COLUMNS = [
     "id",
     "battle_type",
     "winner",
-    "votes_emcee1",
-    "votes_emcee2",
+    "votes_winner",
+    "votes_loser",
     "votes_nv",
     "votes_ot",
     "overtime",
     "notes",
 ]
 
-VOTE_COLUMNS = ["votes_emcee1", "votes_emcee2", "votes_nv", "votes_ot"]
+VOTE_COLUMNS = ["votes_winner", "votes_loser", "votes_nv", "votes_ot"]
 
 BATTLE_TYPES = ("judged", "promo")
 NA = "NA"          # explicit not-applicable marker (no blank cells)
@@ -243,8 +243,8 @@ def make_result_row(
     id: str,
     battle_type: str = "judged",
     winner: str = NA,
-    votes_emcee1=NA,
-    votes_emcee2=NA,
+    votes_winner=NA,
+    votes_loser=NA,
     votes_nv=NA,
     votes_ot=NA,
     overtime: str = NA,
@@ -255,8 +255,8 @@ def make_result_row(
         "id": id,
         "battle_type": battle_type,
         "winner": winner if winner else NA,
-        "votes_emcee1": str(votes_emcee1),
-        "votes_emcee2": str(votes_emcee2),
+        "votes_winner": str(votes_winner),
+        "votes_loser": str(votes_loser),
         "votes_nv": str(votes_nv),
         "votes_ot": str(votes_ot),
         "overtime": overtime,
@@ -307,10 +307,8 @@ def merge_results(
     Left-join the results store onto df_battles by battle key (analysis helper).
 
     Returns a new frame with the result columns added; does not mutate the
-    input and does not touch df_battles.json. ``votes_emcee1`` and
-    ``votes_emcee2`` correspond to the battle table's participant order. Vote
-    columns remain text (with 'NA' where not applicable); convert with
-    pd.to_numeric for analysis.
+    input and does not touch df_battles.json. Vote columns remain text (with
+    'NA' where not applicable); convert with pd.to_numeric for analysis.
     """
     if results is None:
         results = load_results()
