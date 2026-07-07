@@ -49,6 +49,7 @@ id,battle_type,winner,votes_winner,votes_loser,votes_nv,votes_ot,overtime,notes
 1I6Ed9IWUaQ,judged,Mhot,3,0,0,0,no,none
 1KrvZoGoNE4,judged,Kenzer,5,0,0,0,no,none
 1LzOO-vrl_8,judged,Frooz,3,2,0,0,no,none
+1NC16SE3fsM,judged,Target,5,0,0,0,no,none
 1YLbAs1Kgsk,judged,GL,4,3,0,0,no,none
 1YqlZqI3ueI,judged,Class G,3,2,0,0,no,none
 1ZTZoVklqCk,judged,Plazma,5,0,0,0,no,none
@@ -165,6 +166,8 @@ id,battle_type,winner,votes_winner,votes_loser,votes_nv,votes_ot,overtime,notes
 7d-QG0k2ItI,judged,Dave Denver,5,0,0,0,no,none
 7d0UyzZlOrE,judged,One Lie Ace,4,1,0,0,no,none
 7iQSEd0VfSQ,judged,Ilaya,5,0,0,0,no,none
+7mj31KF1SPE,judged,Silent Effect,3,0,0,2,yes,Judges' decision was made but there was a promo OT round by crowd's request
+7oOw0boQ5nU,judged,Lloyd,3,1,0,1,no,none
 7qwAfRQCQak,promo,NA,NA,NA,NA,NA,NA,none
 7rjqA-IWl_o,judged,Pamoso,5,0,0,0,no,none
 7sDVqDsw5vc,judged,Mison,4,1,0,0,no,none
@@ -231,8 +234,10 @@ ArWD8-21o5I,judged,Harlem,7,0,0,0,no,none
 AtXB4Lb4Oh0,judged,Sur Henyo,3,2,0,0,no,none
 B2aslqTfwD8,judged,Bisente,5,0,0,0,no,none
 B2lUNjvFsmI,promo,NA,NA,NA,NA,NA,NA,none
+B38uU44xLUE,judged,Plazma,3,2,0,0,no,none
 B550Fva6pUw,judged,Tipsy D,5,0,0,0,no,none
 B5XC3V3VqXQ,judged,Smugglaz,5,0,0,0,no,none
+BEiSatFLop4,promo,NA,NA,NA,NA,NA,NA,One of the strangest venue for Fliptop; sponsored by Vuclip?
 BQhUyT5VlaI,judged,Katana,7,0,0,0,no,none
 BVi9KrcbsA0,judged,Damsa,3,2,0,0,no,none
 BY4g5_Idhv4,judged,SirDeo,3,2,0,0,no,none
@@ -304,6 +309,7 @@ FJYcuxb7Exc,judged,Poison13,5,0,0,0,no,none
 FOjUCdfAp0I,judged,Kregga,5,0,0,0,no,none
 FWogoAPtH44,judged,Gameboy,4,1,0,0,no,none
 FZEh1yZiS4c,judged,Ilaya,5,0,0,0,no,none
+FfwXgpdv28A,judged,Cool Kidd,4,0,0,1,no,none
 FlLPp9I_jlw,judged,Shehyee,5,0,0,0,no,none
 FmLQg78fcVg,judged,CripLi,5,0,0,0,no,none
 Fu8feXFu-qM,judged,Class G,4,1,0,0,no,none
@@ -318,6 +324,7 @@ GJ8rBdHR1qA,judged,Asser,5,0,0,0,no,none
 GQg7clBMSqE,judged,Antonym,5,0,0,0,no,none
 GSUj5hlTmY8,judged,Yuniko,3,2,0,0,no,none
 GToUffwF78A,judged,Empithri,5,0,0,0,no,none
+GaAEGz4qMVY,judged,Notorious,3,2,0,4,yes,none
 GbM67NUZWRA,judged,Omar Baliw,5,0,0,0,no,none
 GhZglyeiFfg,judged,Jonas,5,0,0,0,no,none
 Ghwb72kxCDc,judged,Thike,3,2,0,0,no,none
@@ -406,6 +413,7 @@ L5rpBBUvVNw,judged,Lhipkram,5,0,0,0,no,none
 L63Ulrd6I_U,judged,Flict-G,5,0,0,0,no,none
 L67aVFER9eg,judged,Rudic,3,2,0,0,no,none
 LA1xckXBCok,judged,Blizzard,4,1,0,0,no,none
+LAahBvoVnVU,judged,Tipsy D,5,0,0,0,no,none
 LAeztRNXHjc,judged,SlockOne,5,0,0,0,no,none
 LAipw_BNi24,judged,Flict-G,3,2,0,0,no,none
 LJW7ya_Dxm0,judged,Hazky,4,1,0,0,no,none
@@ -436,6 +444,7 @@ MdUa4sv14PU,judged,M Zhayt,5,0,0,0,no,none
 MdyybZ9wfuA,judged,Batang Rebelde,5,0,0,0,yes,5 votes for BR after OT; no indication of what the vote was before OT
 MfH1NaCu7Ps,judged,Poison13,7,0,0,0,no,none
 MgKrJe2jAnk,judged,Apekz,5,0,0,0,no,none
+Mio0bOZ1W6A,judged,G-Spot,4,0,0,1,no,none
 MsUnIHqWlmY,judged,One Lie Ace,2,1,0,0,no,none
 MsXnLddzvRs,judged,Sinio,3,2,0,0,no,none
 MuwryF_LOOs,judged,G-Clown,4,3,0,0,no,none
@@ -501,6 +510,7 @@ Q76t76Pji-M,judged,Elbiz,5,2,0,0,no,none
 QACw2qbYPGg,judged,Si7ick,5,0,0,0,no,none
 QEJuvfegSqI,judged,G-Clown,5,0,0,0,no,none
 QGLR66YRy-Q,judged,Chaliz,3,2,0,0,no,none
+QGustt_7MNY,judged,Josh G,5,0,0,0,no,none
 QHVhwMWohPE,judged,CNine,5,0,0,0,no,none
 QLmYdRLqd5o,judged,Mac T,3,2,0,0,no,none
 QPlUWTlok24,judged,Cedie,5,0,0,0,no,none
@@ -554,6 +564,7 @@ SxTO7mRqVOE,judged,Zaito,3,2,0,0,no,none
 T-qXrpkd0Z8,judged,Tweng,3,2,0,0,no,none
 T2L1xXaP8NI,judged,Thike,5,0,0,0,no,none
 T4zf76-Qmrc,judged,CNine,4,1,0,0,no,none
+T7JJQe1A-_4,judged,Plazma,3,2,0,0,no,none
 TAInI0g-BXQ,judged,Vitrum,7,0,0,0,no,none
 TBiYd5z2Rxg,judged,Goriong Talas,3,2,0,0,no,none
 TCax_1ve6uY,judged,Mocks Wun,5,0,0,0,no,none
@@ -561,6 +572,7 @@ TDE6yJu0DOU,judged,Fongger,5,0,0,0,no,none
 TIBhgTg0GII,judged,Mimack,4,1,0,0,no,none
 TKKFI5auE7E,judged,K-Ram,3,0,0,0,no,none
 TW4r7CMNnyc,judged,Marshall Bonifacio,5,0,0,0,no,none
+TW75mIu1ifA,judged,Dopee,4,0,0,1,no,none
 Tb5x9JfFXWc,judged,Aklas,5,0,0,0,no,none
 TcJEedJa-HM,judged,Duma,3,0,0,0,no,none
 TdUeQZpzrmY,judged,Loonie,7,0,0,0,no,none
@@ -619,6 +631,7 @@ WDmcqtoywb0,judged,Zaito,4,1,0,0,no,none
 WFzb5SYPelE,judged,K-Ram,5,0,0,0,no,none
 WGbHppei6ig,judged,Batas,6,1,0,0,no,none
 WGr56CQo3p0,judged,Luxuria,3,0,0,0,no,none
+WId4h046LGM,judged,Notorious,5,0,0,0,no,none
 WJiSYDu5ato,judged,Katana,4,3,0,0,no,none
 WVMP0piBeT4,judged,C-Quence,5,0,0,0,no,none
 WVdTtw8tkQs,judged,Luxuria,5,0,0,0,no,none
@@ -633,6 +646,7 @@ X5kpi4Ih-a4,judged,Jhapormz,5,0,0,0,no,none
 X8om3U5HecI,judged,Dello,4,3,0,0,no,none
 XDo5Is8mCtY,judged,Ryl,2,1,0,0,no,none
 XE6TcNn-FLA,judged,Mizayld,4,1,0,0,no,none
+XEMf6pcZHJk,judged,Lirikal,3,2,0,1,no,none
 XJsW57m9AmY,judged,Romano,5,0,0,0,no,none
 XMu2WAiS6rY,judged,Mhot,5,0,0,0,no,none
 XNVCF-igoKw,judged,Cygnus,2,1,0,0,no,none
@@ -792,6 +806,7 @@ fGnbqVL7G0Y,judged,LilJohn,5,0,0,0,no,none
 fGuH0wWjQBk,judged,Ruffian,5,0,0,0,no,none
 fIMCZ33Vxxs,judged,Hizuka,3,2,0,0,no,none
 fNM3CeJL5cw,judged,Vitrum,7,0,0,0,no,none
+fPfLLFEqAH4,judged,Kris Delano,5,0,0,0,no,none
 fQQR6YN9_vY,judged,Aelekz,4,1,0,0,no,none
 fZYvA6wGOAI,judged,Kaream,4,1,0,0,no,none
 fZri3c9KBnU,judged,Tipsy D,5,0,0,0,no,none
@@ -837,6 +852,7 @@ hcjaNF15Xuo,judged,Elbiz,4,1,0,0,no,none
 hdd_gcjrCOc,judged,Luxuria,6,1,0,0,no,none
 hhgbmSMzYak,judged,Batang X,3,2,0,0,no,none
 hjwKvZoFPOo,judged,Pistolero,5,0,0,0,no,none
+hlhuVlXRpFs,judged,SingleShot,3,1,0,1,no,none
 hlvC1_gUMQg,judged,Poison13,5,0,0,0,no,none
 hnTRJtzeVcE,judged,Illtimate,5,0,0,0,no,none
 hr6CxxuHwcw,promo,NA,NA,NA,NA,NA,NA,none
@@ -901,6 +917,7 @@ kr5xh8aLjrA,judged,Loonie,9,0,0,0,no,none
 krwRDjmCkmE,judged,JDee,3,2,0,0,no,none
 ksVYzeMPeCU,judged,Shernan,4,3,0,0,no,none
 kuyv83sx5F4,judged,Smugglaz,4,1,0,0,no,none
+l3vDaYALwBA,judged,Dello,5,0,0,4,yes,none
 l4OwcE3-dBc,judged,Zaito,3,2,0,0,no,none
 l7DN1QQEEDg,judged,Poison13,7,0,0,0,no,none
 lAVcxpjJsu0,judged,Caytriyu,5,0,0,0,no,none
@@ -918,6 +935,7 @@ ldm0YdF3ndA,judged,Romano,5,0,0,0,no,none
 llo7mx9GtxY,judged,3rdy,3,2,0,0,no,none
 lm4u9ZOX7Kk,judged,Jonas,5,0,0,0,no,none
 lq_1doRWQhM,judged,Harvey,3,2,0,0,no,none
+ls3udVloGN4,judged,Andy G,5,0,0,0,no,Promo OT after the battle
 lxw5YiCznCQ,judged,Goriong Talas,3,2,0,0,no,none
 lyQTC81rbg8,judged,Aklas,5,0,0,0,no,none
 m3YEYa96Uac,judged,MastaFeat,4,1,0,0,no,none
@@ -984,9 +1002,11 @@ p9CM6vENkEM,judged,Batang Rebelde,5,0,0,0,no,none
 pCRpC1-XSL4,judged,Poison13,5,0,0,0,no,none
 pEWUBby0_xk,judged,Kros,3,0,0,0,no,none
 pExK-YWNDI0,judged,Sayadd,5,0,0,0,no,none
+pFqlZwdOBjY,judged,Maxford,5,0,0,0,no,none
 pNklx7GJ7nM,judged,Batas,7,0,0,0,no,none
 pR4axEbcEbQ,judged,BLKD,7,0,0,0,no,none
 pUqNl9LWwhw,judged,Bogchick,3,2,0,0,no,none
+pV1f2jIncAQ,judged,Sayadd,5,0,0,0,no,none
 pVY-2Fqdum0,judged,Tipsy D,5,0,0,0,no,none
 pWUhqtsJ5iE,promo,NA,NA,NA,NA,NA,NA,none
 pXbM6_H5Z68,judged,Luxuria,3,2,0,0,no,none
@@ -1009,6 +1029,7 @@ qfTaZ_yXzg4,judged,Maxford,4,1,0,0,no,none
 qgJVsJlVUp0,judged,Batas,5,0,0,0,no,none
 qgSI0jeFbww,judged,Batas,4,1,0,0,no,none
 qiA45ugCjf4,judged,Cool Kidd,5,0,0,0,no,none
+qklZkVviWXE,judged,Don Busabos,3,0,0,2,yes,Judges' decision was made but promo OT after as requested by crowd
 qscjktp7dqI,judged,Manda Baliw,5,0,0,0,no,none
 r7IswnOaSA4,judged,Batas,7,0,0,0,no,none
 r82YacsQJJg,judged,Jonas,5,0,0,0,no,none
@@ -1030,6 +1051,7 @@ sWZIAQgiS0k,judged,JedLi,4,1,0,0,no,none
 sYhw2ZUsGbs,judged,M Zhayt,5,0,0,0,no,none
 sYsHMEeVNf0,judged,Towpher,5,0,0,0,no,none
 sZjjvoJXajY,judged,Vitrum,5,0,0,0,no,none
+sdQtoI1GwoU,judged,2khelle,4,1,0,0,no,none
 sfqTztCnbG4,judged,Prosecutor Billy,5,0,0,0,no,none
 sjFv7upPlN8,judged,Abra,4,1,0,0,no,none
 smRpLQWu59M,judged,CripLi,5,0,0,0,no,none
@@ -1043,9 +1065,11 @@ t1lTYxSr3tM,judged,Shernan,5,0,0,0,no,none
 t7KNgMnl5w4,judged,EJ Power,7,0,0,0,no,none
 t7tVPBoJqPE,judged,J-Blaque,5,0,0,0,no,none
 tAdGCvvcuSE,judged,BLKD,3,2,0,0,no,none
+tC1WSDGia8E,judged,Daddy Joe D,3,0,0,2,yes,Judges decided on a winner but there was a promo OT round afterwards
 tK1X1rfEuRg,judged,Sixth Threat,6,3,0,0,no,none
 tMDZRsgxjo0,judged,Sinio,4,0,0,1,no,none
 tOYVnJ-6aX8,judged,Sur Henyo,5,0,0,0,no,none
+tQ-S86bN-g0,judged,Rudic,3,0,0,2,no,none
 tSn0rQCC7uM,judged,Sickreto,4,1,0,0,no,none
 tUgtjIbr5PE,judged,Pistolero,7,0,0,0,no,none
 tYZoTyuz4Wg,judged,Plazma,6,1,0,0,no,none
@@ -1112,6 +1136,7 @@ wnvhNAl4zqs,judged,Romano,5,2,0,0,no,none
 x0fnpDyVm9s,promo,NA,NA,NA,NA,NA,NA,none
 x46WuzFAcAM,judged,Romano,5,0,0,0,no,none
 x5_EErMbcqw,judged,LilJohn,3,2,0,0,no,none
+x5yjKPFteLk,judged,Smugglaz,5,0,0,0,no,none
 xARwLri-rN4,judged,Frooz,3,2,0,0,no,none
 xC70a4W3SCc,promo,NA,NA,NA,NA,NA,NA,none
 xDodc_Wwn-g,judged,Asser,4,1,0,0,no,none
