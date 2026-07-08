@@ -183,224 +183,229 @@ emcee_id,emcee_name
 182,JedLi
 183,Jhapormz
 184,Jigsaw
-185,Johndelo
-186,Jojo
-187,Jonas
-188,Jorer
-189,Josh G
-190,Juan Tamad
-191,K-Ram
-192,K-Vill
-193,KJah
-194,KJap
-195,Kahir
-196,Kalidido
-197,Kalixs
-198,Kamandag
-199,Kaream
-200,Karisma
-201,Katana
-202,Keelan
-203,Keji
-204,Kenzer
-205,Khen Magat
-206,Kial
-207,Krack
-208,Kregga
-209,Kris Delano
-210,Kritiko
-211,Kros
-212,Krusa
-213,Kulas
-214,Kuscan
-215,Lanzeta
-216,Lawrence
-217,Lax Hartis
-218,Lazta
-219,Left Eye Blind
-220,Lemi
-221,Lhipkram
-222,Libs
-223,Lil Coli
-224,Lil Sisa
-225,Lil Weng
-226,LilJohn
-227,LilStrocks
-228,LilWeng
-229,Linax
-230,Lirikal
-231,Lloyd
-232,Loco
-233,Loe Pesci
-234,Loon
-235,Loonie
-236,Lord Manuel
-237,Luke
-238,Luxuria
-239,M Zhayt
-240,MC Stiff
-241,Mac T
-242,Mackata
-243,Madd NJ
-244,Makii
-245,Malupit
-246,Manda Baliw
-247,Mardszen
-248,Marichu
-249,Mark Grist
-250,Marshall Bonifacio
-251,Martin
-252,MastaFeat
-253,Mastamine
-254,Maxford
-255,Mazstah Locco
-256,Melchrist
-257,Meraj
-258,Mhel
-259,Mhot
-260,Mike Makata
-261,Mikidee
-262,Mimack
-263,Mison
-264,Mistah Lefty
-265,Mizayld
-266,Mocks Wun
-267,Munchito
-268,Murdz
-269,N-Flowinz
-270,Nadnad
-271,Nathan
-272,Negatibo
-273,Negho Gy
-274,NellyBoy
-275,Nerd Skillz
-276,Nikki
-277,NothingElse
-278,Notorious
-279,Numerhus
-280,OG Ulo
-281,Omar Baliw
-282,Onaks
-283,One Lie Ace
-284,One3d
-285,OnliSon
-286,Paktisoy
-287,Pamoso
-288,Papew
-289,Parz
-290,Pen Pluma
-291,Philos
-292,Pistolero
-293,Placz
-294,Plaridhel
-295,Plazma
-296,Poison13
-297,PriceTagg
-298,Primethugz
-299,Prince Rhyme
-300,Prosecutor Billy
-301,Protege
-302,Psycho
-303,Psykadelik
-304,R-Zone
-305,RBTO
-306,RG
-307,Raizen
-308,Ran
-309,Range
-310,Ranieboy
-311,Rapido
-312,Raynoa
-313,Razick
-314,Redd Blot
-315,Rentao
-316,Renzaurus
-317,Resiak
-318,Rich Flo
-319,Righteous One
-320,Rish
-321,Romano
-322,Ron Aaron
-323,Ru
-324,Rudic
-325,Ruffian
-326,Ryl
-327,Sael
-328,Saff
-329,Saint Ice
-330,Sak Maestro
-331,Sanctuz
-332,Sayadd
-333,Sayantipiko
-334,Scars
-335,Sensei
-336,Sev
-337,Shaboy
-338,Shazaam
-339,Shehyee
-340,Shernan
-341,Si7ick
-342,Sibil
-343,Sickreto
-344,Silencer
-345,Silent Effect
-346,SinCity
-347,SingleShot
-348,Sinio
-349,SirDeo
-350,Sixth Threat
-351,Skarm
-352,Slimer
-353,SlockOne
-354,Smugglaz
-355,Snatch
-356,Sniper
-357,Snob
-358,Sparo
-359,Steven
-360,Stielo
-361,Stiff
-362,Supremo
-363,Sur Henyo
-364,Tactmatic
-365,Tantrum
-366,Target
-367,Tatz Maven
-368,Thike
-369,Third D
-370,Tikboy
-371,Tim
-372,Tipsy D
-373,Toma Hawk
-374,Towpher
-375,Troublesome
-376,Tulala
-377,Tweng
-378,Twister
-379,Twizzie
-380,VLD
-381,Val
-382,Vampi
-383,Verb
-384,Verse1
-385,Vitrum
-386,W Beat
-387,Wangbo Loco
-388,Whitey Uno
-389,Wise Wun
-390,Wrathsol
-391,Yagi
-392,Yelshawn
-393,YoungOne
-394,Yuniko
-395,Z-Han
-396,Zain Azrai
-397,Zaito
-398,Zaki
-399,Zend Luke
-400,Zero Hour
-401,Zero MB
-402,Zeus
-403,Zinntax
-404,Zion
-405,Zucchetto
+185,John Delo
+186,Johndelo
+187,Jojo
+188,Jonas
+189,Jorer
+190,Josh G
+191,Juan Tamad
+192,K-Ram
+193,K-Vill
+194,KJah
+195,KJap
+196,Kahir
+197,Kalidido
+198,Kalixs
+199,Kamandag
+200,Kaream
+201,Karisma
+202,Katana
+203,Keelan
+204,Keji
+205,Kenzer
+206,Khen Magat
+207,Kial
+208,Krack
+209,Kregga
+210,Kris Delano
+211,Kritiko
+212,Kros
+213,Krusa
+214,Kulas
+215,Kuscan
+216,Lanzeta
+217,Lawrence
+218,Lax Hartis
+219,Lazta
+220,Left Eye Blind
+221,Lemi
+222,Lhipkram
+223,Libs
+224,Lil Coli
+225,Lil Sisa
+226,Lil Weng
+227,LilJohn
+228,LilStrocks
+229,LilWeng
+230,Linax
+231,Lirikal
+232,Lloyd
+233,Loco
+234,Loe Pesci
+235,Loon
+236,Loonie
+237,Lord Manuel
+238,Luke
+239,Luxuria
+240,M Zhayt
+241,MC Stiff
+242,Mac T
+243,Mackata
+244,Madd NJ
+245,Makii
+246,Malupit
+247,Manda Baliw
+248,Mardszen
+249,Marichu
+250,Mark Grist
+251,Marshall Bonifacio
+252,Martin
+253,MastaFeat
+254,Mastamine
+255,Maxford
+256,Mazstah Locco
+257,Melchrist
+258,Meraj
+259,Mhel
+260,Mhot
+261,Mike Makata
+262,Mikidee
+263,Miks Maharlika
+264,Mimack
+265,Mison
+266,Mistah Lefty
+267,Mizayld
+268,Mocks Wun
+269,Munchito
+270,Murdz
+271,N-Flowinz
+272,Nadnad
+273,Nasha
+274,Nathan
+275,Negatibo
+276,Negho Gy
+277,NellyBoy
+278,Nerd Skillz
+279,Nikki
+280,NothingElse
+281,Notorious
+282,Numerhus
+283,OG Ulo
+284,Omar Baliw
+285,Onaks
+286,One Lie Ace
+287,One3d
+288,OnliSon
+289,Oxsmugg
+290,Ozarugami
+291,Paktisoy
+292,Pamoso
+293,Papew
+294,Parz
+295,Pen Pluma
+296,Philos
+297,Pistolero
+298,Placz
+299,Plaridhel
+300,Plazma
+301,Poison13
+302,PriceTagg
+303,Primethugz
+304,Prince Rhyme
+305,Prosecutor Billy
+306,Protege
+307,Psycho
+308,Psykadelik
+309,R-Zone
+310,RBTO
+311,RG
+312,Raizen
+313,Ran
+314,Range
+315,Ranieboy
+316,Rapido
+317,Raynoa
+318,Razick
+319,Redd Blot
+320,Rentao
+321,Renzaurus
+322,Resiak
+323,Rich Flo
+324,Righteous One
+325,Rish
+326,Romano
+327,Ron Aaron
+328,Ru
+329,Rudic
+330,Ruffian
+331,Ryl
+332,Sael
+333,Saff
+334,Saint Ice
+335,Sak Maestro
+336,Sanctuz
+337,Sayadd
+338,Sayantipiko
+339,Scars
+340,Sensei
+341,Sev
+342,Shaboy
+343,Shazaam
+344,Shehyee
+345,Shernan
+346,Si7ick
+347,Sibil
+348,Sickreto
+349,Silencer
+350,Silent Effect
+351,SinCity
+352,SingleShot
+353,Sinio
+354,SirDeo
+355,Sixth Threat
+356,Skarm
+357,Slimer
+358,SlockOne
+359,Smugglaz
+360,Snatch
+361,Sniper
+362,Snob
+363,Sparo
+364,Steven
+365,Stielo
+366,Stiff
+367,Supremo
+368,Sur Henyo
+369,Tactmatic
+370,Tantrum
+371,Target
+372,Tatz Maven
+373,Thike
+374,Third D
+375,Tikboy
+376,Tim
+377,Tipsy D
+378,Toma Hawk
+379,Towpher
+380,Troublesome
+381,Tulala
+382,Tweng
+383,Twister
+384,Twizzie
+385,VLD
+386,Val
+387,Vampi
+388,Verb
+389,Verse1
+390,Vitrum
+391,W Beat
+392,Wangbo Loco
+393,Whitey Uno
+394,Wise Wun
+395,Wrathsol
+396,Yagi
+397,Yelshawn
+398,YoungOne
+399,Yuniko
+400,Z-Han
+401,Zain Azrai
+402,Zaito
+403,Zaki
+404,Zend Luke
+405,Zero Hour
+406,Zero MB
+407,Zeus
+408,Zinntax
+409,Zion
+410,Zucchetto
