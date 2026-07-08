@@ -242,166 +242,165 @@ emcee_id,emcee_name
 241,Mac T
 242,Mackata
 243,Madd NJ
-244,Makatang Taga Mindanao
-245,Makii
-246,Malupit
-247,Manda Baliw
-248,Mardszen
-249,Marichu
-250,Mark Grist
-251,Marshall Bonifacio
-252,Martin
-253,MastaFeat
-254,Mastamine
-255,Maxford
-256,Mazstah Locco
-257,Melchrist
-258,Meraj
-259,Mhel
-260,Mhot
-261,Mike Makata
-262,Mikidee
-263,Mimack
-264,Mison
-265,Mistah Lefty
-266,Mizayld
-267,Mocks Wun
-268,Munchito
-269,Murdz
-270,N-Flowinz
-271,Nadnad
-272,Nathan
-273,Negatibo
-274,Negho Gy
-275,NellyBoy
-276,Nerd Skillz
-277,Nikki
-278,NothingElse
-279,Notorious
-280,Numerhus
-281,OG Ulo
-282,Omar Baliw
-283,Onaks
-284,One Lie Ace
-285,One3d
-286,OnliSon
-287,Paktisoy
-288,Pamoso
-289,Papew
-290,Parz
-291,Pen Pluma
-292,Philos
-293,Pistolero
-294,Placz
-295,Plaridhel
-296,Plazma
-297,Poison13
-298,PriceTagg
-299,Primethugz
-300,Prince Rhyme
-301,Prosecutor Billy
-302,Protege
-303,Psycho
-304,Psykadelik
-305,R-Zone
-306,RBTO
-307,RG
-308,Raizen
-309,Ran
-310,Range
-311,Ranieboy
-312,Rapido
-313,Raynoa
-314,Razick
-315,Redd Blot
-316,Rentao
-317,Renzaurus
-318,Resiak
-319,Rich Flo
-320,Righteous One
-321,Rish
-322,Romano
-323,Ron Aaron
-324,Ru
-325,Rudic
-326,Ruffian
-327,Ryl
-328,Sael
-329,Saff
-330,Saint Ice
-331,Sak Maestro
-332,Sanctuz
-333,Sayadd
-334,Sayantipiko
-335,Scars
-336,Sensei
-337,Sev
-338,Shaboy
-339,Shazaam
-340,Shehyee
-341,Shernan
-342,Si7ick
-343,Sibil
-344,Sickreto
-345,Silencer
-346,Silent Effect
-347,SinCity
-348,SingleShot
-349,Sinio
-350,SirDeo
-351,Sixth Threat
-352,Skarm
-353,Slimer
-354,SlockOne
-355,Smugglaz
-356,Snatch
-357,Sniper
-358,Snob
-359,Sparo
-360,Steven
-361,Stielo
-362,Stiff
-363,Supremo
-364,Sur Henyo
-365,Tactmatic
-366,Tantrum
-367,Target
-368,Tatz Maven
-369,Thike
-370,Third D
-371,Tikboy
-372,Tim
-373,Tipsy D
-374,Toma Hawk
-375,Towpher
-376,Troublesome
-377,Tulala
-378,Tweng
-379,Twister
-380,Twizzie
-381,VLD
-382,Val
-383,Vampi
-384,Verb
-385,Verse1
-386,Vitrum
-387,W Beat
-388,Wangbo Loco
-389,Whitey Uno
-390,Wise Wun
-391,Wrathsol
-392,Yagi
-393,Yelshawn
-394,YoungOne
-395,Yuniko
-396,Z-Han
-397,Zain Azrai
-398,Zaito
-399,Zaki
-400,Zend Luke
-401,Zero Hour
-402,Zero MB
-403,Zeus
-404,Zinntax
-405,Zion
-406,Zucchetto
+244,Makii
+245,Malupit
+246,Manda Baliw
+247,Mardszen
+248,Marichu
+249,Mark Grist
+250,Marshall Bonifacio
+251,Martin
+252,MastaFeat
+253,Mastamine
+254,Maxford
+255,Mazstah Locco
+256,Melchrist
+257,Meraj
+258,Mhel
+259,Mhot
+260,Mike Makata
+261,Mikidee
+262,Mimack
+263,Mison
+264,Mistah Lefty
+265,Mizayld
+266,Mocks Wun
+267,Munchito
+268,Murdz
+269,N-Flowinz
+270,Nadnad
+271,Nathan
+272,Negatibo
+273,Negho Gy
+274,NellyBoy
+275,Nerd Skillz
+276,Nikki
+277,NothingElse
+278,Notorious
+279,Numerhus
+280,OG Ulo
+281,Omar Baliw
+282,Onaks
+283,One Lie Ace
+284,One3d
+285,OnliSon
+286,Paktisoy
+287,Pamoso
+288,Papew
+289,Parz
+290,Pen Pluma
+291,Philos
+292,Pistolero
+293,Placz
+294,Plaridhel
+295,Plazma
+296,Poison13
+297,PriceTagg
+298,Primethugz
+299,Prince Rhyme
+300,Prosecutor Billy
+301,Protege
+302,Psycho
+303,Psykadelik
+304,R-Zone
+305,RBTO
+306,RG
+307,Raizen
+308,Ran
+309,Range
+310,Ranieboy
+311,Rapido
+312,Raynoa
+313,Razick
+314,Redd Blot
+315,Rentao
+316,Renzaurus
+317,Resiak
+318,Rich Flo
+319,Righteous One
+320,Rish
+321,Romano
+322,Ron Aaron
+323,Ru
+324,Rudic
+325,Ruffian
+326,Ryl
+327,Sael
+328,Saff
+329,Saint Ice
+330,Sak Maestro
+331,Sanctuz
+332,Sayadd
+333,Sayantipiko
+334,Scars
+335,Sensei
+336,Sev
+337,Shaboy
+338,Shazaam
+339,Shehyee
+340,Shernan
+341,Si7ick
+342,Sibil
+343,Sickreto
+344,Silencer
+345,Silent Effect
+346,SinCity
+347,SingleShot
+348,Sinio
+349,SirDeo
+350,Sixth Threat
+351,Skarm
+352,Slimer
+353,SlockOne
+354,Smugglaz
+355,Snatch
+356,Sniper
+357,Snob
+358,Sparo
+359,Steven
+360,Stielo
+361,Stiff
+362,Supremo
+363,Sur Henyo
+364,Tactmatic
+365,Tantrum
+366,Target
+367,Tatz Maven
+368,Thike
+369,Third D
+370,Tikboy
+371,Tim
+372,Tipsy D
+373,Toma Hawk
+374,Towpher
+375,Troublesome
+376,Tulala
+377,Tweng
+378,Twister
+379,Twizzie
+380,VLD
+381,Val
+382,Vampi
+383,Verb
+384,Verse1
+385,Vitrum
+386,W Beat
+387,Wangbo Loco
+388,Whitey Uno
+389,Wise Wun
+390,Wrathsol
+391,Yagi
+392,Yelshawn
+393,YoungOne
+394,Yuniko
+395,Z-Han
+396,Zain Azrai
+397,Zaito
+398,Zaki
+399,Zend Luke
+400,Zero Hour
+401,Zero MB
+402,Zeus
+403,Zinntax
+404,Zion
+405,Zucchetto
