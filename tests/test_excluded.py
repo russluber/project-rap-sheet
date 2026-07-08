@@ -9,7 +9,7 @@ import json
 import pandas as pd
 
 from fliptop import RAW_DATA_DIR
-from fliptop.battles import build_df_battles, build_excluded_uploads
+from fliptop.battles import build_excluded_uploads, build_ft_battles
 
 
 def _write_raw(tmp_path, videos, events=None):
@@ -66,7 +66,7 @@ def test_excluded_tags_event_name_filter(tmp_path):
 
 def test_excluded_ids_disjoint_from_final_battles():
     ex = build_excluded_uploads(RAW_DATA_DIR)
-    df = build_df_battles(raw_dir=RAW_DATA_DIR)
+    df = build_ft_battles(raw_dir=RAW_DATA_DIR)
 
     final_ids = set()
     for v in df["id"]:

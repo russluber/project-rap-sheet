@@ -21,7 +21,7 @@ merged into the existing CSV - which is much faster for routine updates:
     fliptop-refresh --fetch --events-since 2025
 
 Outputs written (under data/processed by default):
-    - df_battles.json   (final result-enriched table, one battle per line)
+    - ft_battles.json   (final result-enriched table, one battle per line)
     - emcees.csv
 """
 
@@ -34,13 +34,13 @@ from datetime import date
 from pathlib import Path
 
 from . import PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
-from .battles import build_battle_metadata, build_df_battles_from_metadata, save_df_battles
+from .battles import build_battle_metadata, build_ft_battles_from_metadata, save_ft_battles
 from .structures import write_emcees_table
 from .validate import (
     summarize_battle_metadata,
-    summarize_df_battles,
+    summarize_ft_battles,
     validate_battle_metadata,
-    validate_df_battles,
+    validate_ft_battles,
 )
 
 # Default FlipTop YouTube channel (see scripts/fetch_youtube_channel_uploads.py).
@@ -115,7 +115,7 @@ def rebuild_processed(
     validate: bool = True,
 ) -> tuple[Path, Path]:
     """
-    Build battle metadata once, publish df_battles from it, and write outputs.
+    Build battle metadata once, publish ft_battles from it, and write outputs.
 
     Data-quality gates run before anything is written: first on the rich battle
     metadata, then on the final result-enriched table. A regression or missing
@@ -138,27 +138,27 @@ def rebuild_processed(
                 + "\n".join(f"  - {p}" for p in problems)
             )
 
-    df_battles = build_df_battles_from_metadata(
+    ft_battles = build_ft_battles_from_metadata(
         battle_metadata,
         require_results=validate,
     )
-    print(f"[validate] final: {summarize_df_battles(df_battles)}")
+    print(f"[validate] final: {summarize_ft_battles(ft_battles)}")
 
     if validate:
-        problems = validate_df_battles(df_battles)
+        problems = validate_ft_battles(ft_battles)
         if problems:
             raise ValueError(
-                "df_battles failed validation; refusing to write:\n"
+                "ft_battles failed validation; refusing to write:\n"
                 + "\n".join(f"  - {p}" for p in problems)
             )
 
-    battles_path = save_df_battles(
-        df_battles, processed_dir / "df_battles.json", fmt="json"
+    battles_path = save_ft_battles(
+        ft_battles, processed_dir / "ft_battles.json", fmt="json"
     )
-    print(f"[build] wrote {len(df_battles)} battles -> {battles_path}")
+    print(f"[build] wrote {len(ft_battles)} battles -> {battles_path}")
 
     emcees_path = processed_dir / "emcees.csv"
-    write_emcees_table(df_battles, emcees_path)
+    write_emcees_table(ft_battles, emcees_path)
     print(f"[build] wrote emcees table -> {emcees_path}")
 
     return battles_path, emcees_path

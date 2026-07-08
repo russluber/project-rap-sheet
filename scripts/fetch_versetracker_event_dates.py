@@ -26,7 +26,7 @@ pipeline's `impute_event_dates_from_versetracker` consumes this file and applies
 the per-day offset for two-day events from the "(Day N)" suffix still present in
 the raw scrape.
 
-By default the target events are derived dynamically: build df_battles WITHOUT
+By default the target events are derived dynamically: build ft_battles WITHOUT
 this imputation and take every event whose event_date is NaT. Pass --events to
 scrape an explicit list instead.
 
@@ -148,7 +148,7 @@ def _ensure_parent_dir(path: str) -> None:
 
 def quarantine_event_names() -> list[str]:
     """
-    Base event names whose event_date is NaT in df_battles.
+    Base event names whose event_date is NaT in ft_battles.
 
     Builds battle metadata WITHOUT the VerseTracker imputation (so this stays
     the stable set of COVID-masked events even after the reference CSV exists),
@@ -159,7 +159,7 @@ def quarantine_event_names() -> list[str]:
 
     df = build_battle_metadata(raw_dir=RAW_DATA_DIR, vt_event_dates={})
     missing = df[df["event_date"].isna()]
-    # event_name is already day-suffix-stripped in df_battles; dedupe, keep order.
+    # event_name is already day-suffix-stripped in ft_battles; dedupe, keep order.
     names = missing["event_name"].dropna().astype(str)
     seen, out = set(), []
     for n in names:
@@ -276,7 +276,7 @@ def main() -> None:
         default=None,
         metavar="NAME",
         help="Explicit event names to scrape (e.g. --events \"Ahon 12\" \"Zoning 10\"). "
-             "Default: every event whose event_date is currently NaT in df_battles.",
+             "Default: every event whose event_date is currently NaT in ft_battles.",
     )
     parser.add_argument(
         "--output",

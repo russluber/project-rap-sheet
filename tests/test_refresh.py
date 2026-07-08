@@ -23,7 +23,7 @@ def test_rebuild_processed_writes_both_outputs(tmp_path):
 
     assert battles_path.exists()
     assert emcees_path.exists()
-    assert battles_path.name == "df_battles.json"
+    assert battles_path.name == "ft_battles.json"
     assert emcees_path.name == "emcees.csv"
 
 
@@ -55,7 +55,7 @@ def test_rebuild_refuses_to_write_on_validation_failure(tmp_path, monkeypatch):
         rebuild_processed(raw_dir=RAW_DATA_DIR, processed_dir=tmp_path)
 
     # nothing was written - the gate ran before save
-    assert not (tmp_path / "df_battles.json").exists()
+    assert not (tmp_path / "ft_battles.json").exists()
     assert not (tmp_path / "emcees.csv").exists()
 
 
@@ -63,7 +63,7 @@ def test_rebuild_validate_false_bypasses_gate(tmp_path, monkeypatch):
     monkeypatch.setattr(refresh_mod, "build_battle_metadata", lambda **kw: pd.DataFrame())
     monkeypatch.setattr(
         refresh_mod,
-        "build_df_battles_from_metadata",
+        "build_ft_battles_from_metadata",
         lambda *args, **kwargs: _bad_battles(),
     )
 

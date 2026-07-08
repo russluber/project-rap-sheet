@@ -1,9 +1,9 @@
 """
-End-to-end tests that build df_battles from the committed raw data.
+End-to-end tests that build ft_battles from the committed raw data.
 
 These assert *invariants* that must always hold, not exact row counts (which
 grow as new battles are uploaded). They are the smoke test that lets us
-regenerate df_battles.json with confidence that nothing silently shifted.
+regenerate ft_battles.json with confidence that nothing silently shifted.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 import pandas as pd
 
 from fliptop import annotations as ann
-from fliptop.battles import write_df_battles
+from fliptop.battles import write_ft_battles
 
 EXPECTED_COLUMNS = [
     "id",
@@ -53,21 +53,21 @@ COVID_START = pd.Timestamp("2020-05-01")
 COVID_END = pd.Timestamp("2022-04-27")
 
 
-def test_columns_present_and_ordered(df_battles):
-    assert list(df_battles.columns) == EXPECTED_COLUMNS
+def test_columns_present_and_ordered(ft_battles):
+    assert list(ft_battles.columns) == EXPECTED_COLUMNS
 
 
 def test_metadata_columns_present_and_ordered(battle_metadata):
     assert list(battle_metadata.columns) == METADATA_COLUMNS
 
 
-def test_no_null_emcees(df_battles):
-    assert df_battles["emcee1"].notna().all()
-    assert df_battles["emcee2"].notna().all()
+def test_no_null_emcees(ft_battles):
+    assert ft_battles["emcee1"].notna().all()
+    assert ft_battles["emcee2"].notna().all()
 
 
-def test_excluded_event_categories_are_absent(df_battles):
-    excluded = df_battles["event_name"].astype("string").str.contains(
+def test_excluded_event_categories_are_absent(ft_battles):
+    excluded = ft_battles["event_name"].astype("string").str.contains(
         r"Process of Illumination|tryout",
         case=False,
         na=False,
@@ -75,8 +75,8 @@ def test_excluded_event_categories_are_absent(df_battles):
     assert not excluded.any()
 
 
-def test_final_ids_are_scalar(df_battles):
-    assert not df_battles["id"].apply(lambda x: isinstance(x, list)).any()
+def test_final_ids_are_scalar(ft_battles):
+    assert not ft_battles["id"].apply(lambda x: isinstance(x, list)).any()
 
 
 def test_metadata_id_and_url_are_lists_iff_multipart(battle_metadata):
@@ -86,20 +86,20 @@ def test_metadata_id_and_url_are_lists_iff_multipart(battle_metadata):
     assert id_is_list.equals(url_is_list)
 
 
-def test_scalar_ids_are_unique(df_battles):
-    assert not df_battles["id"].duplicated().any()
+def test_scalar_ids_are_unique(ft_battles):
+    assert not ft_battles["id"].duplicated().any()
 
 
-def test_all_annotations_reference_a_final_battle(df_battles):
-    battle_keys = set(df_battles["id"])
+def test_all_annotations_reference_a_final_battle(ft_battles):
+    battle_keys = set(ft_battles["id"])
     results = ann.load_results()
     assert set(results["id"]) <= battle_keys
 
 
-def test_final_table_has_result_columns(df_battles):
-    assert df_battles["battle_type"].notna().all()
-    assert set(df_battles["battle_type"].unique()) <= {"judged", "promo"}
-    assert df_battles["winner"].notna().all()
+def test_final_table_has_result_columns(ft_battles):
+    assert ft_battles["battle_type"].notna().all()
+    assert set(ft_battles["battle_type"].unique()) <= {"judged", "promo"}
+    assert ft_battles["winner"].notna().all()
 
 
 def test_known_draw_annotations_remain_valid():
@@ -139,19 +139,19 @@ def test_event_date_source_is_tagged(battle_metadata):
     assert (src == "manual").sum() >= 1       # the Nikki vs K-Ram hand-pin
 
 
-def test_emcee1_and_emcee2_differ(df_battles):
-    assert (df_battles["emcee1"] != df_battles["emcee2"]).all()
+def test_emcee1_and_emcee2_differ(ft_battles):
+    assert (ft_battles["emcee1"] != ft_battles["emcee2"]).all()
 
 
-def test_write_and_reload_round_trips(df_battles, tmp_path):
-    out_path = tmp_path / "df_battles.json"
+def test_write_and_reload_round_trips(ft_battles, tmp_path):
+    out_path = tmp_path / "ft_battles.json"
     # Build + write straight to a temp dir; never touches data/processed.
     from fliptop import RAW_DATA_DIR
 
-    written = write_df_battles(out_path=out_path, raw_dir=RAW_DATA_DIR, fmt="json")
+    written = write_ft_battles(out_path=out_path, raw_dir=RAW_DATA_DIR, fmt="json")
     assert written.exists()
 
     reloaded = pd.read_json(written, lines=True)
     # Same number of battles and same columns as the in-memory build.
-    assert len(reloaded) == len(df_battles)
+    assert len(reloaded) == len(ft_battles)
     assert list(reloaded.columns) == EXPECTED_COLUMNS

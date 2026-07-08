@@ -180,15 +180,15 @@ def _prompt_notes(current: str | None = None) -> str:
     return raw if raw else current
 
 
-def resolve_targets(df_battles: pd.DataFrame, term: str) -> pd.DataFrame:
+def resolve_targets(ft_battles: pd.DataFrame, term: str) -> pd.DataFrame:
     """
     Find battles matching a --redo term.
 
     The term may be a YouTube URL, an 11-char video id, or free text matched
     against the matchup (e.g. "Loonie vs Abra" or just "Abra"). Returns matching
-    df_battles rows (newest first) with a ``battle_key`` column.
+    ft_battles rows (newest first) with a ``battle_key`` column.
     """
-    work = df_battles.copy()
+    work = ft_battles.copy()
     work["battle_key"] = work["id"].map(ann.battle_key)
 
     key = ann.extract_video_id(term)

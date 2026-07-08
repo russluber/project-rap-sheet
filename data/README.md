@@ -17,7 +17,7 @@ data/
 │   ├── location_aliases.csv
 │   └── event_dates.csv
 ├── processed/             # clean tables built by the fliptop package
-│   ├── df_battles.json
+│   ├── ft_battles.json
 │   └── emcees.csv
 ├── annotations/           # hand-collected results, kept separate from processed
 │   └── battle_results.csv
@@ -28,7 +28,7 @@ data/
 **Data flow.** `raw/` is produced by [`scripts/`](../scripts/); `processed/` is
 built from `raw/` (plus `emcee_aliases.csv` and the `overrides/` tables) by the
 [`fliptop`](../fliptop/) package; `annotations/` is filled in by hand via
-`fliptop-annotate`; refresh validates those annotations and joins the core result fields into the processed `df_battles.json`.
+`fliptop-annotate`; refresh validates those annotations and joins the core result fields into the processed `ft_battles.json`.
 
 ```
 scripts/ ─► raw/ ─┐
@@ -121,7 +121,7 @@ dates are static — rather than refreshed by `fliptop-refresh --fetch`.
 
 > ⚠️ These dates are accurate to within ~days, not exact — VerseTracker appears to
 > use the event **flyer-post** date for some events. Battles dated from this file
-> are tagged `versetracker` in `df_battles`' `event_date_source` column.
+> are tagged `versetracker` in `ft_battles`' `event_date_source` column.
 
 ---
 
@@ -139,7 +139,7 @@ empty table, so the pipeline still runs without them.
 | `event_locations.csv` | `event_name` → `event_location` | exact event name | battles whose venue couldn't be extracted (COVID-era obfuscation, or a no-`@` description that leaked the event name into the location) |
 | `event_location_patterns.csv` | `contains` → `event_location` | substring of the location | a location string that carries junk around the real venue (e.g. `D' mention …`) |
 | `location_aliases.csv` | `location` → `canonical` | exact value | normalize known location strings (e.g. Davao variants) |
-| `event_dates.csv` | `id` → `event_date` | exact YouTube id | a battle whose own description mis-dates it, where the FlipTop site is authoritative (tagged `manual` in `df_battles`) |
+| `event_dates.csv` | `id` → `event_date` | exact YouTube id | a battle whose own description mis-dates it, where the FlipTop site is authoritative (tagged `manual` in `ft_battles`) |
 
 To register a correction, add a row (with a `note`). Matching is exact and
 case-sensitive except `event_location_patterns.csv`, which matches any location
@@ -153,7 +153,7 @@ Clean, analysis-ready tables built by the `fliptop` package via
 `fliptop-refresh`. **Regenerated, not hand-edited** — anything you change here is
 overwritten on the next refresh.
 
-### `df_battles.json`
+### `ft_battles.json`
 
 The project's core table: **one row per battle**, as newline-delimited JSON
 (one battle per line). It is result-enriched from
@@ -161,7 +161,7 @@ The project's core table: **one row per battle**, as newline-delimited JSON
 `pd.read_json(path, lines=True)`.
 
 The full column-by-column schema is documented in the
-[fliptop README](../fliptop/README.md#df_battles-schema). A few file-format notes:
+[fliptop README](../fliptop/README.md#ft_battles-schema). A few file-format notes:
 
 The final file keeps the analysis columns only. Rich audit fields such as
 `description`, `duration_hms`, and `event_date_source` live in the internal
@@ -184,7 +184,7 @@ metadata table returned by `fliptop.build_battle_metadata()`.
 
 ### `emcees.csv`
 
-The distinct, canonicalized emcees that appear in `df_battles`, with a stable id.
+The distinct, canonicalized emcees that appear in `ft_battles`, with a stable id.
 
 | column | example | notes |
 | ------ | ------- | ----- |
@@ -199,7 +199,7 @@ Built by [`fliptop.structures.write_emcees_table`](../fliptop/structures.py).
 
 Hand-collected data kept **deliberately separate** from the auto-built metadata,
 so rebuilding never clobbers manual work. `fliptop-refresh` validates it and
-joins the core result fields into the published `df_battles.json`.
+joins the core result fields into the published `ft_battles.json`.
 
 ### `battle_results.csv`
 
@@ -262,5 +262,5 @@ reproducible — it's hand-entered, so it's the one thing here worth guarding.
   never has ambiguous empties. Load with `keep_default_na=False` to preserve them.
 - **Canonical names everywhere downstream.** By the time data reaches
   `processed/`, emcee names have been run through `emcee_aliases.csv`.
-- **Dates** are epoch-ms in `df_battles.json` and ISO-8601 strings in the raw
+- **Dates** are epoch-ms in `ft_battles.json` and ISO-8601 strings in the raw
   YouTube JSON.

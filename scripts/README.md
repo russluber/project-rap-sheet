@@ -33,7 +33,7 @@ right channel id and a `2010 → current year` scrape window — and then rebuil
 the processed datasets in one shot:
 
 ```bash
-fliptop-refresh --fetch    # fetch both raw sources, then rebuild df_battles + emcees
+fliptop-refresh --fetch    # fetch both raw sources, then rebuild ft_battles + emcees
 fliptop-refresh            # rebuild only, from the raw data already on disk (no network)
 ```
 
@@ -56,7 +56,7 @@ The end-to-end flow they fit into:
 1. Fetch raw data with the scripts here (or `fliptop-refresh --fetch`).
 2. Raw files land in [`data/raw/`](../data/raw/).
 3. The pipeline in [`fliptop/battles.py`](../fliptop/battles.py) cleans those
-   files into [`data/processed/df_battles.json`](../data/processed/) (the rebuild
+   files into [`data/processed/ft_battles.json`](../data/processed/) (the rebuild
    step `fliptop-refresh` runs by default).
 
 **`fetch_versetracker_event_dates.py` is the exception** — it is *not* bundled
@@ -192,7 +192,7 @@ lowercased with non-alphanumerics turned to hyphens (`Ahon 12` →
 `fliptop-ahon-12`). The script builds that URL per event, fetches the page, and
 reads the single date out of `div.event-date` (e.g. `December 8, 2021` →
 `2021-12-08`). By **default** it targets exactly the events whose `event_date` is
-currently `NaT` (it builds `df_battles` with imputation off to find them); pass
+currently `NaT` (it builds `ft_battles` with imputation off to find them); pass
 `--events` to scrape an explicit list instead. A 404 or unparseable date is
 logged as a `[warn]` and skipped.
 
@@ -205,7 +205,7 @@ No API key needed — plain HTML scraping with `requests` + `BeautifulSoup`.
 
 | flag | required | default | meaning |
 | ---- | -------- | ------- | ------- |
-| `--events` | | NaT events in `df_battles` | explicit event names to scrape, e.g. `--events "Ahon 12" "Zoning 10"` |
+| `--events` | | NaT events in `ft_battles` | explicit event names to scrape, e.g. `--events "Ahon 12" "Zoning 10"` |
 | `--output` | | `data/raw/versetracker_event_dates.csv` | where to write the CSV |
 | `--base` | | `https://versetracker.com` | site root |
 | `--user-agent` | | a project UA string | `User-Agent` header to send |
@@ -234,7 +234,7 @@ python scripts/fetch_versetracker_event_dates.py --events "Ahon 12" "Zoning 10"
 > ⚠️ VerseTracker's date is sometimes a proxy (it appears to use the event
 > **flyer-post** date for some events — e.g. Bwelta Balentong 7), so treat these
 > as accurate to within days, not exact. They are tagged `versetracker` in
-> `df_battles`' `event_date_source` column; override a specific battle by adding
+> `ft_battles`' `event_date_source` column; override a specific battle by adding
 > a row to `data/overrides/event_dates.csv` if you find a better source. This
 > scraper also depends on VerseTracker's current HTML (`div.event-date`); if the
 > site is redesigned, update `parse_event_date`.

@@ -2,7 +2,7 @@
 
 The core Python package for Project Rap Sheet. It implements the reproducible
 pipeline that turns raw FlipTop data into a rich **one-row-per-battle** metadata
-table, then publishes the final result-enriched `df_battles` table used for
+table, then publishes the final result-enriched `ft_battles` table used for
 analysis. It also includes helpers that build structures from that table, record
 battle results, and refresh everything with one command.
 
@@ -16,8 +16,8 @@ reimplement it.
 
 - [Architecture at a glance](#architecture-at-a-glance)
 - [Package layout](#package-layout)
-- [The pipeline: raw → `df_battles`](#the-pipeline-raw--df_battles) (`battles.py`)
-- [`df_battles` schema](#df_battles-schema)
+- [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`battles.py`)
+- [`ft_battles` schema](#ft_battles-schema)
 - [Auditing what gets filtered out](#auditing-what-gets-filtered-out)
 - [Derived structures](#derived-structures) (`structures.py`)
 - [Output validation gate](#output-validation-gate) (`validate.py`)
@@ -31,13 +31,13 @@ reimplement it.
 
 ## Architecture at a glance
 
-Everything flows one way toward `df_battles` as the hub: the pipeline builds
-metadata, validates and joins annotations, publishes `df_battles`, and other
+Everything flows one way toward `ft_battles` as the hub: the pipeline builds
+metadata, validates and joins annotations, publishes `ft_battles`, and other
 modules consume it.
 
 ```
  data/raw/youtube_videos.json ─┐
-                               ├─► battles.py ──► df_battles ──┬─► structures.py  (emcee table, network)
+                               ├─► battles.py ──► ft_battles ──┬─► structures.py  (emcee table, network)
  data/raw/matchup_events_      ─┘   (+ emcee_aliases.csv)      │
    metadata.csv                                                ??? annotations.py (validated result store)
 
@@ -48,7 +48,7 @@ modules consume it.
 **Design principles**
 
 - **Two layers, one public output.** `build_battle_metadata()` keeps the rich
-  audit table with provenance fields; `build_df_battles()` joins validated
+  audit table with provenance fields; `build_ft_battles()` joins validated
   annotations and emits the final analysis table.
 - **Logic is separate from CLI.** `battles.py` ↔ `refresh.py` (build ↔ command)
   and `annotations.py` ↔ `annotate.py` (store ↔ command) are deliberate splits.
@@ -65,11 +65,11 @@ modules consume it.
 ```
 fliptop/
 ├── __init__.py         # package init: shared data-dir paths + lazy public API
-├── battles.py          # the pipeline: raw sources -> df_battles
+├── battles.py          # the pipeline: raw sources -> ft_battles
 ├── rename_map.py       # loads/validates the alias map from data/emcee_aliases.csv
 ├── overrides.py        # loads/validates the correction tables in data/overrides/
-├── structures.py       # structures derived from df_battles (emcee table + battle network)
-├── validate.py         # output data-quality gate for df_battles
+├── structures.py       # structures derived from ft_battles (emcee table + battle network)
+├── validate.py         # output data-quality gate for ft_battles
 ├── annotations.py      # battle-results store (winner/judging/notes) + helpers
 ├── annotate.py         # fliptop-annotate CLI: interactively record battle results
 └── refresh.py          # fliptop-refresh CLI: rebuild (and optionally re-fetch) the datasets
@@ -77,14 +77,14 @@ fliptop/
 
 ---
 
-## The pipeline: raw → `df_battles`
+## The pipeline: raw → `ft_battles`
 
 `battles.py` is the heart of the package. `build_battle_metadata(raw_dir=...)`
-runs three cleaning stages and returns the rich metadata table. `build_df_battles`
+runs three cleaning stages and returns the rich metadata table. `build_ft_battles`
 then joins validated battle results and returns the final analysis table.
 
 ```
-build_df_battles
+build_ft_battles
   ├─ make_df_1v1_uploads      Stage 1: raw YouTube uploads -> clean 1v1 uploads
   ├─ attach_event_metadata    Stage 2: merge event name / date / location
   ├─ drop_excluded_events              remove excluded event categories
@@ -218,7 +218,7 @@ and loaded by `load_versetracker_event_dates`.
 
 The reference CSV is optional: if it's absent, `load_versetracker_event_dates`
 returns `{}` and the step is a no-op (those battles simply stay `NaT`). The build
-auto-loads it from `raw_dir`; pass `build_df_battles(..., vt_event_dates={})` to
+auto-loads it from `raw_dir`; pass `build_ft_battles(..., vt_event_dates={})` to
 disable imputation explicitly.
 
 > ⚠️ VerseTracker's dates are accurate to ~days, not exact (it appears to use the
@@ -227,26 +227,27 @@ disable imputation explicitly.
 
 ---
 
-## `df_battles` schema
+## `ft_battles` schema
 
 | column | type | notes |
 | ------ | ---- | ----- |
-| `id` | string or list | YouTube video id; a **list** of part ids for multi-part battles |
+| `id` | string | scalar battle key; for multi-part battles, the first part's YouTube id |
 | `title` | string | cleaned title, `pt. N` suffix removed |
-| `description` | string | raw YouTube description (left verbatim) |
 | `upload_date` | datetime | earliest part for multi-part battles |
 | `duration_seconds` | number | summed across parts |
-| `duration_hms` | string | `HH:MM:SS` |
 | `emcee1`, `emcee2` | string | canonicalized names |
 | `matchup` | string | `emcee1 vs emcee2` |
 | `event_name` | string | standardized — the `(Day N)` suffix is stripped (see below) |
 | `event_date` | datetime | the battle's actual day (the specific day for multi-day events); COVID-era dates are imputed from VerseTracker (see above) |
-| `event_date_source` | string | provenance of `event_date`: `website` \| `description` \| `versetracker` \| `manual` |
 | `event_location` | string | |
 | `url` | string or list | a **list** for multi-part battles |
+| `battle_type` | string | `judged` or `promo`, from `battle_results.csv` |
+| `winner` | string | winning emcee, or `NA` for draws/promos |
+| `votes_winner`, `votes_loser` | string | final vote totals as text, or `NA` when not applicable/unknown |
 
-> Win/loss data is **not** in `df_battles` — it lives separately and is joined on
-> demand (see [Battle results](#battle-results--annotations)).
+Rich audit fields such as `description`, `duration_hms`, and
+`event_date_source` stay in the internal `battle_metadata` table returned by
+`build_battle_metadata()`.
 
 ---
 
@@ -272,7 +273,7 @@ excluded["excluded_reason"].value_counts()
 
 ## Derived structures
 
-`structures.py` holds reusable structures **derived from `df_battles`**. They
+`structures.py` holds reusable structures **derived from `ft_battles`**. They
 shape the table into analysis-ready form but do **not** perform analysis itself —
 that belongs in notebooks. (A per-emcee career table for survival analysis would
 be a natural addition here.)
@@ -287,8 +288,8 @@ be a natural addition here.)
 ```python
 from fliptop.structures import build_emcees_table, build_battle_network
 
-df_emcees = build_emcees_table(df_battles)
-G = build_battle_network(df_battles)   # networkx.Graph
+df_emcees = build_emcees_table(ft_battles)
+G = build_battle_network(ft_battles)   # networkx.Graph
 ```
 
 ---
@@ -321,8 +322,9 @@ picks it up.
 ## Battle results / annotations
 
 Battle results (including draws and promos) and judges' tallies are collected
-**by hand** and kept **separate** from `df_battles`, in an append-only CSV keyed
-by battle `id`:
+**by hand** in an append-only CSV keyed by battle `id`. The CSV remains the
+manual source of truth; `ft_battles.json` publishes only the core analysis
+fields from it:
 
 ```
 data/annotations/battle_results.csv
@@ -355,8 +357,8 @@ distinguishes it. Draw rulings that do not fit the structured fields belong in
 `notes`.
 
 **Current publishing contract.** The annotation CSV stays separate as the
-hand-maintained source of truth, but the published `df_battles.json` is now
-result-enriched. `build_df_battles()` validates the store against the battle
+hand-maintained source of truth, but the published `ft_battles.json` is now
+result-enriched. `build_ft_battles()` validates the store against the battle
 metadata, joins the core result fields, and keeps only the final analysis
 columns. If a fetch adds new battles, `fliptop-refresh` will refuse to publish
 until `fliptop-annotate` records those results.
@@ -364,10 +366,9 @@ until `fliptop-annotate` records those results.
 **`annotations.py`** — the store and its helpers:
 
 - `load_results()` / `save_results()` — read/write the CSV.
-- `pending_battles(df_battles)` — battles not yet annotated (newest first).
-- `merge_results(df_battles)` — left-join results onto `df_battles` **on demand**.
-  `df_battles.json` itself stays clean (no partially-filled result columns); you
-  opt into the join only when analyzing.
+- `pending_battles(ft_battles)` — battles not yet annotated (newest first).
+- `merge_results(ft_battles)` — left-join the full result store onto a battle
+  table when you need fields beyond the published core result columns.
 - `battle_key()` — the canonical scalar key for a battle (the first id for
   consolidated multi-part battles).
 
@@ -390,10 +391,10 @@ fliptop-annotate --redo "A vs B" # re-annotate an existing battle (fix a mistake
 
 ## Output validation gate
 
-`validate.py` guards the built table. `build_df_battles` is a long chain of
+`validate.py` guards the built table. `build_ft_battles` is a long chain of
 heuristic filters, merges, and overrides, so a change in a raw source's shape (a
 re-scrape, a YouTube API tweak) can silently produce a malformed table that still
-writes cleanly to disk. `validate_df_battles(df)` returns a list of
+writes cleanly to disk. `validate_ft_battles(df)` returns a list of
 human-readable problems (empty == ok), checking the invariants the pipeline is
 supposed to guarantee:
 
@@ -409,7 +410,7 @@ supposed to guarantee:
 
 `fliptop-refresh` runs the gate after every build and **aborts before writing**
 if anything fails, so a regression fails loudly instead of overwriting the
-processed data with a broken table. `summarize_df_battles(df)` produces the
+processed data with a broken table. `summarize_ft_battles(df)` produces the
 one-line build summary (battle count + `event_date_source` breakdown) printed on
 each refresh.
 
@@ -421,12 +422,12 @@ each refresh.
 way to regenerate the processed datasets.
 
 ```bash
-fliptop-refresh                        # rebuild df_battles.json + emcees.csv from existing raw data
+fliptop-refresh                        # rebuild ft_battles.json + emcees.csv from existing raw data
 fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first, then rebuild
 fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
 ```
 
-- `rebuild_processed()` builds `df_battles` once, runs the
+- `rebuild_processed()` builds `ft_battles` once, runs the
   [validation gate](#output-validation-gate), and (if it passes) writes **both**
   processed outputs from that single frame (fast, deterministic, no network).
 - `fetch_raw()` (only with `--fetch`) runs the two `scripts/` collectors as
@@ -453,24 +454,24 @@ so `import fliptop` stays cheap:
 from fliptop import (
     RAW_DATA_DIR, PROCESSED_DATA_DIR, DATA_DIR,   # shared paths
     build_battle_metadata,   # raw -> rich metadata
-    build_df_battles,        # raw + annotations -> final df_battles
+    build_ft_battles,        # raw + annotations -> final ft_battles
     build_excluded_uploads,  # audit of dropped uploads
-    build_emcees_table,      # df_battles -> emcee table
+    build_emcees_table,      # ft_battles -> emcee table
     write_emcees_table,
-    build_battle_network,    # df_battles -> networkx graph
+    build_battle_network,    # ft_battles -> networkx graph
     merge_results,           # join full battle results onto a battle table
     validate_battle_metadata,
-    validate_df_battles,     # data-quality gate for final df_battles
+    validate_ft_battles,     # data-quality gate for final ft_battles
 )
 ```
 
 Build the dataset in memory:
 
 ```python
-from fliptop import RAW_DATA_DIR, build_battle_metadata, build_df_battles
+from fliptop import RAW_DATA_DIR, build_battle_metadata, build_ft_battles
 
 metadata = build_battle_metadata(raw_dir=RAW_DATA_DIR)
-df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)
+ft_battles = build_ft_battles(raw_dir=RAW_DATA_DIR)
 ```
 
 Build and write it to disk. The committed output is newline-delimited JSON, so
@@ -478,10 +479,10 @@ pass `fmt="json"` (the function also supports `fmt="csv"`):
 
 ```python
 from fliptop import RAW_DATA_DIR, PROCESSED_DATA_DIR
-from fliptop.battles import write_df_battles
+from fliptop.battles import write_ft_battles
 
-write_df_battles(
-    out_path=PROCESSED_DATA_DIR / "df_battles.json",
+write_ft_battles(
+    out_path=PROCESSED_DATA_DIR / "ft_battles.json",
     raw_dir=RAW_DATA_DIR,
     fmt="json",
 )
@@ -493,14 +494,14 @@ stored as epoch-ms, so name the date columns to restore the datetime dtype:
 ```python
 import pandas as pd
 
-df_battles = pd.read_json(
-    "data/processed/df_battles.json",
+ft_battles = pd.read_json(
+    "data/processed/ft_battles.json",
     lines=True,
     convert_dates=["upload_date", "event_date"],
 )
 ```
 
-(Or just call `build_df_battles(...)` again — building in memory keeps the
+(Or just call `build_ft_battles(...)` again — building in memory keeps the
 datetime dtypes and skips the JSON round-trip entirely.)
 
 ---

@@ -5,16 +5,16 @@ Output data-quality gates for the built battle tables.
 
 The raw-to-metadata build is a long chain of heuristic filters, merges, and
 overrides; a change in a raw source's shape (a re-scrape, a YouTube API tweak)
-can silently produce a malformed table. The final ``df_battles`` table then adds
+can silently produce a malformed table. The final ``ft_battles`` table then adds
 the id-keyed battle results and selects the project-level analysis columns.
 
 ``validate_battle_metadata`` guards the rich intermediate metadata table.
-``validate_df_battles`` guards the final result-enriched table written to
-``data/processed/df_battles.json``.
+``validate_ft_battles`` guards the final result-enriched table written to
+``data/processed/ft_battles.json``.
 
 The refresh CLI runs it after every build and aborts *before writing* if anything
 is wrong, so a regression fails loudly instead of shipping a broken
-``data/processed/df_battles.json``.
+``data/processed/ft_battles.json``.
 """
 
 from __future__ import annotations
@@ -143,9 +143,9 @@ def validate_battle_metadata(
     return problems
 
 
-def validate_df_battles(df: pd.DataFrame, *, today: date | None = None) -> list[str]:
+def validate_ft_battles(df: pd.DataFrame, *, today: date | None = None) -> list[str]:
     """
-    Return data-quality problems with the final result-enriched ``df_battles``.
+    Return data-quality problems with the final result-enriched ``ft_battles``.
 
     Checks the published output schema, one scalar id per battle, non-blank
     emcees, plausible event dates, valid result fields, and winners that match
@@ -154,11 +154,11 @@ def validate_df_battles(df: pd.DataFrame, *, today: date | None = None) -> list[
     problems: list[str] = []
 
     if df.empty:
-        problems.append("df_battles is empty")
+        problems.append("ft_battles is empty")
         return problems
 
-    problems.extend(_check_expected_columns(df, FINAL_COLUMNS, "df_battles"))
-    problems.extend(_check_battle_identity(df, label="df_battles", allow_list_ids=False))
+    problems.extend(_check_expected_columns(df, FINAL_COLUMNS, "ft_battles"))
+    problems.extend(_check_battle_identity(df, label="ft_battles", allow_list_ids=False))
     problems.extend(_check_emcees(df))
     problems.extend(_check_event_dates(df, today=today))
 
@@ -207,7 +207,7 @@ def summarize_battle_metadata(df: pd.DataFrame) -> str:
     return f"{n} battles; event_date_source: {', '.join(parts)}"
 
 
-def summarize_df_battles(df: pd.DataFrame) -> str:
+def summarize_ft_battles(df: pd.DataFrame) -> str:
     """
     One-line final-output summary: battle count and result-type breakdown.
 

@@ -38,7 +38,7 @@ columns with ``pd.to_numeric`` for analysis.
 The store is never regenerated wholesale - the annotate workflow only adds rows
 for battles not yet recorded. The refresh/build pipeline validates it against
 the battle metadata and joins the core result fields into the final
-``df_battles.json`` output.
+``ft_battles.json`` output.
 """
 
 from __future__ import annotations
@@ -85,8 +85,8 @@ def battle_key(id_value) -> str | None:
     """
     Canonical scalar key for a battle.
 
-    df_battles stores ``id`` as a string for single uploads and as a list of
-    part ids for consolidated multi-part battles; the key is the first id.
+    Accepts either the published scalar id or the rich metadata layer's
+    list-valued multi-part id; the key is the first id.
     """
     if isinstance(id_value, list):
         return id_value[0] if id_value else None
@@ -194,16 +194,16 @@ def validate_result_row(row: dict) -> list[str]:
 
 def validate_results_store(
     results: pd.DataFrame,
-    df_battles: pd.DataFrame | None = None,
+    ft_battles: pd.DataFrame | None = None,
     *,
     require_complete: bool = True,
 ) -> list[str]:
     """
     Validate the results table by itself, and optionally against a battles table.
 
-    This is the gate used before publishing result-enriched ``df_battles``. It
+    This is the gate used before publishing result-enriched ``ft_battles``. It
     checks the CSV-level contract (schema, unique ids, no blank cells, valid row
-    structure), then, when ``df_battles`` is supplied, checks id alignment and
+    structure), then, when ``ft_battles`` is supplied, checks id alignment and
     verifies that each non-NA winner is one of the two emcees in that battle.
     """
     problems: list[str] = []
@@ -245,10 +245,10 @@ def validate_results_store(
         for problem in row_problems:
             problems.append(f"row {idx}: {problem}")
 
-    if df_battles is None or "id" not in df_battles.columns:
+    if ft_battles is None or "id" not in ft_battles.columns:
         return problems
 
-    work = df_battles.copy()
+    work = ft_battles.copy()
     work["_battle_key"] = work["id"].map(battle_key)
     battle_keys = set(work["_battle_key"].dropna().astype(str))
     result_ids = set(ids.dropna().astype(str))
@@ -369,11 +369,11 @@ def upsert_result(results: pd.DataFrame, row: dict) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def pending_battles(
-    df_battles: pd.DataFrame,
+    ft_battles: pd.DataFrame,
     results: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
-    Battles from df_battles not yet in the results store, newest upload first.
+    Battles from ft_battles not yet in the results store, newest upload first.
 
     Adds a scalar ``battle_key`` column for joining/recording. A battle is
     considered done once it has a row in the store.
@@ -383,7 +383,7 @@ def pending_battles(
 
     done = set(results["id"])
 
-    work = df_battles.copy()
+    work = ft_battles.copy()
     work["battle_key"] = work["id"].map(battle_key)
     pending = work[~work["battle_key"].isin(done)]
 
@@ -393,11 +393,11 @@ def pending_battles(
 
 
 def merge_results(
-    df_battles: pd.DataFrame,
+    ft_battles: pd.DataFrame,
     results: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """
-    Left-join the results store onto df_battles by battle key (analysis helper).
+    Left-join the results store onto ft_battles by battle key (analysis helper).
 
     Returns a new frame with the result columns added and does not mutate the
     input. Vote columns remain text (with 'NA' where not applicable); convert
@@ -406,7 +406,7 @@ def merge_results(
     if results is None:
         results = load_results()
 
-    out = df_battles.copy()
+    out = ft_battles.copy()
     out["battle_key"] = out["id"].map(battle_key)
     merged = out.merge(
         results.rename(columns={"id": "battle_key"}),

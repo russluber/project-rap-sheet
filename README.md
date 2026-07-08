@@ -12,7 +12,7 @@ The first objective of this project is to create a database for FlipTop rap batt
 
 3. `versetracker_event_dates.csv` - raw event and event date data scraped from [Verse Tracker](https://versetracker.com/battles/fliptop).
 
-The main output is a cleaned, result-enriched `df_battles` table with one row
+The main output is a cleaned, result-enriched `ft_battles` table with one row
 per battle. It is built from the battle metadata plus the hand-collected result
 store in `data/annotations/battle_results.csv`, and includes:
 
@@ -72,7 +72,7 @@ project-rap-sheet/
 │   │   ├── location_aliases.csv
 │   │   └── event_dates.csv
 │   ├── processed/
-│   │   ├── df_battles.json
+│   │   ├── ft_battles.json
 │   │   └── emcees.csv
 │   ├── annotations/
 │   │   └── battle_results.csv
@@ -154,7 +154,7 @@ fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (fa
 ```
 
 - The default (no flags) is fast, deterministic, and needs no network or API
-  key: it rebuilds `data/processed/df_battles.json` and `data/processed/emcees.csv`
+  key: it rebuilds `data/processed/ft_battles.json` and `data/processed/emcees.csv`
   from the raw files already in `data/raw/` plus
   `data/annotations/battle_results.csv`.
 - `--fetch` first runs the two collection scripts in `scripts/` to refresh the
@@ -176,7 +176,7 @@ build interactively.
 Wins, judged draws, and promos are collected by hand in an id-keyed store
 (`data/annotations/battle_results.csv`). `fliptop-refresh` validates that store
 against the battle metadata and joins the core result fields into the published
-`df_battles.json`. Use the interactive tool to record results:
+`ft_battles.json`. Use the interactive tool to record results:
 
 ```bash
 fliptop-annotate            # walk through battles that aren't annotated yet

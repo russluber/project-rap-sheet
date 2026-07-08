@@ -1,5 +1,5 @@
 """
-Tests for the df_battles-derived structures in fliptop.structures:
+Tests for the ft_battles-derived structures in fliptop.structures:
 
     build_battle_network
     build_emcees_table

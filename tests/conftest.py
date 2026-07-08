@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from fliptop import RAW_DATA_DIR
-from fliptop.battles import build_battle_metadata, build_df_battles
+from fliptop.battles import build_battle_metadata, build_ft_battles
 
 
 @pytest.fixture(scope="session")
@@ -32,8 +32,8 @@ def battle_metadata(raw_data_dir):
 
 
 @pytest.fixture(scope="session")
-def df_battles(raw_data_dir):
+def ft_battles(raw_data_dir):
     """
-    The final result-enriched df_battles table built once from committed data.
+    The final result-enriched ft_battles table built once from committed data.
     """
-    return build_df_battles(raw_dir=raw_data_dir)
+    return build_ft_battles(raw_dir=raw_data_dir)

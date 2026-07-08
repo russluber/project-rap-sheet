@@ -29,7 +29,7 @@ the reusable logic they settle on gets promoted into the
 
 | notebook | what it's for | status |
 | -------- | ------------- | ------ |
-| `wrangling.ipynb` | Loads `df_battles`, explores `event_name` / `event_location`, and is where the **COVID-era date & location sleuthing** actually happens (gathering month/year estimates and venue leads from external sources). | active scratchpad |
+| `wrangling.ipynb` | Loads `ft_battles`, explores `event_name` / `event_location`, and is where the **COVID-era date & location sleuthing** actually happens (gathering month/year estimates and venue leads from external sources). | active scratchpad |
 | `imputation.ipynb` | An attempt to *infer* missing COVID-era `event_date`s from signals like `event_name` seasonality and `upload_date` lag. | abandoned — see below |
 
 > On `imputation.ipynb`, in my own words: *"This went nowhere honestly. Just an

@@ -13,9 +13,9 @@ import pandas as pd
 
 from fliptop.validate import (
     summarize_battle_metadata,
-    summarize_df_battles,
+    summarize_ft_battles,
     validate_battle_metadata,
-    validate_df_battles,
+    validate_ft_battles,
 )
 
 
@@ -42,7 +42,7 @@ def _valid_metadata() -> pd.DataFrame:
 
 
 def _valid_final() -> pd.DataFrame:
-    """A minimal final df_battles frame with every expected column."""
+    """A minimal final ft_battles frame with every expected column."""
     return pd.DataFrame(
         {
             "id": ["aaaaaaaaaaa", "bbbbbbbbbbb"],
@@ -70,7 +70,7 @@ def _valid_final() -> pd.DataFrame:
 
 def test_valid_frame_has_no_problems():
     assert validate_battle_metadata(_valid_metadata(), today=date(2020, 1, 1)) == []
-    assert validate_df_battles(_valid_final(), today=date(2020, 1, 1)) == []
+    assert validate_ft_battles(_valid_final(), today=date(2020, 1, 1)) == []
 
 
 def test_missing_metadata_event_date_and_source_are_allowed():
@@ -86,26 +86,27 @@ def test_missing_metadata_event_date_and_source_are_allowed():
 # ---------------------------------------------------------------------------
 
 def test_empty_frame():
-    assert validate_df_battles(pd.DataFrame()) == ["df_battles is empty"]
+    assert validate_ft_battles(pd.DataFrame()) == ["ft_battles is empty"]
 
 
 def test_missing_expected_columns():
     df = _valid_final().drop(columns=["matchup", "event_location"])
-    problems = validate_df_battles(df, today=date(2020, 1, 1))
+    problems = validate_ft_battles(df, today=date(2020, 1, 1))
     assert any("missing expected columns" in p and "matchup" in p for p in problems)
 
 
 def test_duplicate_scalar_id():
     df = _valid_final()
     df["id"] = ["dup", "dup"]
-    problems = validate_df_battles(df, today=date(2020, 1, 1))
+    problems = validate_ft_battles(df, today=date(2020, 1, 1))
     assert any("duplicate battle id" in p for p in problems)
 
 
 def test_final_list_id_is_rejected():
     df = _valid_final()
+    df["id"] = df["id"].astype(object)
     df.at[1, "id"] = ["bbbbbbbbbbb", "ccccccccccc"]
-    problems = validate_df_battles(df, today=date(2020, 1, 1))
+    problems = validate_ft_battles(df, today=date(2020, 1, 1))
     assert any("list-valued id" in p for p in problems)
 
 
@@ -120,14 +121,14 @@ def test_metadata_duplicate_id_across_scalar_and_multipart_list():
 def test_missing_id_flagged():
     df = _valid_final()
     df["id"] = [pd.NA, "bbbbbbbbbbb"]
-    problems = validate_df_battles(df, today=date(2020, 1, 1))
+    problems = validate_ft_battles(df, today=date(2020, 1, 1))
     assert any("no usable id" in p for p in problems)
 
 
 def test_blank_emcee():
     df = _valid_final()
     df.loc[1, "emcee2"] = "   "
-    problems = validate_df_battles(df, today=date(2020, 1, 1))
+    problems = validate_ft_battles(df, today=date(2020, 1, 1))
     assert any("blank emcee2" in p for p in problems)
 
 
@@ -140,28 +141,28 @@ def test_unknown_event_date_source():
 
 def test_future_event_date():
     df = _valid_final()
-    problems = validate_df_battles(df, today=date(2015, 6, 1))  # row 1 is 2016-02-02
+    problems = validate_ft_battles(df, today=date(2015, 6, 1))  # row 1 is 2016-02-02
     assert any("in the future" in p for p in problems)
 
 
 def test_too_early_event_date():
     df = _valid_final()
     df.loc[0, "event_date"] = pd.Timestamp("1999-01-01")
-    problems = validate_df_battles(df, today=date(2020, 1, 1))
+    problems = validate_ft_battles(df, today=date(2020, 1, 1))
     assert any("before 2010-01-01" in p for p in problems)
 
 
 def test_missing_battle_type_flagged():
     df = _valid_final()
     df.loc[0, "battle_type"] = pd.NA
-    problems = validate_df_battles(df, today=date(2020, 1, 1))
+    problems = validate_ft_battles(df, today=date(2020, 1, 1))
     assert any("missing battle_type" in p for p in problems)
 
 
 def test_winner_must_be_one_of_the_emcees():
     df = _valid_final()
     df.loc[0, "winner"] = "Z"
-    problems = validate_df_battles(df, today=date(2020, 1, 1))
+    problems = validate_ft_battles(df, today=date(2020, 1, 1))
     assert any("winner" in p and "not one of" in p for p in problems)
 
 
@@ -176,7 +177,7 @@ def test_summarize_metadata_reports_count_and_sources():
 
 
 def test_summarize_final_reports_count_and_battle_types():
-    s = summarize_df_battles(_valid_final())
+    s = summarize_ft_battles(_valid_final())
     assert s.startswith("2 battles")
     assert "judged=1" in s and "promo=1" in s
 
@@ -185,7 +186,7 @@ def test_real_battle_metadata_passes_the_gate(battle_metadata):
     assert validate_battle_metadata(battle_metadata) == []
 
 
-def test_real_df_battles_passes_the_gate(df_battles):
+def test_real_ft_battles_passes_the_gate(ft_battles):
     # The committed pipeline output must satisfy every invariant (guards against
     # a raw-source change silently producing a malformed table).
-    assert validate_df_battles(df_battles) == []
+    assert validate_ft_battles(ft_battles) == []

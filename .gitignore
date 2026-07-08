@@ -47,6 +47,7 @@ tasks.md
 *.log
 *.tmp
 *.bak
+.pytest-tmp/
 
 # --------------------------------------
 # OS junk

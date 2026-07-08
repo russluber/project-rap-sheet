@@ -3,18 +3,18 @@ fliptop.battles
 
 Reproducible pipeline to go from raw FlipTop data to a clean
 one-row-per-battle metadata table, then publish the result-enriched
-``df_battles`` table used for analysis.
+``ft_battles`` table used for analysis.
 
 Typical notebook usage:
 
     from fliptop import RAW_DATA_DIR, PROCESSED_DATA_DIR
-    from fliptop.battles import build_df_battles, build_battle_metadata, write_df_battles
+    from fliptop.battles import build_ft_battles, build_battle_metadata, write_ft_battles
 
     battle_metadata = build_battle_metadata(raw_dir=RAW_DATA_DIR)
-    df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)
+    ft_battles = build_ft_battles(raw_dir=RAW_DATA_DIR)
 
-    write_df_battles(
-        out_path=PROCESSED_DATA_DIR / "df_battles.json",
+    write_ft_battles(
+        out_path=PROCESSED_DATA_DIR / "ft_battles.json",
         raw_dir=RAW_DATA_DIR,
         fmt="json",
     )
@@ -25,7 +25,7 @@ The metadata pipeline has three main stages:
 2. Attach event metadata and remove excluded event categories.
 3. Consolidate multi part uploads into one row per battle.
 
-The final ``df_battles`` output then joins ``data/annotations/battle_results.csv``
+The final ``ft_battles`` output then joins ``data/annotations/battle_results.csv``
 onto that metadata, keeps the project-level analysis columns, and scalarizes
 multi-part ``id`` values to their battle key.
 """
@@ -1410,7 +1410,7 @@ METADATA_COLUMNS = [
     "url",
 ]
 
-# The columns build_df_battles() emits, in order. This is the final wrangling
+# The columns build_ft_battles() emits, in order. This is the final wrangling
 # artifact: battle metadata plus the core result fields, with only the columns
 # needed for downstream analysis.
 FINAL_COLUMNS = [
@@ -1437,7 +1437,7 @@ def finalize_battles(
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
 ) -> pd.DataFrame:
     """
-    Final tidy up step to produce df_battles.
+    Final tidy up step to produce ft_battles.
 
     Mirrors the final notebook steps conceptually:
 
@@ -1464,7 +1464,7 @@ def finalize_battles(
         work["event_date_source"] = pd.Series(pd.NA, index=work.index, dtype="object")
         work.loc[work["event_date"].notna(), "event_date_source"] = "website"
 
-    # 1) Drop raw / helper columns you don't want in df_battles
+    # 1) Drop raw / helper columns you don't want in ft_battles
     # (these are from your notebook; safe to ignore if not present)
     cols_to_drop = [
         "view_count",
@@ -1565,7 +1565,7 @@ def build_battle_metadata(
     pd.DataFrame
         Metadata table with one row per battle. It includes provenance/debug
         columns such as ``description``, ``duration_hms``, and
-        ``event_date_source``; use :func:`build_df_battles` for the final
+        ``event_date_source``; use :func:`build_ft_battles` for the final
         result-enriched analysis table.
     """
     raw_dir = Path(raw_dir)
@@ -1584,14 +1584,14 @@ def build_battle_metadata(
     return battle_metadata
 
 
-def build_df_battles_from_metadata(
+def build_ft_battles_from_metadata(
     battle_metadata: pd.DataFrame,
     results: pd.DataFrame | None = None,
     *,
     require_results: bool = True,
 ) -> pd.DataFrame:
     """
-    Publish the final result-enriched ``df_battles`` table from metadata.
+    Publish the final result-enriched ``ft_battles`` table from metadata.
 
     This is the final data-wrangling artifact. It joins the id-keyed battle
     results onto the metadata table, converts multi-part ``id`` values to their
@@ -1622,7 +1622,7 @@ def build_df_battles_from_metadata(
     )
     if require_results and problems:
         raise ValueError(
-            "battle results failed validation; refusing to build df_battles:\n"
+            "battle results failed validation; refusing to build ft_battles:\n"
             + "\n".join(f"  - {p}" for p in problems)
         )
 
@@ -1633,7 +1633,7 @@ def build_df_battles_from_metadata(
     return merged[existing_cols]
 
 
-def build_df_battles(
+def build_ft_battles(
     raw_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
     events_csv_name: str = "matchup_events_metadata.csv",
@@ -1644,7 +1644,7 @@ def build_df_battles(
     require_results: bool = True,
 ) -> pd.DataFrame:
     """
-    Build the final result-enriched ``df_battles`` table from raw files.
+    Build the final result-enriched ``ft_battles`` table from raw files.
 
     The output keeps only the project-level analysis columns and joins
     ``battle_type``, ``winner``, ``votes_winner``, and ``votes_loser`` from the
@@ -1659,14 +1659,14 @@ def build_df_battles(
         rename_map=rename_map,
         vt_event_dates=vt_event_dates,
     )
-    return build_df_battles_from_metadata(
+    return build_ft_battles_from_metadata(
         battle_metadata,
         results=results,
         require_results=require_results,
     )
 
 
-def write_df_battles(
+def write_ft_battles(
     out_path: PathLike,
     raw_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
@@ -1675,15 +1675,15 @@ def write_df_battles(
     fmt: str = "json",
 ) -> Path:
     """
-    Convenience helper to build the final result-enriched df_battles table and
+    Convenience helper to build the final result-enriched ft_battles table and
     save it to disk.
 
     Parameters
     ----------
     out_path:
         Where to write the file, for example:
-          - data/processed/df_battles.csv
-          - data/processed/df_battles.json
+          - data/processed/ft_battles.csv
+          - data/processed/ft_battles.json
     raw_dir:
         Directory that contains the raw data files under data/raw.
     youtube_json_name:
@@ -1703,36 +1703,36 @@ def write_df_battles(
     Path
         The path that was written.
     """
-    df_battles = build_df_battles(
+    ft_battles = build_ft_battles(
         raw_dir=raw_dir,
         youtube_json_name=youtube_json_name,
         events_csv_name=events_csv_name,
         rename_map=rename_map,
     )
 
-    return save_df_battles(df_battles, out_path, fmt=fmt)
+    return save_ft_battles(ft_battles, out_path, fmt=fmt)
 
 
-def save_df_battles(
-    df_battles: pd.DataFrame,
+def save_ft_battles(
+    ft_battles: pd.DataFrame,
     out_path: PathLike,
     fmt: str = "json",
 ) -> Path:
     """
-    Serialize an already-built df_battles table to disk.
+    Serialize an already-built ft_battles table to disk.
 
-    Split out from `write_df_battles` so callers that already hold a built
-    df_battles (for example the refresh CLI, which also writes the emcees
+    Split out from `write_ft_battles` so callers that already hold a built
+    ft_battles (for example the refresh CLI, which also writes the emcees
     table from the same frame) do not have to rebuild it.
 
     Parameters
     ----------
-    df_battles:
+    ft_battles:
         The battle-level table to write.
     out_path:
-        Destination path, e.g. data/processed/df_battles.json.
+        Destination path, e.g. data/processed/ft_battles.json.
     fmt:
-        "json" (default) or "csv". See `write_df_battles` for why JSON is the
+        "json" (default) or "csv". See `write_ft_battles` for why JSON is the
         default (nested values do not round-trip through CSV cleanly).
 
     Returns
@@ -1745,13 +1745,15 @@ def save_df_battles(
 
     fmt = fmt.lower()
     if fmt == "csv":
-        df_battles.to_csv(out_path, index=False)
+        ft_battles.to_csv(out_path, index=False)
     elif fmt == "json":
         # newline-delimited JSON, one battle per line, UTF-8 friendly
-        df_battles.to_json(
+        ft_battles.to_json(
             out_path,
             orient="records",
             lines=True,
+            date_format="epoch",
+            date_unit="ms",
             force_ascii=False,
         )
     else:
