@@ -150,14 +150,14 @@ def quarantine_event_names() -> list[str]:
     """
     Base event names whose event_date is NaT in df_battles.
 
-    Builds df_battles WITHOUT the VerseTracker imputation (so this stays the
-    stable set of COVID-masked events even after the reference CSV exists), then
-    returns the distinct event names, in newest-event-first order.
+    Builds battle metadata WITHOUT the VerseTracker imputation (so this stays
+    the stable set of COVID-masked events even after the reference CSV exists),
+    then returns the distinct event names, in newest-event-first order.
     """
     from fliptop import RAW_DATA_DIR
-    from fliptop.battles import build_df_battles
+    from fliptop.battles import build_battle_metadata
 
-    df = build_df_battles(raw_dir=RAW_DATA_DIR, vt_event_dates={})
+    df = build_battle_metadata(raw_dir=RAW_DATA_DIR, vt_event_dates={})
     missing = df[df["event_date"].isna()]
     # event_name is already day-suffix-stripped in df_battles; dedupe, keep order.
     names = missing["event_name"].dropna().astype(str)

@@ -31,7 +31,7 @@ import pandas as pd
 
 from . import RAW_DATA_DIR
 from . import annotations as ann
-from .battles import build_df_battles
+from .battles import build_battle_metadata
 
 # sentinels returned by the winner prompt
 _QUIT = object()
@@ -206,7 +206,7 @@ def resolve_targets(df_battles: pd.DataFrame, term: str) -> pd.DataFrame:
 
 def redo(term: str) -> None:
     """Re-annotate an existing battle, overwriting its row in the store."""
-    df = build_df_battles(raw_dir=RAW_DATA_DIR)
+    df = build_battle_metadata(raw_dir=RAW_DATA_DIR)
     results = ann.load_results()
 
     targets = resolve_targets(df, term)
@@ -255,7 +255,7 @@ def redo(term: str) -> None:
 
 
 def run(*, limit: int | None = None, event: str | None = None, open_urls: bool = False) -> None:
-    df = build_df_battles(raw_dir=RAW_DATA_DIR)
+    df = build_battle_metadata(raw_dir=RAW_DATA_DIR)
     results = ann.load_results()
 
     pending = ann.pending_battles(df, results)

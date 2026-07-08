@@ -2,13 +2,15 @@
 fliptop.battles
 
 Reproducible pipeline to go from raw FlipTop data to a clean
-one-row-per-battle table (df_battles).
+one-row-per-battle metadata table, then publish the result-enriched
+``df_battles`` table used for analysis.
 
 Typical notebook usage:
 
     from fliptop import RAW_DATA_DIR, PROCESSED_DATA_DIR
-    from fliptop.battles import build_df_battles, write_df_battles
+    from fliptop.battles import build_df_battles, build_battle_metadata, write_df_battles
 
+    battle_metadata = build_battle_metadata(raw_dir=RAW_DATA_DIR)
     df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)
 
     write_df_battles(
@@ -17,11 +19,15 @@ Typical notebook usage:
         fmt="json",
     )
 
-The pipeline has three main stages:
+The metadata pipeline has three main stages:
 
 1. From raw YouTube uploads to clean 1v1 battle uploads.
 2. Attach event metadata and remove excluded event categories.
 3. Consolidate multi part uploads into one row per battle.
+
+The final ``df_battles`` output then joins ``data/annotations/battle_results.csv``
+onto that metadata, keeps the project-level analysis columns, and scalarizes
+multi-part ``id`` values to their battle key.
 """
 
 from __future__ import annotations
@@ -1384,10 +1390,10 @@ def consolidate_battle_parts(df: pd.DataFrame) -> pd.DataFrame:
     return final_df
 
 
-# The columns build_df_battles emits, in order. Single source of truth for the
-# output schema: finalize_battles selects/orders by it, and fliptop.validate
-# checks the built table against it.
-FINAL_COLUMNS = [
+# The rich intermediate columns emitted by build_battle_metadata(), in order.
+# This table keeps provenance/debug columns that are useful inside the pipeline
+# but are not part of the final public analysis table.
+METADATA_COLUMNS = [
     "id",
     "title",
     "description",
@@ -1402,6 +1408,27 @@ FINAL_COLUMNS = [
     "event_date_source",
     "event_location",
     "url",
+]
+
+# The columns build_df_battles() emits, in order. This is the final wrangling
+# artifact: battle metadata plus the core result fields, with only the columns
+# needed for downstream analysis.
+FINAL_COLUMNS = [
+    "id",
+    "title",
+    "upload_date",
+    "duration_seconds",
+    "emcee1",
+    "emcee2",
+    "matchup",
+    "event_name",
+    "event_date",
+    "event_location",
+    "url",
+    "battle_type",
+    "winner",
+    "votes_winner",
+    "votes_loser",
 ]
 
 
@@ -1491,8 +1518,8 @@ def finalize_battles(
     #    (website-authoritative hand fixes).
     battles = apply_manual_event_date_overrides(battles)
 
-    # 10) Select and order final columns (keep only those that exist)
-    existing_cols = [c for c in FINAL_COLUMNS if c in battles.columns]
+    # 10) Select and order metadata columns (keep only those that exist)
+    existing_cols = [c for c in METADATA_COLUMNS if c in battles.columns]
     battles = battles[existing_cols]
 
     return battles
@@ -1503,7 +1530,7 @@ def finalize_battles(
 # These are what you will usually call from notebooks and scripts.
 # ---------------------------------------------------------------------------
 
-def build_df_battles(
+def build_battle_metadata(
     raw_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
     events_csv_name: str = "matchup_events_metadata.csv",
@@ -1512,7 +1539,7 @@ def build_df_battles(
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
 ) -> pd.DataFrame:
     """
-    Build the complete df_battles table from raw files.
+    Build the rich one-row-per-battle metadata table from raw files.
 
     Parameters
     ----------
@@ -1536,7 +1563,10 @@ def build_df_battles(
     Returns
     -------
     pd.DataFrame
-        Final df_battles table with one row per battle.
+        Metadata table with one row per battle. It includes provenance/debug
+        columns such as ``description``, ``duration_hms``, and
+        ``event_date_source``; use :func:`build_df_battles` for the final
+        result-enriched analysis table.
     """
     raw_dir = Path(raw_dir)
 
@@ -1549,9 +1579,91 @@ def build_df_battles(
     df_1v1 = make_df_1v1_uploads(df_yt, rename_map=rename_map)
     df_with_meta = attach_event_metadata(df_1v1, df_events)
     df_with_meta = drop_excluded_events(df_with_meta)
-    df_battles = finalize_battles(df_with_meta, vt_event_dates=vt_event_dates)
+    battle_metadata = finalize_battles(df_with_meta, vt_event_dates=vt_event_dates)
 
-    return df_battles
+    return battle_metadata
+
+
+def build_df_battles_from_metadata(
+    battle_metadata: pd.DataFrame,
+    results: pd.DataFrame | None = None,
+    *,
+    require_results: bool = True,
+) -> pd.DataFrame:
+    """
+    Publish the final result-enriched ``df_battles`` table from metadata.
+
+    This is the final data-wrangling artifact. It joins the id-keyed battle
+    results onto the metadata table, converts multi-part ``id`` values to their
+    scalar battle key, and selects the stable analysis columns in
+    :data:`FINAL_COLUMNS`.
+
+    Parameters
+    ----------
+    battle_metadata:
+        Rich one-row-per-battle metadata from :func:`build_battle_metadata`.
+    results:
+        Optional battle-results DataFrame. If omitted,
+        ``data/annotations/battle_results.csv`` is loaded.
+    require_results:
+        When true, every battle must have a valid result row and every result row
+        must point to a battle in ``battle_metadata``. This should stay true for
+        the published output; pass false only for exploratory workflows.
+    """
+    from .annotations import battle_key, load_results, merge_results, validate_results_store
+
+    if results is None:
+        results = load_results()
+
+    problems = validate_results_store(
+        results,
+        battle_metadata,
+        require_complete=require_results,
+    )
+    if require_results and problems:
+        raise ValueError(
+            "battle results failed validation; refusing to build df_battles:\n"
+            + "\n".join(f"  - {p}" for p in problems)
+        )
+
+    merged = merge_results(battle_metadata, results)
+    merged["id"] = merged["id"].map(battle_key)
+
+    existing_cols = [c for c in FINAL_COLUMNS if c in merged.columns]
+    return merged[existing_cols]
+
+
+def build_df_battles(
+    raw_dir: PathLike,
+    youtube_json_name: str = "youtube_videos.json",
+    events_csv_name: str = "matchup_events_metadata.csv",
+    versetracker_csv_name: str = "versetracker_event_dates.csv",
+    rename_map: RenameMap | None = None,
+    vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
+    results: pd.DataFrame | None = None,
+    require_results: bool = True,
+) -> pd.DataFrame:
+    """
+    Build the final result-enriched ``df_battles`` table from raw files.
+
+    The output keeps only the project-level analysis columns and joins
+    ``battle_type``, ``winner``, ``votes_winner``, and ``votes_loser`` from the
+    annotations store. Use :func:`build_battle_metadata` when you need the rich
+    intermediate metadata with description/provenance columns.
+    """
+    battle_metadata = build_battle_metadata(
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+        versetracker_csv_name=versetracker_csv_name,
+        rename_map=rename_map,
+        vt_event_dates=vt_event_dates,
+    )
+    return build_df_battles_from_metadata(
+        battle_metadata,
+        results=results,
+        require_results=require_results,
+    )
 
 
 def write_df_battles(
@@ -1563,7 +1675,8 @@ def write_df_battles(
     fmt: str = "json",
 ) -> Path:
     """
-    Convenience helper to build df_battles and save it to disk.
+    Convenience helper to build the final result-enriched df_battles table and
+    save it to disk.
 
     Parameters
     ----------
@@ -1581,8 +1694,8 @@ def write_df_battles(
         Optional emcee rename map for canonicalization.
     fmt:
         "json" (default) or "csv". JSON is the default because consolidated
-        multi-part battles store list-valued `id` and `url` columns, which CSV
-        cannot represent or round-trip. The JSON output is newline-delimited
+        multi-part battles may store list-valued `url` values, which CSV cannot
+        represent or round-trip cleanly. The JSON output is newline-delimited
         (one battle per line); reload it with `pd.read_json(path, lines=True)`.
 
     Returns
@@ -1620,7 +1733,7 @@ def save_df_battles(
         Destination path, e.g. data/processed/df_battles.json.
     fmt:
         "json" (default) or "csv". See `write_df_battles` for why JSON is the
-        default (list-valued id/url columns do not round-trip through CSV).
+        default (nested values do not round-trip through CSV cleanly).
 
     Returns
     -------

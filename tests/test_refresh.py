@@ -35,6 +35,7 @@ def test_rebuild_outputs_are_consistent(tmp_path):
     battles = pd.read_json(battles_path, lines=True)
     emcees = pd.read_csv(emcees_path)
 
+    assert {"battle_type", "winner", "votes_winner", "votes_loser"} <= set(battles.columns)
     # Every emcee in the battles table appears in the emcees table, and the
     # emcees table is the de-duplicated union of emcee1/emcee2.
     names_in_battles = set(battles["emcee1"]) | set(battles["emcee2"])
@@ -48,7 +49,7 @@ def _bad_battles():
 
 
 def test_rebuild_refuses_to_write_on_validation_failure(tmp_path, monkeypatch):
-    monkeypatch.setattr(refresh_mod, "build_df_battles", lambda **kw: _bad_battles())
+    monkeypatch.setattr(refresh_mod, "build_battle_metadata", lambda **kw: _bad_battles())
 
     with pytest.raises(ValueError, match="failed validation"):
         rebuild_processed(raw_dir=RAW_DATA_DIR, processed_dir=tmp_path)
@@ -59,7 +60,12 @@ def test_rebuild_refuses_to_write_on_validation_failure(tmp_path, monkeypatch):
 
 
 def test_rebuild_validate_false_bypasses_gate(tmp_path, monkeypatch):
-    monkeypatch.setattr(refresh_mod, "build_df_battles", lambda **kw: _bad_battles())
+    monkeypatch.setattr(refresh_mod, "build_battle_metadata", lambda **kw: pd.DataFrame())
+    monkeypatch.setattr(
+        refresh_mod,
+        "build_df_battles_from_metadata",
+        lambda *args, **kwargs: _bad_battles(),
+    )
 
     battles_path, emcees_path = rebuild_processed(
         raw_dir=RAW_DATA_DIR, processed_dir=tmp_path, validate=False

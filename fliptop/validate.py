@@ -1,15 +1,16 @@
 """
 fliptop.validate
 
-Output data-quality gate for the built ``df_battles`` table.
+Output data-quality gates for the built battle tables.
 
-``build_df_battles`` is a long chain of heuristic filters, merges, and overrides;
-a change in a raw source's shape (a re-scrape, a YouTube API tweak) can silently
-produce a malformed table - blank emcee names, duplicate battles, dates in the
-future - that still writes cleanly to disk. :func:`validate_df_battles` checks the
-invariants the pipeline is supposed to guarantee and returns a list of
-human-readable problems (empty == ok), mirroring
-:func:`fliptop.annotations.validate_result_row`.
+The raw-to-metadata build is a long chain of heuristic filters, merges, and
+overrides; a change in a raw source's shape (a re-scrape, a YouTube API tweak)
+can silently produce a malformed table. The final ``df_battles`` table then adds
+the id-keyed battle results and selects the project-level analysis columns.
+
+``validate_battle_metadata`` guards the rich intermediate metadata table.
+``validate_df_battles`` guards the final result-enriched table written to
+``data/processed/df_battles.json``.
 
 The refresh CLI runs it after every build and aborts *before writing* if anything
 is wrong, so a regression fails loudly instead of shipping a broken
@@ -22,8 +23,8 @@ from datetime import date
 
 import pandas as pd
 
-from .annotations import battle_key
-from .battles import FINAL_COLUMNS
+from .annotations import BATTLE_TYPES, NA, battle_key, validate_votes, validate_winner
+from .battles import FINAL_COLUMNS, METADATA_COLUMNS
 
 # event_date_source is a small closed vocabulary; missing (undated battles) is ok.
 EVENT_DATE_SOURCES = {"website", "description", "versetracker", "manual"}
@@ -33,52 +34,99 @@ EVENT_DATE_SOURCES = {"website", "description", "versetracker", "manual"}
 EARLIEST_EVENT_DATE = pd.Timestamp("2010-01-01")
 
 
-def validate_df_battles(df: pd.DataFrame, *, today: date | None = None) -> list[str]:
-    """
-    Return a list of data-quality problems with a built ``df_battles`` (empty == ok).
+def _check_expected_columns(
+    df: pd.DataFrame,
+    expected_columns: list[str],
+    label: str,
+) -> list[str]:
+    missing = [c for c in expected_columns if c not in df.columns]
+    if missing:
+        return [f"{label} is missing expected columns: {', '.join(missing)}"]
+    if list(df.columns) != expected_columns:
+        return [f"{label} columns are out of order or include unexpected columns"]
+    return []
 
-    Checks the invariants ``build_df_battles`` should guarantee:
 
-    * every expected column is present (see :data:`fliptop.battles.FINAL_COLUMNS`);
-    * one row per battle - the scalar battle key (first id for consolidated
-      multi-part battles) is present and unique;
-    * every battle has two non-blank emcees;
-    * ``event_date_source`` is drawn from the known vocabulary (missing allowed);
-    * ``event_date`` is within a plausible window (>= 2010, not in the future).
-
-    ``today`` overrides the upper date bound (defaults to the current date); handy
-    for deterministic tests.
-    """
+def _check_battle_identity(
+    df: pd.DataFrame,
+    *,
+    label: str,
+    allow_list_ids: bool,
+) -> list[str]:
     problems: list[str] = []
-
-    if df.empty:
-        problems.append("df_battles is empty")
+    if "id" not in df.columns:
         return problems
 
-    missing = [c for c in FINAL_COLUMNS if c not in df.columns]
-    if missing:
-        problems.append(f"missing expected columns: {', '.join(missing)}")
+    if not allow_list_ids:
+        list_ids = df["id"].map(lambda x: isinstance(x, list))
+        if bool(list_ids.any()):
+            problems.append(f"{int(list_ids.sum())} {label} row(s) have list-valued id")
 
-    # One row per battle: unique, present scalar key.
-    if "id" in df.columns:
-        keys = df["id"].map(battle_key)
-        n_missing = int(keys.isna().sum())
-        if n_missing:
-            problems.append(f"{n_missing} battle(s) have no usable id")
-        present = keys.dropna()
-        dup_values = present[present.duplicated()].unique().tolist()
-        if dup_values:
-            shown = ", ".join(map(str, dup_values[:5]))
-            more = "" if len(dup_values) <= 5 else f" (+{len(dup_values) - 5} more)"
-            problems.append(f"{len(dup_values)} duplicate battle id(s): {shown}{more}")
+    keys = df["id"].map(battle_key)
+    n_missing = int(keys.isna().sum())
+    if n_missing:
+        problems.append(f"{n_missing} {label} row(s) have no usable id")
+    present = keys.dropna()
+    dup_values = present[present.duplicated()].unique().tolist()
+    if dup_values:
+        shown = ", ".join(map(str, dup_values[:5]))
+        more = "" if len(dup_values) <= 5 else f" (+{len(dup_values) - 5} more)"
+        problems.append(f"{len(dup_values)} duplicate battle id(s): {shown}{more}")
+    return problems
 
-    # Every battle needs two named emcees.
+
+def _check_emcees(df: pd.DataFrame) -> list[str]:
+    problems: list[str] = []
     for col in ("emcee1", "emcee2"):
         if col in df.columns:
             blank = df[col].isna() | (df[col].astype("string").str.strip() == "")
             n_blank = int(blank.sum())
             if n_blank:
                 problems.append(f"{n_blank} battle(s) have a blank {col}")
+    if {"emcee1", "emcee2"} <= set(df.columns):
+        same = df["emcee1"].astype("string").str.strip() == df["emcee2"].astype("string").str.strip()
+        if bool(same.any()):
+            problems.append(f"{int(same.sum())} battle(s) have the same emcee twice")
+    return problems
+
+
+def _check_event_dates(df: pd.DataFrame, *, today: date | None = None) -> list[str]:
+    problems: list[str] = []
+    if "event_date" not in df.columns:
+        return problems
+
+    dates = pd.to_datetime(df["event_date"], errors="coerce")
+    upper = pd.Timestamp(today or date.today())
+    n_early = int((dates < EARLIEST_EVENT_DATE).sum())
+    n_future = int((dates > upper).sum())
+    if n_early:
+        problems.append(f"{n_early} event_date(s) before {EARLIEST_EVENT_DATE.date()}")
+    if n_future:
+        problems.append(f"{n_future} event_date(s) in the future (after {upper.date()})")
+    return problems
+
+
+def validate_battle_metadata(
+    df: pd.DataFrame,
+    *,
+    today: date | None = None,
+) -> list[str]:
+    """
+    Return data-quality problems with the rich battle metadata table.
+
+    This table may still carry list-valued ``id``/``url`` for consolidated
+    multi-part battles and includes provenance columns such as
+    ``event_date_source``.
+    """
+    problems: list[str] = []
+
+    if df.empty:
+        problems.append("battle metadata is empty")
+        return problems
+
+    problems.extend(_check_expected_columns(df, METADATA_COLUMNS, "battle metadata"))
+    problems.extend(_check_battle_identity(df, label="metadata", allow_list_ids=True))
+    problems.extend(_check_emcees(df))
 
     # event_date_source is a closed vocabulary (missing = undated battle, allowed).
     if "event_date_source" in df.columns:
@@ -90,28 +138,66 @@ def validate_df_battles(df: pd.DataFrame, *, today: date | None = None) -> list[
                 + ", ".join(map(repr, unknown))
             )
 
-    # event_date within a plausible window (NaT rows are left undated and skipped).
-    if "event_date" in df.columns:
-        dates = pd.to_datetime(df["event_date"], errors="coerce")
-        upper = pd.Timestamp(today or date.today())
-        n_early = int((dates < EARLIEST_EVENT_DATE).sum())
-        n_future = int((dates > upper).sum())
-        if n_early:
-            problems.append(
-                f"{n_early} event_date(s) before {EARLIEST_EVENT_DATE.date()}"
-            )
-        if n_future:
-            problems.append(f"{n_future} event_date(s) in the future (after {upper.date()})")
+    problems.extend(_check_event_dates(df, today=today))
 
     return problems
 
 
-def summarize_df_battles(df: pd.DataFrame) -> str:
+def validate_df_battles(df: pd.DataFrame, *, today: date | None = None) -> list[str]:
     """
-    One-line build summary: battle count and the ``event_date_source`` breakdown.
+    Return data-quality problems with the final result-enriched ``df_battles``.
 
-    Printed by the refresh CLI as a quick sanity read on each build.
+    Checks the published output schema, one scalar id per battle, non-blank
+    emcees, plausible event dates, valid result fields, and winners that match
+    one of the two emcees when a judged battle has a winner.
     """
+    problems: list[str] = []
+
+    if df.empty:
+        problems.append("df_battles is empty")
+        return problems
+
+    problems.extend(_check_expected_columns(df, FINAL_COLUMNS, "df_battles"))
+    problems.extend(_check_battle_identity(df, label="df_battles", allow_list_ids=False))
+    problems.extend(_check_emcees(df))
+    problems.extend(_check_event_dates(df, today=today))
+
+    if "battle_type" in df.columns:
+        battle_type = df["battle_type"].astype("string").str.strip()
+        missing = battle_type.isna() | (battle_type == "")
+        if bool(missing.any()):
+            problems.append(f"{int(missing.sum())} battle(s) are missing battle_type")
+        unknown = sorted(set(battle_type.dropna()) - set(BATTLE_TYPES))
+        if unknown:
+            problems.append("unexpected battle_type value(s): " + ", ".join(map(repr, unknown)))
+
+    for col in ("votes_winner", "votes_loser"):
+        if col in df.columns:
+            bad = ~df[col].map(validate_votes)
+            if bool(bad.any()):
+                problems.append(f"{int(bad.sum())} battle(s) have invalid {col}")
+
+    if {"battle_type", "winner", "emcee1", "emcee2"} <= set(df.columns):
+        for idx, row in df.iterrows():
+            battle_type = str(row["battle_type"]).strip()
+            winner = str(row["winner"]).strip()
+            if battle_type == "promo" and winner != NA:
+                problems.append(f"row {idx}: promo battle has non-NA winner {winner!r}")
+            if (
+                battle_type == "judged"
+                and winner != NA
+                and not validate_winner(winner, row["emcee1"], row["emcee2"])
+            ):
+                problems.append(
+                    f"row {idx}: winner {winner!r} is not one of "
+                    f"{row['emcee1']!r} / {row['emcee2']!r}"
+                )
+
+    return problems
+
+
+def summarize_battle_metadata(df: pd.DataFrame) -> str:
+    """One-line metadata build summary."""
     n = len(df)
     if "event_date_source" not in df.columns:
         return f"{n} battles"
@@ -119,3 +205,18 @@ def summarize_df_battles(df: pd.DataFrame) -> str:
     counts = df["event_date_source"].value_counts(dropna=False)
     parts = [f"{'none' if pd.isna(k) else k}={v}" for k, v in counts.items()]
     return f"{n} battles; event_date_source: {', '.join(parts)}"
+
+
+def summarize_df_battles(df: pd.DataFrame) -> str:
+    """
+    One-line final-output summary: battle count and result-type breakdown.
+
+    Printed by the refresh CLI as a quick sanity read on each build.
+    """
+    n = len(df)
+    if "battle_type" not in df.columns:
+        return f"{n} battles"
+
+    counts = df["battle_type"].value_counts(dropna=False)
+    parts = [f"{'none' if pd.isna(k) else k}={v}" for k, v in counts.items()]
+    return f"{n} battles; battle_type: {', '.join(parts)}"

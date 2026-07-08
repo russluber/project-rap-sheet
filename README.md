@@ -12,25 +12,32 @@ The first objective of this project is to create a database for FlipTop rap batt
 
 3. `versetracker_event_dates.csv` - raw event and event date data scraped from [Verse Tracker](https://versetracker.com/battles/fliptop).
 
-The main output is a cleaned `df_battles` table with one row per battle, including:
+The main output is a cleaned, result-enriched `df_battles` table with one row
+per battle. It is built from the battle metadata plus the hand-collected result
+store in `data/annotations/battle_results.csv`, and includes:
 
 
 | Variable | Type | Description |
 | ------------- | ------------- | ----------- |
-| `id` | string | YouTube video ID for the battle. For multi-part uploads (`pt. 1`, `pt. 2`, …) this is a list of the part IDs. |
+| `id` | string | Scalar battle key / YouTube video ID. For multi-part uploads, this is the first part ID. |
 | `title` | string | The title of the YouTube video (with any `pt. N` suffix stripped) |
-| `description` | string | The text description box of the YouTube video |
 | `upload_date` | datetime | When the video of the battle was uploaded to YouTube (earliest part for multi-part battles) |
 | `duration_seconds` | number | Duration of the battle's video in seconds (summed across parts) |
-| `duration_hms` | string | Duration of the battle's video formatted as `HH:MM:SS` |
 | `emcee1` | string | Name of the first emcee in the battle (canonicalized) |
 | `emcee2` | string | Name of the second emcee in the battle (canonicalized) |
 | `matchup` | string | Cleaned and standardized `emcee1 vs emcee2` |
 | `event_name` | string | Name of the FlipTop event the battle took place in (standardized — a `(Day N)` suffix is stripped) |
 | `event_date` | datetime | The day the battle actually took place (for multi-day events, the specific day). COVID-era dates are imputed from VerseTracker — see note below. |
-| `event_date_source` | string | Where `event_date` came from: `website`, `description`, `versetracker` (COVID-era imputation), or `manual` |
 | `event_location` | string | Location of where the battle took place |
 | `url`| string | Link to the battle. A list of URLs for multi-part uploads. |
+| `battle_type` | string | `judged` or `promo` |
+| `winner` | string | Winning emcee, or `NA` for promos and judged draws |
+| `votes_winner` | string | Judges voting for the winner, or `NA` |
+| `votes_loser` | string | Judges voting for the loser, or `NA` |
+
+The richer internal metadata table, available from
+`fliptop.build_battle_metadata`, keeps audit/provenance fields such as
+`description`, `duration_hms`, and `event_date_source`.
 
 
 > **Note on COVID-era events.** FlipTop obfuscated the real dates and locations
@@ -39,10 +46,9 @@ The main output is a cleaned `df_battles` table with one row per battle, includi
 > pipeline blanks those out, then **imputes** the real dates from
 > [VerseTracker](https://versetracker.com/battles/fliptop) (a third-party FlipTop
 > database) via [`scripts/fetch_versetracker_event_dates.py`](scripts/) and the
-> date-imputation step in the build. These imputed dates are accurate to within
+> date-imputation step in the metadata build. These imputed dates are accurate to within
 > ~days (VerseTracker appears to use the event flyer-post date for some events),
-> so they're flagged in the `event_date_source` column (`versetracker`) — slice
-> on it if a downstream analysis needs to treat them as approximate. See the
+> so they're flagged in the metadata table's `event_date_source` column (`versetracker`). See the
 > [imputation notebook journal](notebooks/README.md#covid-era-event-dates--resolved).
 
 The second objective is to analyze data about FlipTop rap battles. 
@@ -149,7 +155,8 @@ fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (fa
 
 - The default (no flags) is fast, deterministic, and needs no network or API
   key: it rebuilds `data/processed/df_battles.json` and `data/processed/emcees.csv`
-  from the raw files already in `data/raw/`.
+  from the raw files already in `data/raw/` plus
+  `data/annotations/battle_results.csv`.
 - `--fetch` first runs the two collection scripts in `scripts/` to refresh the
   raw data (this needs a YouTube API key — see `data/README.md`), then rebuilds.
   Override the channel or scrape years with `--channel`, `--start`, `--end`.
@@ -166,19 +173,18 @@ build interactively.
 
 ### Recording battle results
 
-Wins, judged draws, and promos are collected by hand and kept **separate** from
-`df_battles` in an append-only, id-keyed store
-(`data/annotations/battle_results.csv`). Use the interactive tool to record
-results:
+Wins, judged draws, and promos are collected by hand in an id-keyed store
+(`data/annotations/battle_results.csv`). `fliptop-refresh` validates that store
+against the battle metadata and joins the core result fields into the published
+`df_battles.json`. Use the interactive tool to record results:
 
 ```bash
 fliptop-annotate            # walk through battles that aren't annotated yet
 fliptop-annotate --limit 20 # do a batch of 20
 ```
 
-It is incremental and resumable. After a refresh you only annotate *new*
-battles, and quitting mid-session loses nothing. At the result prompt, `d`
-records a judged draw and `p` records a promo with no judging. Join the results onto
-`df_battles` on demand with `fliptop.annotations.merge_results(df_battles)`;
-the published `df_battles.json` is intentionally left without result columns (for now).
+It is incremental and resumable. After fetching new raw data you only annotate
+*new* battles, and quitting mid-session loses nothing. At the result prompt, `d`
+records a judged draw and `p` records a promo with no judging. The final refresh
+will refuse to publish if any battle is missing a result row.
 See `fliptop/README.md` for details.

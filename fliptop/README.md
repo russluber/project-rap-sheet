@@ -1,8 +1,9 @@
 # FlipTop
 
 The core Python package for Project Rap Sheet. It implements the reproducible
-pipeline that turns raw FlipTop data into a clean, **one-row-per-battle** table
-(`df_battles`), plus the helpers that build things from that table, record
+pipeline that turns raw FlipTop data into a rich **one-row-per-battle** metadata
+table, then publishes the final result-enriched `df_battles` table used for
+analysis. It also includes helpers that build structures from that table, record
 battle results, and refresh everything with one command.
 
 The code lives here (not in notebooks) so the pipeline is modular, reusable,
@@ -30,14 +31,15 @@ reimplement it.
 
 ## Architecture at a glance
 
-Everything flows one way toward `df_battles` as the hub: the pipeline *builds*
-it, and other modules *consume* it.
+Everything flows one way toward `df_battles` as the hub: the pipeline builds
+metadata, validates and joins annotations, publishes `df_battles`, and other
+modules consume it.
 
 ```
  data/raw/youtube_videos.json ─┐
                                ├─► battles.py ──► df_battles ──┬─► structures.py  (emcee table, network)
  data/raw/matchup_events_      ─┘   (+ emcee_aliases.csv)      │
-   metadata.csv                                                └─► annotations.py (winner/judging, joined on demand)
+   metadata.csv                                                ??? annotations.py (validated result store)
 
  scripts/ (fetch raw) ──► data/raw/        refresh.py orchestrates: fetch (optional) → build → write
                                            annotate.py records battle results into data/annotations/
@@ -45,9 +47,9 @@ it, and other modules *consume* it.
 
 **Design principles**
 
-- **`df_battles` is the hub.** `battles.py` produces the one canonical table;
-  `structures.py` and `annotations.py` only read from it. No module downstream
-  of `df_battles` feeds back into building it.
+- **Two layers, one public output.** `build_battle_metadata()` keeps the rich
+  audit table with provenance fields; `build_df_battles()` joins validated
+  annotations and emits the final analysis table.
 - **Logic is separate from CLI.** `battles.py` ↔ `refresh.py` (build ↔ command)
   and `annotations.py` ↔ `annotate.py` (store ↔ command) are deliberate splits.
 - **Hand-maintained data lives in `data/` files, not in code** — emcee aliases,
@@ -77,8 +79,9 @@ fliptop/
 
 ## The pipeline: raw → `df_battles`
 
-`battles.py` is the heart of the package. `build_df_battles(raw_dir=...)` runs
-three stages and returns the final table.
+`battles.py` is the heart of the package. `build_battle_metadata(raw_dir=...)`
+runs three cleaning stages and returns the rich metadata table. `build_df_battles`
+then joins validated battle results and returns the final analysis table.
 
 ```
 build_df_battles
@@ -351,6 +354,13 @@ score unknown" is represented (no separate status for it). A judged row with
 distinguishes it. Draw rulings that do not fit the structured fields belong in
 `notes`.
 
+**Current publishing contract.** The annotation CSV stays separate as the
+hand-maintained source of truth, but the published `df_battles.json` is now
+result-enriched. `build_df_battles()` validates the store against the battle
+metadata, joins the core result fields, and keeps only the final analysis
+columns. If a fetch adds new battles, `fliptop-refresh` will refuse to publish
+until `fliptop-annotate` records those results.
+
 **`annotations.py`** — the store and its helpers:
 
 - `load_results()` / `save_results()` — read/write the CSV.
@@ -442,21 +452,24 @@ so `import fliptop` stays cheap:
 ```python
 from fliptop import (
     RAW_DATA_DIR, PROCESSED_DATA_DIR, DATA_DIR,   # shared paths
-    build_df_battles,        # raw -> df_battles
+    build_battle_metadata,   # raw -> rich metadata
+    build_df_battles,        # raw + annotations -> final df_battles
     build_excluded_uploads,  # audit of dropped uploads
     build_emcees_table,      # df_battles -> emcee table
     write_emcees_table,
     build_battle_network,    # df_battles -> networkx graph
-    merge_results,           # join battle results onto df_battles
-    validate_df_battles,     # data-quality gate for a built df_battles
+    merge_results,           # join full battle results onto a battle table
+    validate_battle_metadata,
+    validate_df_battles,     # data-quality gate for final df_battles
 )
 ```
 
 Build the dataset in memory:
 
 ```python
-from fliptop import RAW_DATA_DIR, build_df_battles
+from fliptop import RAW_DATA_DIR, build_battle_metadata, build_df_battles
 
+metadata = build_battle_metadata(raw_dir=RAW_DATA_DIR)
 df_battles = build_df_battles(raw_dir=RAW_DATA_DIR)
 ```
 

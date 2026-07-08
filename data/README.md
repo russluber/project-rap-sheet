@@ -28,14 +28,14 @@ data/
 **Data flow.** `raw/` is produced by [`scripts/`](../scripts/); `processed/` is
 built from `raw/` (plus `emcee_aliases.csv` and the `overrides/` tables) by the
 [`fliptop`](../fliptop/) package; `annotations/` is filled in by hand via
-`fliptop-annotate` and joined onto the processed table only on demand.
+`fliptop-annotate`; refresh validates those annotations and joins the core result fields into the processed `df_battles.json`.
 
 ```
 scripts/ ─► raw/ ─┐
 emcee_aliases.csv ┤
 overrides/ ───────┼─► fliptop (build) ─► processed/
                   │                          │
-                  └──────────── annotations/ ─(join on demand)─┘
+                  ????????????? annotations/ ?(validated join)??
 ```
 
 ---
@@ -156,26 +156,31 @@ overwritten on the next refresh.
 ### `df_battles.json`
 
 The project's core table: **one row per battle**, as newline-delimited JSON
-(one battle per line). Read it with `pd.read_json(path, lines=True)`.
+(one battle per line). It is result-enriched from
+`data/annotations/battle_results.csv`. Read it with
+`pd.read_json(path, lines=True)`.
 
 The full column-by-column schema is documented in the
 [fliptop README](../fliptop/README.md#df_battles-schema). A few file-format notes:
 
+The final file keeps the analysis columns only. Rich audit fields such as
+`description`, `duration_hms`, and `event_date_source` live in the internal
+metadata table returned by `fliptop.build_battle_metadata()`.
+
 - Process of Illumination and tryout events are excluded after event metadata is
   attached; they remain visible in `build_excluded_uploads` with an exclusion
   reason.
-- `id` and `url` are a **single value** for normal battles and a **list** for
-  consolidated multi-part (`pt. 1`, `pt. 2`, …) uploads.
+- `id` is a scalar battle key. For consolidated multi-part uploads, it is the
+  first part's YouTube id; `url` may still be a list of source URLs.
+- In the internal metadata layer, `id` and `url` are a **single value** for
+  normal battles and a **list** for consolidated multi-part uploads.
 - `event_name` is standardized (no `(Day N)` suffix); for a multi-day event,
   `event_date` carries the specific day the battle happened.
 - Dates (`upload_date`, `event_date`) are stored as **epoch milliseconds** in the
   JSON; pass `convert_dates=[…]` (or `pd.to_datetime`) when loading.
-- `event_date_source` tags where each date came from — `website` |
-  `description` | `versetracker` | `manual`. COVID-era ("quarantine") dates are
-  imputed from VerseTracker (tagged `versetracker`) and are approximate; slice on
-  this column for sensitivity checks. See the note in the
-  [root README](../README.md) and the
-  [imputation notebook](../notebooks/README.md#covid-era-event-dates--resolved).
+- `battle_type`, `winner`, `votes_winner`, and `votes_loser` come from the
+  validated annotation store. Fuller judging detail (`votes_nv`, `votes_ot`,
+  `overtime`, `notes`) remains in `data/annotations/battle_results.csv`.
 
 ### `emcees.csv`
 
@@ -192,9 +197,9 @@ Built by [`fliptop.structures.write_emcees_table`](../fliptop/structures.py).
 
 ## `annotations/`
 
-Hand-collected data kept **deliberately separate** from the auto-built tables, so
-rebuilding `processed/` never clobbers manual work. Joined onto `df_battles` on
-demand via `fliptop.annotations.merge_results`.
+Hand-collected data kept **deliberately separate** from the auto-built metadata,
+so rebuilding never clobbers manual work. `fliptop-refresh` validates it and
+joins the core result fields into the published `df_battles.json`.
 
 ### `battle_results.csv`
 
@@ -241,7 +246,7 @@ fliptop-refresh --fetch --events-since 2025   # incremental events scrape (recen
 ```
 
 `processed/` is fully reproducible from `raw/` + `emcee_aliases.csv` +
-`overrides/`. `raw/` is
+`overrides/` + `annotations/`. `raw/` is
 reproducible from the network via [`scripts/`](../scripts/) — a full
 `--fetch` overwrites the events CSV with a clean scrape, while `--events-since`
 **merges** only recent events in (faster, but accumulates scrape history; see

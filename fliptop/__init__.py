@@ -32,32 +32,43 @@ __all__ = [
     "DATA_DIR",
     "RAW_DATA_DIR",
     "PROCESSED_DATA_DIR",
+    "build_battle_metadata",
     "build_df_battles",
+    "build_df_battles_from_metadata",
     "build_excluded_uploads",
     "build_emcees_table",
     "write_emcees_table",
     "build_battle_network",
     "merge_results",
+    "validate_battle_metadata",
     "validate_df_battles",
 ]
 
 # Lazy public API: name -> (submodule, attribute). Imported on first access so
 # `import fliptop` does not eagerly load pandas/networkx.
 _LAZY = {
+    "build_battle_metadata": (".battles", "build_battle_metadata"),
     "build_df_battles": (".battles", "build_df_battles"),
+    "build_df_battles_from_metadata": (".battles", "build_df_battles_from_metadata"),
     "build_excluded_uploads": (".battles", "build_excluded_uploads"),
     "build_emcees_table": (".structures", "build_emcees_table"),
     "write_emcees_table": (".structures", "write_emcees_table"),
     "build_battle_network": (".structures", "build_battle_network"),
     "merge_results": (".annotations", "merge_results"),
+    "validate_battle_metadata": (".validate", "validate_battle_metadata"),
     "validate_df_battles": (".validate", "validate_df_battles"),
 }
 
 if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
     from .annotations import merge_results
-    from .battles import build_df_battles, build_excluded_uploads
+    from .battles import (
+        build_battle_metadata,
+        build_df_battles,
+        build_df_battles_from_metadata,
+        build_excluded_uploads,
+    )
     from .structures import build_battle_network, build_emcees_table, write_emcees_table
-    from .validate import validate_df_battles
+    from .validate import validate_battle_metadata, validate_df_battles
 
 
 def __getattr__(name: str):

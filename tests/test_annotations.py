@@ -94,6 +94,43 @@ def test_validate_result_row_promo_has_no_winner_and_no_votes():
     assert ann.validate_result_row(dict(ok, winner="A"))        # promo never has a winner
 
 
+def test_validate_results_store_checks_alignment_and_winners():
+    battles = pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "emcee1": ["Loonie", "Abra"],
+            "emcee2": ["Abra", "Shehyee"],
+        }
+    )
+    results = pd.DataFrame(
+        [ann.make_result_row(id="a", winner="Shehyee", battle_type="judged")],
+        columns=ann.RESULTS_COLUMNS,
+    )
+
+    problems = ann.validate_results_store(results, battles)
+    assert any("missing results" in p for p in problems)
+    assert any("winner" in p and "not one of" in p for p in problems)
+
+
+def test_validate_results_store_allows_complete_valid_results():
+    battles = pd.DataFrame(
+        {
+            "id": ["a", ["b", "b2"]],
+            "emcee1": ["Loonie", "Abra"],
+            "emcee2": ["Abra", "Shehyee"],
+        }
+    )
+    results = pd.DataFrame(
+        [
+            ann.make_result_row(id="a", winner="Loonie", battle_type="judged"),
+            ann.make_result_row(id="b", winner=ann.NA, battle_type="promo"),
+        ],
+        columns=ann.RESULTS_COLUMNS,
+    )
+
+    assert ann.validate_results_store(results, battles) == []
+
+
 # ---------------------------------------------------------------------------
 # store round-trip + upsert (no blank cells)
 # ---------------------------------------------------------------------------

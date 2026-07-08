@@ -2,7 +2,7 @@
 fliptop.annotations
 
 Storage and helpers for manually-collected battle results, kept deliberately
-separate from the auto-built df_battles table.
+separate from the auto-built battle metadata table.
 
 The authoritative store is an append-only CSV keyed by battle ``id``:
 
@@ -36,8 +36,9 @@ values are stored as text so the CSV has no blank cells; convert the vote
 columns with ``pd.to_numeric`` for analysis.
 
 The store is never regenerated wholesale - the annotate workflow only adds rows
-for battles not yet recorded. Use ``merge_results`` to join it onto df_battles
-on demand; df_battles.json itself is left clean.
+for battles not yet recorded. The refresh/build pipeline validates it against
+the battle metadata and joins the core result fields into the final
+``df_battles.json`` output.
 """
 
 from __future__ import annotations
@@ -191,6 +192,98 @@ def validate_result_row(row: dict) -> list[str]:
     return problems
 
 
+def validate_results_store(
+    results: pd.DataFrame,
+    df_battles: pd.DataFrame | None = None,
+    *,
+    require_complete: bool = True,
+) -> list[str]:
+    """
+    Validate the results table by itself, and optionally against a battles table.
+
+    This is the gate used before publishing result-enriched ``df_battles``. It
+    checks the CSV-level contract (schema, unique ids, no blank cells, valid row
+    structure), then, when ``df_battles`` is supplied, checks id alignment and
+    verifies that each non-NA winner is one of the two emcees in that battle.
+    """
+    problems: list[str] = []
+
+    actual = list(results.columns)
+    if actual != RESULTS_COLUMNS:
+        missing = [col for col in RESULTS_COLUMNS if col not in actual]
+        unexpected = [col for col in actual if col not in RESULTS_COLUMNS]
+        details = []
+        if missing:
+            details.append(f"missing: {', '.join(missing)}")
+        if unexpected:
+            details.append(f"unexpected: {', '.join(unexpected)}")
+        if not missing and not unexpected:
+            details.append("columns are out of order")
+        problems.append("results schema mismatch (" + "; ".join(details) + ")")
+        return problems
+
+    if results.empty:
+        problems.append("battle_results is empty")
+
+    blank = results.map(lambda v: str(v).strip() == "")
+    if bool(blank.any().any()):
+        n_blank = int(blank.sum().sum())
+        problems.append(f"battle_results has {n_blank} blank cell(s)")
+
+    ids = results["id"].astype("string").str.strip()
+    n_missing = int((ids.isna() | (ids == "")).sum())
+    if n_missing:
+        problems.append(f"{n_missing} result row(s) have a blank id")
+    dupes = ids[ids.notna() & ids.duplicated()].dropna().unique().tolist()
+    if dupes:
+        shown = ", ".join(map(str, dupes[:5]))
+        more = "" if len(dupes) <= 5 else f" (+{len(dupes) - 5} more)"
+        problems.append(f"{len(dupes)} duplicate result id(s): {shown}{more}")
+
+    for idx, row in results.iterrows():
+        row_problems = validate_result_row(row.to_dict())
+        for problem in row_problems:
+            problems.append(f"row {idx}: {problem}")
+
+    if df_battles is None or "id" not in df_battles.columns:
+        return problems
+
+    work = df_battles.copy()
+    work["_battle_key"] = work["id"].map(battle_key)
+    battle_keys = set(work["_battle_key"].dropna().astype(str))
+    result_ids = set(ids.dropna().astype(str))
+
+    orphan = sorted(result_ids - battle_keys)
+    if orphan:
+        shown = ", ".join(orphan[:5])
+        more = "" if len(orphan) <= 5 else f" (+{len(orphan) - 5} more)"
+        problems.append(f"{len(orphan)} result id(s) do not match a battle: {shown}{more}")
+
+    missing = sorted(battle_keys - result_ids)
+    if require_complete and missing:
+        shown = ", ".join(missing[:5])
+        more = "" if len(missing) <= 5 else f" (+{len(missing) - 5} more)"
+        problems.append(f"{len(missing)} battle(s) are missing results: {shown}{more}")
+
+    if {"emcee1", "emcee2"} <= set(work.columns):
+        lookup = work.dropna(subset=["_battle_key"]).set_index("_battle_key")
+        for idx, row in results.iterrows():
+            result_id = str(row["id"]).strip()
+            winner = str(row["winner"]).strip()
+            if winner == NA or result_id not in lookup.index:
+                continue
+            battle = lookup.loc[result_id]
+            if isinstance(battle, pd.DataFrame):
+                battle = battle.iloc[0]
+            if not validate_winner(winner, battle["emcee1"], battle["emcee2"]):
+                problems.append(
+                    f"row {idx}: winner {winner!r} is not one of "
+                    f"{battle['emcee1']!r} / {battle['emcee2']!r}"
+                )
+
+    return problems
+
+
 # ---------------------------------------------------------------------------
 # Store I/O
 # ---------------------------------------------------------------------------
@@ -306,9 +399,9 @@ def merge_results(
     """
     Left-join the results store onto df_battles by battle key (analysis helper).
 
-    Returns a new frame with the result columns added; does not mutate the
-    input and does not touch df_battles.json. Vote columns remain text (with
-    'NA' where not applicable); convert with pd.to_numeric for analysis.
+    Returns a new frame with the result columns added and does not mutate the
+    input. Vote columns remain text (with 'NA' where not applicable); convert
+    with pd.to_numeric for analysis.
     """
     if results is None:
         results = load_results()

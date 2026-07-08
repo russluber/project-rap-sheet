@@ -21,7 +21,7 @@ merged into the existing CSV - which is much faster for routine updates:
     fliptop-refresh --fetch --events-since 2025
 
 Outputs written (under data/processed by default):
-    - df_battles.json   (newline-delimited JSON, one battle per line)
+    - df_battles.json   (final result-enriched table, one battle per line)
     - emcees.csv
 """
 
@@ -34,9 +34,14 @@ from datetime import date
 from pathlib import Path
 
 from . import PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
-from .battles import build_df_battles, save_df_battles
+from .battles import build_battle_metadata, build_df_battles_from_metadata, save_df_battles
 from .structures import write_emcees_table
-from .validate import summarize_df_battles, validate_df_battles
+from .validate import (
+    summarize_battle_metadata,
+    summarize_df_battles,
+    validate_battle_metadata,
+    validate_df_battles,
+)
 
 # Default FlipTop YouTube channel (see scripts/fetch_youtube_channel_uploads.py).
 DEFAULT_CHANNEL = "UCBdHwFIE4AJWSa3Wxdu7bAQ"
@@ -110,13 +115,11 @@ def rebuild_processed(
     validate: bool = True,
 ) -> tuple[Path, Path]:
     """
-    Build df_battles once and write both processed outputs from it.
+    Build battle metadata once, publish df_battles from it, and write outputs.
 
-    A data-quality gate runs after the build and before anything is written: if
-    ``validate`` is set (the default) and the table violates any invariant (see
-    ``fliptop.validate.validate_df_battles``), a ``ValueError`` is raised and no
-    output files are touched, so a regression can't silently overwrite the
-    processed data with a broken table.
+    Data-quality gates run before anything is written: first on the rich battle
+    metadata, then on the final result-enriched table. A regression or missing
+    annotation therefore fails loudly instead of overwriting processed data.
 
     Returns
     -------
@@ -124,8 +127,22 @@ def rebuild_processed(
     """
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    df_battles = build_df_battles(raw_dir=raw_dir)
-    print(f"[validate] {summarize_df_battles(df_battles)}")
+    battle_metadata = build_battle_metadata(raw_dir=raw_dir)
+    print(f"[validate] metadata: {summarize_battle_metadata(battle_metadata)}")
+
+    if validate:
+        problems = validate_battle_metadata(battle_metadata)
+        if problems:
+            raise ValueError(
+                "battle metadata failed validation; refusing to write:\n"
+                + "\n".join(f"  - {p}" for p in problems)
+            )
+
+    df_battles = build_df_battles_from_metadata(
+        battle_metadata,
+        require_results=validate,
+    )
+    print(f"[validate] final: {summarize_df_battles(df_battles)}")
 
     if validate:
         problems = validate_df_battles(df_battles)
