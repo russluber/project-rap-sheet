@@ -12,6 +12,7 @@ id,battle_type,winner,votes_winner,votes_loser,votes_nv,votes_ot,overtime,notes
 -QKKtOnXYFA,judged,Rudic,4,1,0,0,no,none
 -RFFeYRXtoE,judged,Rudic,3,2,0,0,no,none
 -VkCoPH4HMo,judged,Tatz Maven,4,1,0,0,no,none
+-VkMrtq0gMQ,judged,Whitey Uno,3,1,0,1,yes,Promo OT round at end by crowd request
 -kbb9YSmDu4,judged,JDee,5,0,0,0,no,none
 -mQxq66Ycnw,judged,Mhel,2,1,0,0,no,none
 -omScjxUAf4,judged,Invictus,5,0,0,0,no,none
@@ -347,6 +348,7 @@ HPJTPQqyI2M,judged,CripLi,5,0,0,0,no,none
 HP_Vg8x2PMw,judged,Gustav,3,0,0,0,no,none
 HRF4brmlF3A,judged,Aklas,5,0,0,0,no,none
 HSFHJCMtCfw,judged,Goriong Talas,3,2,0,0,no,none
+HUSuRfmqUPU,judged,Don Busabos,4,1,0,0,no,none
 HUeIBCaW7Yc,judged,Mhot,5,0,0,0,no,none
 HXlPq4WBrns,judged,Elbiz,5,0,0,0,no,none
 HYXGRNluj-o,judged,Harlem,5,0,0,0,no,none
@@ -429,6 +431,7 @@ LZF0v6ZGFcE,judged,Apoc,3,2,0,0,no,Age-restricted video because English Conferen
 Ld9rnVTawyI,judged,Don Rafael,3,0,0,0,no,none
 LlbgujCVl60,judged,Pistolero,5,0,0,0,no,none
 LrwoGdSVk2g,judged,Emar Industriya,5,0,0,0,no,none
+M5zpk0TKOnw,judged,Josh G,5,0,0,0,no,none
 M7kbMc8jB8w,judged,Harlem,5,0,0,0,no,none
 MJ3FvP8rMYM,judged,Cerberus,5,0,0,0,no,none
 MJfuZgAswwo,judged,CripLi,5,0,0,0,no,none
@@ -490,6 +493,7 @@ O_J8J9FaITk,judged,Luxuria,7,0,0,0,no,none
 O_KZuCcwol0,judged,Illtimate,3,0,0,0,no,none
 Odksj8yAVxU,judged,J-Blaque,3,2,0,0,no,none
 OepVPDWPxeo,judged,Baltz,4,1,0,0,no,none
+OmBxq7BbQHc,judged,Zain Azrai,5,0,0,0,no,none
 OxS28uUWZrM,judged,Fangs,5,0,0,0,no,none
 P3dNb2njEMc,judged,J-Blaque,5,0,0,0,no,none
 P7LP92Yhi-g,judged,Mistah Lefty,5,0,0,0,no,none
@@ -525,6 +529,7 @@ QdEnZ0wE_H0,judged,J-Skeelz,3,2,0,0,no,none
 QdtgOGmmtEQ,judged,Rapido,5,0,0,0,no,none
 QfNRBbL65Uk,judged,GL,5,0,0,0,no,none
 Qj1eJV9m7lc,judged,Asero,3,2,0,0,no,none
+QleH6GxaMq4,judged,Dopee,3,2,0,3,yes,none
 QlmLXBvMJFI,judged,Flict-G,5,0,0,0,no,none
 Qou0_qhERtw,judged,Sickreto,5,0,0,0,no,none
 QsQkNDepZBU,judged,BLKD,5,0,0,0,no,none
@@ -538,6 +543,7 @@ R7anFm1vRYE,judged,Linax,5,0,0,0,no,none
 RDX9rWnsXy4,judged,Batang Rebelde,4,1,0,0,no,none
 RDiDkJHcnqs,judged,Negho Gy,5,0,0,0,no,none
 RFU9nhvgxaM,judged,Jonas,5,0,0,0,no,none
+RGRRZp_D5Ww,judged,One3d,3,2,0,0,no,none
 RLMwvBTRNPE,judged,Plazma,3,2,0,0,no,none
 RMkisdubvnQ,judged,Zend Luke,3,2,0,0,no,none
 RQxUqqd4wN4,judged,Kregga,5,0,0,0,no,none
@@ -788,6 +794,7 @@ e3NEiFyEJTc,judged,EJ Power,7,0,0,0,no,none
 e6uzjTULlrA,judged,Apoc,5,0,0,0,no,none
 e9dbvtAJjlA,judged,BLKD,4,1,0,0,no,none
 eG96pPRwD2Y,judged,Kregga,5,0,0,0,no,none
+eMIIdftRy1c,judged,Psycho,4,0,0,1,no,none
 eS8FYO8qhxk,judged,Ruffian,4,1,0,0,no,none
 eTrp2cPm5z0,judged,Target,4,1,0,0,no,none
 eWO0x_McjQ8,judged,Snob,3,2,0,0,no,none
@@ -1030,6 +1037,7 @@ qQPTSgWVb7M,judged,Aklas,6,1,0,0,no,none
 qRzYDWZfJq0,judged,CripLi,5,0,0,0,no,none
 qTO6ACFQnxs,judged,Sinio,5,0,0,0,no,none
 qUpS-oCRP_w,judged,Yelshawn,3,2,0,0,no,none
+q_csUNuI1io,judged,G-Spot,4,0,0,1,no,none
 qbegs9-zzV8,judged,Dhuski,5,0,0,0,no,none
 qfTaZ_yXzg4,judged,Maxford,4,1,0,0,no,none
 qfxVQUQXBLI,judged,Kamandag,4,1,0,0,no,none
