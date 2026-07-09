@@ -36,6 +36,7 @@ __all__ = [
     "build_ft_battles",
     "build_ft_battles_from_metadata",
     "build_excluded_uploads",
+    "build_upload_lineage",
     "build_emcees_table",
     "write_emcees_table",
     "build_battle_network",
@@ -51,6 +52,7 @@ _LAZY = {
     "build_ft_battles": (".battles", "build_ft_battles"),
     "build_ft_battles_from_metadata": (".battles", "build_ft_battles_from_metadata"),
     "build_excluded_uploads": (".battles", "build_excluded_uploads"),
+    "build_upload_lineage": (".battles", "build_upload_lineage"),
     "build_emcees_table": (".structures", "build_emcees_table"),
     "write_emcees_table": (".structures", "write_emcees_table"),
     "build_battle_network": (".structures", "build_battle_network"),
@@ -66,6 +68,7 @@ if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
         build_excluded_uploads,
         build_ft_battles,
         build_ft_battles_from_metadata,
+        build_upload_lineage,
     )
     from .structures import build_battle_network, build_emcees_table, write_emcees_table
     from .validate import validate_battle_metadata, validate_ft_battles

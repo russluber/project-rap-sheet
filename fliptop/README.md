@@ -18,7 +18,7 @@ reimplement it.
 - [Package layout](#package-layout)
 - [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`battles.py`)
 - [`ft_battles` schema](#ft_battles-schema)
-- [Auditing what gets filtered out](#auditing-what-gets-filtered-out)
+- [Auditing upload lineage](#auditing-upload-lineage)
 - [Derived structures](#derived-structures) (`structures.py`)
 - [Output validation gate](#output-validation-gate) (`validate.py`)
 - [Canonical emcee names](#canonical-emcee-names) (`rename_map.py`)
@@ -251,23 +251,39 @@ Rich audit fields such as `description`, `duration_hms`, and
 
 ---
 
-## Auditing what gets filtered out
+## Auditing upload lineage
 
-To verify the filters aren't dropping real battles, `build_excluded_uploads(raw_dir)`
-returns every upload the pipeline removed, tagged with the reason (`no 'vs'
-token`, `non-battle keyword`, `not 1v1`, or `excluded event`) and, for keyword
-drops, the matched title or event keyword. It reruns the same title/format
-filters, attaches the event metadata, and then applies the same event-name
-filter as the build. The audit includes `event_name` when available and retains
-the first reason that excluded an upload.
+To verify the filters aren't dropping real battles, use the lineage audit:
+`build_upload_lineage(raw_dir)` returns **one row per raw YouTube upload** and
+records what happened to it. Rows are tagged as `included`, `excluded`, or
+`consolidated_part` (for the second upload in a multi-part battle), with the
+filter stage, exclusion reason, matched keyword, final battle key, canonical
+matchup, and annotation status where applicable.
+
+For the narrower compatibility view, `build_excluded_uploads(raw_dir)` returns
+only the removed uploads, tagged with the reason (`no 'vs' token`,
+`non-battle keyword`, `not 1v1`, or `excluded event`) and, for keyword drops, the
+matched title or event keyword. Both audit views share the same filter trace so
+they cannot drift apart.
 
 ```python
-from fliptop import RAW_DATA_DIR, build_excluded_uploads, DATA_DIR
+from fliptop import RAW_DATA_DIR, build_excluded_uploads, build_upload_lineage
 
+lineage = build_upload_lineage(RAW_DATA_DIR)
 excluded = build_excluded_uploads(RAW_DATA_DIR)
-excluded.to_csv(DATA_DIR / "debug" / "filtered_out.csv", index=False)
+lineage["pipeline_status"].value_counts()
 excluded["excluded_reason"].value_counts()
 ```
+
+To write the local debug artifacts, run:
+
+```bash
+fliptop-refresh --audit
+```
+
+This writes `data/debug/upload_lineage.csv` and
+`data/debug/filtered_out.csv`. The `data/debug/` directory is git-ignored; these
+files are regenerated audit outputs, not hand-maintained data.
 
 ---
 
@@ -425,6 +441,7 @@ way to regenerate the processed datasets.
 fliptop-refresh                        # rebuild ft_battles.json + emcees.csv from existing raw data
 fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first, then rebuild
 fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
+fliptop-refresh --audit                # rebuild and write data/debug audit files
 ```
 
 - `rebuild_processed()` builds `ft_battles` once, runs the
@@ -439,6 +456,9 @@ fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape rece
   Run a plain `--fetch` periodically for a clean full reconcile. See
   [`scripts/README.md`](../scripts/README.md) for the overwrite-vs-merge
   trade-off.
+- `--audit` writes `data/debug/filtered_out.csv` and
+  `data/debug/upload_lineage.csv` after a successful rebuild, so the local debug
+  files always come from the current code and raw data.
 
 This is the recommended way to regenerate data. The Python API below is for when
 you want the table in memory or finer control.
@@ -456,6 +476,7 @@ from fliptop import (
     build_battle_metadata,   # raw -> rich metadata
     build_ft_battles,        # raw + annotations -> final ft_battles
     build_excluded_uploads,  # audit of dropped uploads
+    build_upload_lineage,    # audit of every raw YouTube upload
     build_emcees_table,      # ft_battles -> emcee table
     write_emcees_table,
     build_battle_network,    # ft_battles -> networkx graph

@@ -23,6 +23,10 @@ merged into the existing CSV - which is much faster for routine updates:
 Outputs written (under data/processed by default):
     - ft_battles.json   (final result-enriched table, one battle per line)
     - emcees.csv
+
+With ``--audit`` it also writes reproducible debug files under ``data/debug``:
+    - filtered_out.csv
+    - upload_lineage.csv
 """
 
 from __future__ import annotations
@@ -33,8 +37,13 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from . import PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
-from .battles import build_battle_metadata, build_ft_battles_from_metadata, save_ft_battles
+from . import DATA_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
+from .battles import (
+    build_battle_metadata,
+    build_ft_battles_from_metadata,
+    save_ft_battles,
+    write_audit_outputs,
+)
 from .structures import write_emcees_table
 from .validate import (
     summarize_battle_metadata,
@@ -47,6 +56,7 @@ from .validate import (
 DEFAULT_CHANNEL = "UCBdHwFIE4AJWSa3Wxdu7bAQ"
 
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+DEBUG_DATA_DIR = DATA_DIR / "debug"
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +230,17 @@ def main(argv: list[str] | None = None) -> None:
         default=PROCESSED_DATA_DIR,
         help="Directory to write processed outputs into.",
     )
+    parser.add_argument(
+        "--audit",
+        action="store_true",
+        help="Also write debug audit files (filtered_out.csv and upload_lineage.csv).",
+    )
+    parser.add_argument(
+        "--debug-dir",
+        type=Path,
+        default=DEBUG_DATA_DIR,
+        help="Directory to write --audit debug outputs into.",
+    )
 
     args = parser.parse_args(argv)
 
@@ -235,6 +256,15 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     rebuild_processed(raw_dir=args.raw_dir, processed_dir=args.processed_dir)
+
+    if args.audit:
+        excluded_path, lineage_path = write_audit_outputs(
+            raw_dir=args.raw_dir,
+            debug_dir=args.debug_dir,
+        )
+        print(f"[audit] wrote filtered uploads -> {excluded_path}")
+        print(f"[audit] wrote upload lineage -> {lineage_path}")
+
     print("[done] refresh complete.")
 
 

@@ -1078,6 +1078,99 @@ def prepare_uploads(df_yt: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def _event_name_lookup(df_events: pd.DataFrame) -> pd.DataFrame:
+    """Return a small ``id -> event_name`` lookup from raw event metadata."""
+    event_key = "video_id" if "video_id" in df_events.columns else "id"
+    if event_key not in df_events.columns or "event_name" not in df_events.columns:
+        return pd.DataFrame(columns=["id", "_event_name_lookup"])
+    return (
+        df_events[[event_key, "event_name"]]
+        .drop_duplicates(subset=[event_key])
+        .rename(columns={event_key: "id", "event_name": "_event_name_lookup"})
+    )
+
+
+def _matched_exclusion_keyword(row):
+    """Keyword responsible for a keyword-based exclusion, if any."""
+    if row["excluded_reason"] == "non-battle keyword":
+        value, pattern = row.get("title"), EXCLUDE_RE
+    elif row["excluded_reason"] == "excluded event":
+        value, pattern = row.get("event_name"), EXCLUDE_EVENT_RE
+    else:
+        return pd.NA
+    if not isinstance(value, str):
+        return pd.NA
+    m = pattern.search(value)
+    return m.group(0) if m else pd.NA
+
+
+def _filter_upload_stages(
+    df_yt: pd.DataFrame,
+    df_events: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Run the upload filters once and return ``(prepared, kept, excluded)``.
+
+    ``excluded`` records the first stage that removed each upload. This is the
+    shared spine for both ``build_excluded_uploads`` and ``build_upload_lineage``.
+    """
+    pre = prepare_uploads(df_yt)
+
+    def _dropped(
+        before: pd.DataFrame,
+        after: pd.DataFrame,
+        reason: str,
+        stage: str,
+    ) -> pd.DataFrame:
+        out = before[~before["id"].isin(after["id"])].copy()
+        out["pipeline_status"] = "excluded"
+        out["stage"] = stage
+        out["excluded_reason"] = reason
+        return out
+
+    after_vs = filter_titles_with_vs(pre)
+    after_nonbattle = drop_non_battles(after_vs)
+    after_1v1 = keep_1v1(after_nonbattle)
+    with_event_meta = attach_event_metadata(after_1v1, df_events)
+    after_event_filter = drop_excluded_events(with_event_meta)
+
+    excluded = pd.concat(
+        [
+            _dropped(pre, after_vs, "no 'vs' token", "filter_titles_with_vs"),
+            _dropped(
+                after_vs,
+                after_nonbattle,
+                "non-battle keyword",
+                "drop_non_battles",
+            ),
+            _dropped(after_nonbattle, after_1v1, "not 1v1", "keep_1v1"),
+            _dropped(
+                with_event_meta,
+                after_event_filter,
+                "excluded event",
+                "drop_excluded_events",
+            ),
+        ],
+        ignore_index=True,
+    )
+
+    # Add event names to early-stage drops too, without changing which filter
+    # receives credit for excluding them.
+    event_lookup = _event_name_lookup(df_events)
+    if not event_lookup.empty:
+        excluded = excluded.merge(event_lookup, on="id", how="left")
+        if "event_name" in excluded.columns:
+            excluded["event_name"] = excluded["event_name"].fillna(
+                excluded["_event_name_lookup"]
+            )
+        else:
+            excluded["event_name"] = excluded["_event_name_lookup"]
+        excluded = excluded.drop(columns=["_event_name_lookup"])
+
+    excluded["matched_keyword"] = excluded.apply(_matched_exclusion_keyword, axis=1)
+    return pre, after_event_filter, excluded
+
+
 def build_excluded_uploads(
     raw_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
@@ -1105,61 +1198,7 @@ def build_excluded_uploads(
     raw_dir = Path(raw_dir)
     df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
     df_events = load_event_metadata(raw_dir / events_csv_name)
-    pre = prepare_uploads(df_yt)
-
-    def _dropped(before: pd.DataFrame, after: pd.DataFrame, reason: str) -> pd.DataFrame:
-        out = before[~before["id"].isin(after["id"])].copy()
-        out["excluded_reason"] = reason
-        return out
-
-    after_vs = filter_titles_with_vs(pre)
-    after_nonbattle = drop_non_battles(after_vs)
-    after_1v1 = keep_1v1(after_nonbattle)
-    with_event_meta = attach_event_metadata(after_1v1, df_events)
-    after_event_filter = drop_excluded_events(with_event_meta)
-
-    excluded = pd.concat(
-        [
-            _dropped(pre, after_vs, "no 'vs' token"),
-            _dropped(after_vs, after_nonbattle, "non-battle keyword"),
-            _dropped(after_nonbattle, after_1v1, "not 1v1"),
-            _dropped(with_event_meta, after_event_filter, "excluded event"),
-        ],
-        ignore_index=True,
-    )
-
-    # Add event names to early-stage drops too, without changing which filter
-    # receives credit for excluding them.
-    event_key = "video_id" if "video_id" in df_events.columns else "id"
-    if event_key in df_events.columns and "event_name" in df_events.columns:
-        event_lookup = (
-            df_events[[event_key, "event_name"]]
-            .drop_duplicates(subset=[event_key])
-            .rename(columns={event_key: "id", "event_name": "_event_name_lookup"})
-        )
-        excluded = excluded.merge(event_lookup, on="id", how="left")
-        if "event_name" in excluded.columns:
-            excluded["event_name"] = excluded["event_name"].fillna(
-                excluded["_event_name_lookup"]
-            )
-        else:
-            excluded["event_name"] = excluded["_event_name_lookup"]
-        excluded = excluded.drop(columns=["_event_name_lookup"])
-
-    # Record the title or event keyword responsible for keyword-based drops.
-    def _matched_keyword(row):
-        if row["excluded_reason"] == "non-battle keyword":
-            value, pattern = row.get("title"), EXCLUDE_RE
-        elif row["excluded_reason"] == "excluded event":
-            value, pattern = row.get("event_name"), EXCLUDE_EVENT_RE
-        else:
-            return pd.NA
-        if not isinstance(value, str):
-            return pd.NA
-        m = pattern.search(value)
-        return m.group(0) if m else pd.NA
-
-    excluded["matched_keyword"] = excluded.apply(_matched_keyword, axis=1)
+    _, _, excluded = _filter_upload_stages(df_yt, df_events)
 
     cols = [
         "id",
@@ -1175,6 +1214,213 @@ def build_excluded_uploads(
     if "upload_date" in excluded.columns:
         excluded = excluded.sort_values("upload_date").reset_index(drop=True)
     return excluded
+
+
+UPLOAD_LINEAGE_COLUMNS = [
+    "id",
+    "yt_raw_title",
+    "title",
+    "upload_date",
+    "url",
+    "pipeline_status",
+    "stage",
+    "excluded_reason",
+    "matched_keyword",
+    "event_name",
+    "event_date",
+    "event_date_source",
+    "battle_key",
+    "final_title",
+    "final_matchup",
+    "emcee1",
+    "emcee2",
+    "source_part_number",
+    "annotation_status",
+    "battle_type",
+    "winner",
+    "votes_winner",
+    "votes_loser",
+]
+
+
+def build_upload_lineage(
+    raw_dir: PathLike,
+    youtube_json_name: str = "youtube_videos.json",
+    events_csv_name: str = "matchup_events_metadata.csv",
+    versetracker_csv_name: str = "versetracker_event_dates.csv",
+    rename_map: RenameMap | None = None,
+    vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
+    battle_metadata: pd.DataFrame | None = None,
+    results: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """
+    Build a one-row-per-YouTube-upload audit table for the wrangling pipeline.
+
+    The lineage table answers "what happened to every raw upload?" Each raw
+    ``youtube_videos.json`` row is tagged as:
+
+    - ``excluded``: removed by the first recorded filter stage;
+    - ``included``: source upload is the published battle key;
+    - ``consolidated_part``: source upload was folded into a multi-part battle
+      whose key is another source id.
+
+    For included rows it also records the final battle key, canonical matchup,
+    event/date provenance, and annotation status. This is an audit surface only;
+    it does not change the published ``ft_battles`` build.
+    """
+    from .annotations import battle_key, load_results
+
+    raw_dir = Path(raw_dir)
+    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
+    df_events = load_event_metadata(raw_dir / events_csv_name)
+    prepared, _kept, excluded = _filter_upload_stages(df_yt, df_events)
+
+    base_cols = ["id", "yt_raw_title", "title", "upload_date", "url"]
+    lineage = prepared[[c for c in base_cols if c in prepared.columns]].copy()
+    lineage["id"] = lineage["id"].astype(str)
+
+    event_lookup = _event_name_lookup(df_events)
+    if not event_lookup.empty:
+        lineage = lineage.merge(event_lookup, on="id", how="left")
+        lineage["event_name"] = lineage["_event_name_lookup"]
+        lineage = lineage.drop(columns=["_event_name_lookup"])
+
+    for col in UPLOAD_LINEAGE_COLUMNS:
+        if col not in lineage.columns:
+            lineage[col] = pd.NA
+
+    lineage["source_part_number"] = lineage["yt_raw_title"].map(_part_num)
+
+    if not excluded.empty:
+        excluded_lookup = excluded.drop_duplicates(subset=["id"]).copy()
+        excluded_lookup["id"] = excluded_lookup["id"].astype(str)
+        excluded_lookup = excluded_lookup.set_index("id")
+        is_excluded = lineage["id"].isin(excluded_lookup.index)
+        for col in ["pipeline_status", "stage", "excluded_reason", "matched_keyword"]:
+            lineage.loc[is_excluded, col] = lineage.loc[is_excluded, "id"].map(
+                excluded_lookup[col]
+            )
+        if "event_name" in excluded_lookup.columns:
+            lineage.loc[is_excluded, "event_name"] = lineage.loc[is_excluded, "id"].map(
+                excluded_lookup["event_name"]
+            )
+
+    if battle_metadata is None:
+        battle_metadata = build_battle_metadata(
+            raw_dir=raw_dir,
+            youtube_json_name=youtube_json_name,
+            events_csv_name=events_csv_name,
+            versetracker_csv_name=versetracker_csv_name,
+            rename_map=rename_map,
+            vt_event_dates=vt_event_dates,
+        )
+
+    final_rows: list[dict[str, object]] = []
+    for _, battle in battle_metadata.iterrows():
+        key = battle_key(battle["id"])
+        if key is None:
+            continue
+        source_ids = battle["id"] if isinstance(battle["id"], list) else [battle["id"]]
+        for source_id in source_ids:
+            source_id = str(source_id)
+            final_rows.append(
+                {
+                    "id": source_id,
+                    "pipeline_status": (
+                        "included" if source_id == str(key) else "consolidated_part"
+                    ),
+                    "stage": (
+                        "final" if source_id == str(key) else "consolidate_battle_parts"
+                    ),
+                    "event_name": battle.get("event_name", pd.NA),
+                    "event_date": battle.get("event_date", pd.NaT),
+                    "event_date_source": battle.get("event_date_source", pd.NA),
+                    "battle_key": str(key),
+                    "final_title": battle.get("title", pd.NA),
+                    "final_matchup": battle.get("matchup", pd.NA),
+                    "emcee1": battle.get("emcee1", pd.NA),
+                    "emcee2": battle.get("emcee2", pd.NA),
+                }
+            )
+
+    if final_rows:
+        final_lookup = pd.DataFrame(final_rows).drop_duplicates(subset=["id"]).set_index("id")
+        is_final_source = lineage["id"].isin(final_lookup.index)
+        for col in [
+            "pipeline_status",
+            "stage",
+            "event_name",
+            "event_date",
+            "event_date_source",
+            "battle_key",
+            "final_title",
+            "final_matchup",
+            "emcee1",
+            "emcee2",
+        ]:
+            lineage.loc[is_final_source, col] = lineage.loc[is_final_source, "id"].map(
+                final_lookup[col]
+            )
+
+    if results is None:
+        results = load_results()
+
+    if not results.empty and "battle_key" in lineage.columns:
+        result_lookup = results.copy()
+        result_lookup["id"] = result_lookup["id"].astype(str)
+        result_lookup = result_lookup.drop_duplicates(subset=["id"]).set_index("id")
+        has_battle_key = lineage["battle_key"].notna()
+        lineage.loc[has_battle_key, "annotation_status"] = "missing"
+        annotated = has_battle_key & lineage["battle_key"].isin(result_lookup.index)
+        lineage.loc[annotated, "annotation_status"] = "annotated"
+        for col in ["battle_type", "winner", "votes_winner", "votes_loser"]:
+            lineage.loc[has_battle_key, col] = lineage.loc[has_battle_key, "battle_key"].map(
+                result_lookup[col]
+            )
+    else:
+        lineage.loc[lineage["battle_key"].notna(), "annotation_status"] = "missing"
+
+    unclassified = lineage["pipeline_status"].isna()
+    lineage.loc[unclassified, "pipeline_status"] = "unclassified"
+
+    lineage = lineage[UPLOAD_LINEAGE_COLUMNS]
+    if "upload_date" in lineage.columns:
+        lineage = lineage.sort_values("upload_date").reset_index(drop=True)
+    return lineage
+
+
+def write_audit_outputs(
+    raw_dir: PathLike,
+    debug_dir: PathLike,
+    youtube_json_name: str = "youtube_videos.json",
+    events_csv_name: str = "matchup_events_metadata.csv",
+) -> tuple[Path, Path]:
+    """
+    Write the reproducible debug audit files and return their paths.
+
+    Outputs:
+    - ``filtered_out.csv``: compatibility view from ``build_excluded_uploads``;
+    - ``upload_lineage.csv``: one row per raw YouTube upload.
+    """
+    debug_dir = Path(debug_dir)
+    debug_dir.mkdir(parents=True, exist_ok=True)
+
+    excluded = build_excluded_uploads(
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+    )
+    lineage = build_upload_lineage(
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+    )
+
+    excluded_path = debug_dir / "filtered_out.csv"
+    lineage_path = debug_dir / "upload_lineage.csv"
+    excluded.to_csv(excluded_path, index=False)
+    lineage.to_csv(lineage_path, index=False)
+    return excluded_path, lineage_path
 
 
 def attach_event_metadata(

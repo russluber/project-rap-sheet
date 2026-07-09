@@ -243,6 +243,7 @@ is optional if you prefer env vars.
 fliptop-refresh                        # rebuild processed/ from the raw files already on disk
 fliptop-refresh --fetch                # re-scrape raw/ first (needs network + API key), then rebuild
 fliptop-refresh --fetch --events-since 2025   # incremental events scrape (recent years only), then rebuild
+fliptop-refresh --audit                # also write local data/debug audit files
 ```
 
 `processed/` is fully reproducible from `raw/` + `emcee_aliases.csv` +
@@ -254,6 +255,11 @@ reproducible from the network via [`scripts/`](../scripts/) — a full
 reproducible — it's hand-entered, so it's the one thing here worth guarding.
 
 ---
+
+`data/debug/` is git-ignored and regenerated on demand with
+`fliptop-refresh --audit`. It includes `filtered_out.csv` plus
+`upload_lineage.csv`, a one-row-per-raw-YouTube-upload audit of what the pipeline
+did with each source row.
 
 ## Conventions
 

@@ -151,6 +151,7 @@ The whole pipeline is wrapped in a single command, `fliptop-refresh`:
 fliptop-refresh                        # rebuild processed outputs from existing raw data
 fliptop-refresh --fetch                # fetch fresh raw data (YouTube + web) first, then rebuild
 fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (faster), then rebuild
+fliptop-refresh --audit                # also write local data/debug audit files
 ```
 
 - The default (no flags) is fast, deterministic, and needs no network or API
@@ -164,6 +165,10 @@ fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (fa
   `--events-since YEAR` instead scrapes only recent events and **merges** them
   into the existing data — much faster for routine top-ups. See
   `scripts/README.md` for the trade-off.
+- `--audit` writes regenerated local debug files:
+  `data/debug/filtered_out.csv` and `data/debug/upload_lineage.csv`. The lineage
+  file has one row per raw YouTube upload and records whether each upload was
+  included, excluded, or folded into a multi-part battle.
 
 Under the hood the command runs three stages — fetch YouTube uploads, scrape
 FlipTop event metadata, then build the cleaned tables. You can also drive these
