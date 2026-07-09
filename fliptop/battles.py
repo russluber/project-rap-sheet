@@ -205,7 +205,7 @@ def convert_video_metrics_to_numeric(
 
 
 EXCLUDE_KEYWORDS = [
-    "tryout", "tryouts", "beatbox", "beat box", "flyer", "promo", "promos",
+    "tryout", "tryouts", "beatbox", "beat box", "flyer",
     "anygma machine", "unggoyan", "pre-battle interviews", "interview", "interviews",
     "salitang ugat", "trailer", "video flyer", "[live]", "silip", "sound check",
     "tribute", "anniversary party", "tutok", "review", "abangan",
@@ -1018,7 +1018,7 @@ def make_df_1v1_uploads(
         -> copy_yt_title                (preserve original cleaned YouTube title)
         -> strip_pt_suffix_from_title   (remove 'pt. N' from working title)
         -> filter_titles_with_vs        (keep only titles containing 'vs')
-        -> drop_non_battles             (remove flyers/promos/etc)
+        -> drop_non_battles             (remove flyers/trailers/etc)
         -> keep_1v1                     (heuristics to keep likely 1v1 battles)
         -> add_matchup_and_split        (matchup, emcee1, emcee2)
         -> apply_emcee_rename           (canonicalize emcee names)

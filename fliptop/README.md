@@ -113,7 +113,7 @@ counts as a battle:
 | filter | keeps / drops |
 | ------ | ------------- |
 | `filter_titles_with_vs` | keep only titles containing the token `vs` |
-| `drop_non_battles` | drop titles matching `EXCLUDE_KEYWORDS` (beatbox, tryout, promo, `[LIVE]`, …) — matched as **substrings**, case-insensitive |
+| `drop_non_battles` | drop titles matching `EXCLUDE_KEYWORDS` (beatbox, tryout, flyer, `[LIVE]`, …) — matched as **substrings**, case-insensitive. Title-labeled promo battles are kept and classified later via annotations. |
 | `keep_1v1` | drop multi-emcee formats: `>1 vs`, `/`, `+`, `N on M`, `and … vs … and` |
 
 and finally extracts the matchup:

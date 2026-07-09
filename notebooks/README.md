@@ -113,7 +113,7 @@ and the `vs` filter in [`fliptop.battles`](../fliptop/battles.py).
 | ------- | -------------------------------- |
 | **tryout** | Newcomer tryouts — often unjudged, especially in older videos. |
 | **beatbox** | A separate genre from the a cappella judged battles. |
-| **flyer** / **promo** | Advertisements and announcement videos for upcoming events. |
+| **flyer** / **trailer** / **video flyer** | Advertisements and announcement videos for upcoming events. Title-labeled promo battles are kept and classified later as `battle_type=promo` when they have no judging. |
 | **Anygma Machine** | Anygma (FlipTop's head) reviewing battles / previewing matches. A nod to the WW2 [Enigma machine](https://en.wikipedia.org/wiki/Enigma_machine). |
 | **[LIVE]** | Live performances from the 2020 FlipTop Festival. |
 | **UnggoYan** | Emcees reacting to comments on their past battles. |

@@ -74,6 +74,7 @@ def test_filter_titles_with_vs(title, kept):
         ("Pre-Battle Interviews: Loonie", False),
         ("FlipTop Festival [LIVE]", False),
         ("Anniversary Party Recap", False),
+        ("FlipTop - sKarm vs Luck Loosh (PROMO)", True),
     ],
 )
 def test_drop_non_battles_keyword_matching(title, kept):
