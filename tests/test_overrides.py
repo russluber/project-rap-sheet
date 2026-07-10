@@ -65,6 +65,31 @@ def test_load_manual_matchups_with_pending_and_resolved_rows(tmp_path):
     }
 
 
+def test_load_upload_decisions_validates_and_skips_inactive_rows(tmp_path):
+    csv = _write(
+        tmp_path / "u.csv",
+        "id,decision,reason,note,active",
+        [
+            "keepme,include,special_case_include,parseable battle with noisy title,true",
+            "dropme,exclude,not_battle,not a battle,true",
+            "later,review,manual_review_required,needs watching,false",
+        ],
+    )
+
+    assert ov.load_upload_decisions(csv) == {
+        "keepme": {
+            "decision": "include",
+            "reason": "special_case_include",
+            "note": "parseable battle with noisy title",
+        },
+        "dropme": {
+            "decision": "exclude",
+            "reason": "not_battle",
+            "note": "not a battle",
+        },
+    }
+
+
 def test_load_location_aliases(tmp_path):
     csv = _write(
         tmp_path / "a.csv",
@@ -165,6 +190,39 @@ def test_manual_matchups_reject_bad_status(tmp_path):
         ov.load_manual_matchups(csv)
 
 
+def test_upload_decisions_reject_bad_decision(tmp_path):
+    csv = _write(
+        tmp_path / "u.csv",
+        "id,decision,reason,note,active",
+        ["abc,maybe,not_battle,nope,true"],
+    )
+    with pytest.raises(ValueError, match="decision must be one of"):
+        ov.load_upload_decisions(csv)
+
+
+def test_upload_decisions_reject_bad_reason(tmp_path):
+    csv = _write(
+        tmp_path / "u.csv",
+        "id,decision,reason,note,active",
+        ["abc,exclude,because,nope,true"],
+    )
+    with pytest.raises(ValueError, match="reason must be one of"):
+        ov.load_upload_decisions(csv)
+
+
+def test_upload_decisions_reject_conflicting_duplicate(tmp_path):
+    csv = _write(
+        tmp_path / "u.csv",
+        "id,decision,reason,note,active",
+        [
+            "abc,exclude,not_battle,nope,true",
+            "abc,review,manual_review_required,watch,true",
+        ],
+    )
+    with pytest.raises(ValueError, match="conflicting upload decisions"):
+        ov.load_upload_decisions(csv)
+
+
 # ---------------------------------------------------------------------------
 # the committed data
 # ---------------------------------------------------------------------------
@@ -186,3 +244,6 @@ def test_shipped_csvs_load_with_expected_keys():
     assert manual["Um2XyeCDEew"]["helper_emcee"] == "Aelekz"
     assert manual["Um2XyeCDEew"]["emcee2_status"] == "no_show"
     assert manual["IO6AaGSupuY"]["emcee2"] is None
+
+    assert ov.UPLOAD_DECISIONS_CSV.exists()
+    assert ov.load_upload_decisions() == {}

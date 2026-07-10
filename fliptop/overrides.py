@@ -10,17 +10,18 @@ fixes as literal dicts in the build code, they live as small reference-data CSVs
 edited like the project's other data (see :mod:`fliptop.rename_map`) - and the build
 pipeline applies them.
 
-Five tables, each keyed differently:
+Six tables, each keyed differently:
 
     event_locations.csv          event_name -> event_location   (exact event_name match)
     event_location_patterns.csv  substring  -> event_location   (event_location contains)
     location_aliases.csv         location   -> canonical         (exact value match)
     event_dates.csv              id         -> event_date (ISO)  (exact video-id match)
     manual_matchups.csv          id         -> matchup/roles     (exact video-id match)
+    upload_decisions.csv         id         -> include/exclude/review decision
 
 Every table carries a free-text ``note`` column recording *why* the correction
-exists; it is ignored on load. Loading validates the required columns, skips blank
-rows, and raises if a key is mapped to two conflicting values.
+exists. Loading validates the required columns, skips blank rows, and raises if
+a key is mapped to two conflicting values.
 """
 
 from __future__ import annotations
@@ -39,6 +40,7 @@ EVENT_LOCATION_PATTERNS_CSV = OVERRIDES_DIR / "event_location_patterns.csv"
 LOCATION_ALIASES_CSV = OVERRIDES_DIR / "location_aliases.csv"
 EVENT_DATES_CSV = OVERRIDES_DIR / "event_dates.csv"
 MANUAL_MATCHUPS_CSV = OVERRIDES_DIR / "manual_matchups.csv"
+UPLOAD_DECISIONS_CSV = OVERRIDES_DIR / "upload_decisions.csv"
 
 
 def _load_mapping(path: PathLike, key_col: str, value_col: str) -> dict[str, str]:
@@ -108,6 +110,82 @@ def load_location_aliases(path: PathLike = LOCATION_ALIASES_CSV) -> dict[str, st
 def load_event_date_overrides(path: PathLike = EVENT_DATES_CSV) -> dict[str, str]:
     """Load ``YouTube video id -> corrected event_date`` (ISO date string)."""
     return _load_mapping(path, "id", "event_date")
+
+
+UPLOAD_DECISIONS = {"include", "exclude", "review"}
+UPLOAD_DECISION_REASONS = {
+    "not_battle",
+    "out_of_scope_event",
+    "format_not_supported",
+    "manual_review_required",
+    "special_case_include",
+}
+TRUE_VALUES = {"1", "true", "yes", "y"}
+FALSE_VALUES = {"0", "false", "no", "n"}
+
+
+def _active_flag(value: str | None, *, path: Path, lineno: int) -> bool:
+    value = (value or "").strip().casefold()
+    if value in TRUE_VALUES:
+        return True
+    if value in FALSE_VALUES:
+        return False
+    allowed = ", ".join(sorted(TRUE_VALUES | FALSE_VALUES))
+    raise ValueError(f"{path}:{lineno}: active must be one of: {allowed}")
+
+
+def load_upload_decisions(
+    path: PathLike = UPLOAD_DECISIONS_CSV,
+) -> dict[str, dict[str, str]]:
+    """
+    Load exact per-upload include/exclude/review decisions.
+
+    This table is for id-specific judgment calls that should not become broad
+    regex rules. Inactive rows are ignored so a decision can be preserved for
+    history without changing the build.
+    """
+    path = Path(path)
+    if not path.exists():
+        return {}
+
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        required = {"id", "decision", "reason", "note", "active"}
+        if reader.fieldnames is None or not required <= set(reader.fieldnames):
+            raise ValueError(
+                f"{path}: expected columns {sorted(required)}, got {reader.fieldnames}"
+            )
+
+        decisions: dict[str, dict[str, str]] = {}
+        for lineno, row in enumerate(reader, start=2):
+            upload_id = (row.get("id") or "").strip()
+            decision = (row.get("decision") or "").strip().casefold()
+            reason = (row.get("reason") or "").strip().casefold()
+            note = (row.get("note") or "").strip()
+            active_raw = (row.get("active") or "").strip()
+
+            if not any([upload_id, decision, reason, note, active_raw]):
+                continue
+            if not all([upload_id, decision, reason, note, active_raw]):
+                raise ValueError(f"{path}:{lineno}: all upload decision fields are required")
+
+            active = _active_flag(active_raw, path=path, lineno=lineno)
+            if decision not in UPLOAD_DECISIONS:
+                allowed = ", ".join(sorted(UPLOAD_DECISIONS))
+                raise ValueError(f"{path}:{lineno}: decision must be one of: {allowed}")
+            if reason not in UPLOAD_DECISION_REASONS:
+                allowed = ", ".join(sorted(UPLOAD_DECISION_REASONS))
+                raise ValueError(f"{path}:{lineno}: reason must be one of: {allowed}")
+
+            value = {"decision": decision, "reason": reason, "note": note}
+            if upload_id in decisions and decisions[upload_id] != value:
+                raise ValueError(
+                    f"{path}:{lineno}: {upload_id!r} has conflicting upload decisions"
+                )
+            if active:
+                decisions[upload_id] = value
+
+    return decisions
 
 
 def _manual_name(value: str | None) -> str | None:

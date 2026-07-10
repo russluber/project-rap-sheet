@@ -113,6 +113,7 @@ counts as a battle:
 
 | filter | keeps / drops |
 | ------ | ------------- |
+| `upload_decisions.csv` | exact `include`/`exclude`/`review` decisions from `data/overrides/upload_decisions.csv`; `include` can rescue parseable one-off uploads from broad filters, while `exclude`/`review` hold exact ids out of final outputs |
 | `filter_titles_with_vs` | keep only titles containing the token `vs` |
 | `drop_non_battles` | drop titles matching active rules in `data/rules/title_exclusions.csv` (beatbox, tryout, flyer, `[LIVE]`, ...) — currently matched as **substrings**, case-insensitive. Title-labeled promo battles are kept and classified later via annotations. |
 | `keep_1v1_or_manual_matchup` | drop multi-emcee formats (`>1 vs`, `/`, `+`, `N on M`, `and ... vs ... and`) unless a resolved row in `data/overrides/manual_matchups.csv` supplies the actual 1v1 matchup |
@@ -269,13 +270,15 @@ in `data/overrides/manual_matchups.csv`, unless the row is excluded by event
 category first. The lineage includes the filter stage, exclusion reason, matched
 keyword, final battle key, canonical matchup, manual note, and annotation status
 where applicable. Rule-based exits also carry `rule_id`, `rule_note`, and
-`exit_category` from `data/rules/`.
+`exit_category` from `data/rules/`. Exact upload decisions carry
+`upload_decision`, `upload_decision_reason`, and `upload_decision_note` from
+`data/overrides/upload_decisions.csv`.
 
 For the narrower compatibility view, `build_excluded_uploads(raw_dir)` returns
 only the removed uploads, tagged with the reason (`no 'vs' token`,
-`non-battle keyword`, `not 1v1`, or `excluded event`) and, for keyword drops, the
-matched title or event keyword. Both audit views share the same filter trace so
-they cannot drift apart.
+`non-battle keyword`, `not 1v1`, `excluded event`, or `manual upload decision`)
+and, for keyword drops, the matched title or event keyword. Both audit views
+share the same filter trace so they cannot drift apart.
 
 ```python
 from fliptop import RAW_DATA_DIR, build_excluded_uploads, build_upload_lineage

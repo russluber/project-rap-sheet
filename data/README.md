@@ -16,7 +16,8 @@ data/
 │   ├── event_location_patterns.csv
 │   ├── location_aliases.csv
 │   ├── event_dates.csv
-│   └── manual_matchups.csv
+│   ├── manual_matchups.csv
+│   └── upload_decisions.csv
 ├── rules/                 # reviewable exclusion rules applied during the build
 │   ├── title_exclusions.csv
 │   └── event_exclusions.csv
@@ -138,7 +139,8 @@ dates are static — rather than refreshed by `fliptop-refresh --fetch`.
 Small, hand-maintained **correction tables** the build applies to fix things the
 raw sources get wrong — kept as CSVs (like `emcee_aliases.csv`) so they're edited
 as data, not code. Each has a free-text `note` column recording *why* the row
-exists; it's ignored on load. Loaded and validated by
+exists; most notes are just documentation, while upload-decision notes are also
+surfaced in audit outputs. Loaded and validated by
 [`fliptop.overrides`](../fliptop/overrides.py); a missing file is treated as an
 empty table, so the pipeline still runs without them.
 
@@ -149,10 +151,34 @@ empty table, so the pipeline still runs without them.
 | `location_aliases.csv` | `location` → `canonical` | exact value | normalize known location strings (e.g. Davao variants) |
 | `event_dates.csv` | `id` → `event_date` | exact YouTube id | a battle whose own description mis-dates it, where the FlipTop site is authoritative (tagged `manual` in `ft_battles`) |
 | `manual_matchups.csv` | `id` → matchup + participation roles | exact YouTube id | no-show or ambiguous titles such as `A + B vs C`; records scheduled emcees, helper emcee, and appeared/no-show status |
+| `upload_decisions.csv` | `id` → include/exclude/review decision | exact YouTube id | one-off upload-level judgments that should not become broad rules |
 
 To register a correction, add a row (with a `note`). Matching is exact and
 case-sensitive except `event_location_patterns.csv`, which matches any location
 *containing* the substring.
+
+### `upload_decisions.csv`
+
+Use this table when an exact upload id needs human judgment that is too specific
+for `data/rules/`:
+
+| column | notes |
+| ------ | ----- |
+| `id` | YouTube video id |
+| `decision` | `include`, `exclude`, or `review` |
+| `reason` | one of `not_battle`, `out_of_scope_event`, `format_not_supported`, `manual_review_required`, `special_case_include` |
+| `note` | why the exact decision exists; surfaced in audit outputs |
+| `active` | `true`/`false`; inactive rows are ignored |
+
+Decision behavior:
+
+- `include` protects a parseable upload from broad title/event exclusion rules,
+  but it does not invent a matchup. If the title still cannot be parsed, add the
+  matchup to `manual_matchups.csv`.
+- `exclude` removes the exact upload with `excluded_reason=manual upload decision`.
+- `review` holds the exact upload out of final outputs and surfaces it in
+  `upload_lineage.csv` / `pipeline_stage_drops.csv` with
+  `pipeline_status=needs_upload_review`.
 
 ---
 

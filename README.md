@@ -70,7 +70,9 @@ project-rap-sheet/
 │   │   ├── event_locations.csv
 │   │   ├── event_location_patterns.csv
 │   │   ├── location_aliases.csv
-│   │   └── event_dates.csv
+│   │   ├── event_dates.csv
+│   │   ├── manual_matchups.csv
+│   │   └── upload_decisions.csv
 │   ├── rules/
 │   │   ├── title_exclusions.csv
 │   │   └── event_exclusions.csv

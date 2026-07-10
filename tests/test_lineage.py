@@ -91,6 +91,131 @@ def test_pending_manual_matchup_is_surfaced_not_filtered(tmp_path):
     assert needed["id"].tolist() == ["noshow"]
 
 
+def test_upload_decision_exclude_removes_exact_upload(tmp_path):
+    videos = [
+        {"id": "drop", "title": "FlipTop - A vs B", "upload_date": "2020-01-01T00:00:00Z", "duration": "PT10M", "url": "u1"},
+        {"id": "keep", "title": "FlipTop - C vs D", "upload_date": "2020-01-02T00:00:00Z", "duration": "PT10M", "url": "u2"},
+    ]
+    decisions = {
+        "drop": {
+            "decision": "exclude",
+            "reason": "not_battle",
+            "note": "bad upload",
+        }
+    }
+    raw_dir = _write_raw(tmp_path, videos)
+
+    metadata = build_battle_metadata(
+        raw_dir,
+        rename_map={},
+        manual_matchups={},
+        upload_decisions=decisions,
+        vt_event_dates={},
+    )
+    lineage = build_upload_lineage(
+        raw_dir,
+        manual_matchups={},
+        upload_decisions=decisions,
+    ).set_index("id")
+    drops = build_pipeline_stage_drops(
+        raw_dir,
+        manual_matchups={},
+        upload_decisions=decisions,
+    ).set_index("id")
+
+    assert metadata["id"].tolist() == ["keep"]
+    assert lineage.loc["drop", "pipeline_status"] == "excluded"
+    assert lineage.loc["drop", "stage"] == "upload_decision_override"
+    assert lineage.loc["drop", "excluded_reason"] == "manual upload decision"
+    assert lineage.loc["drop", "upload_decision"] == "exclude"
+    assert drops.loc["drop", "upload_decision_note"] == "bad upload"
+
+
+def test_upload_decision_review_holds_exact_upload_without_generic_exclusion(tmp_path):
+    videos = [
+        {"id": "review", "title": "FlipTop - A vs B", "upload_date": "2020-01-01T00:00:00Z", "duration": "PT10M", "url": "u1"},
+        {"id": "keep", "title": "FlipTop - C vs D", "upload_date": "2020-01-02T00:00:00Z", "duration": "PT10M", "url": "u2"},
+    ]
+    decisions = {
+        "review": {
+            "decision": "review",
+            "reason": "manual_review_required",
+            "note": "needs a human look",
+        }
+    }
+    raw_dir = _write_raw(tmp_path, videos)
+
+    metadata = build_battle_metadata(
+        raw_dir,
+        rename_map={},
+        manual_matchups={},
+        upload_decisions=decisions,
+        vt_event_dates={},
+    )
+    excluded = build_excluded_uploads(
+        raw_dir,
+        manual_matchups={},
+        upload_decisions=decisions,
+    )
+    manual_matchups_needed = build_manual_matchup_review_uploads(
+        raw_dir,
+        manual_matchups={},
+        upload_decisions=decisions,
+    )
+    drops = build_pipeline_stage_drops(
+        raw_dir,
+        manual_matchups={},
+        upload_decisions=decisions,
+    ).set_index("id")
+
+    assert metadata["id"].tolist() == ["keep"]
+    assert "review" not in set(excluded["id"])
+    assert manual_matchups_needed.empty
+    assert drops.loc["review", "pipeline_status"] == "needs_upload_review"
+    assert drops.loc["review", "stage"] == "upload_decision_review"
+    assert drops.loc["review", "upload_decision_reason"] == "manual_review_required"
+
+
+def test_upload_decision_include_rescues_parseable_keyword_match(tmp_path):
+    videos = [
+        {"id": "rescued", "title": "FlipTop - A vs B (review)", "upload_date": "2020-01-01T00:00:00Z", "duration": "PT10M", "url": "u1"},
+        {"id": "dropped", "title": "FlipTop - C vs D (review)", "upload_date": "2020-01-02T00:00:00Z", "duration": "PT10M", "url": "u2"},
+    ]
+    decisions = {
+        "rescued": {
+            "decision": "include",
+            "reason": "special_case_include",
+            "note": "actual battle despite noisy title",
+        }
+    }
+    raw_dir = _write_raw(tmp_path, videos)
+
+    metadata = build_battle_metadata(
+        raw_dir,
+        rename_map={},
+        manual_matchups={},
+        upload_decisions=decisions,
+        vt_event_dates={},
+    )
+    lineage = build_upload_lineage(
+        raw_dir,
+        manual_matchups={},
+        upload_decisions=decisions,
+    ).set_index("id")
+    drops = build_pipeline_stage_drops(
+        raw_dir,
+        manual_matchups={},
+        upload_decisions=decisions,
+    )
+
+    assert metadata["id"].tolist() == ["rescued"]
+    assert metadata["matchup"].tolist() == ["A vs B"]
+    assert lineage.loc["rescued", "pipeline_status"] == "included"
+    assert lineage.loc["rescued", "upload_decision"] == "include"
+    assert "rescued" not in set(drops["id"])
+    assert "dropped" in set(drops["id"])
+
+
 def test_pipeline_stage_summary_counts_filters_and_manual_queue(tmp_path):
     videos = [
         {"id": "keep1", "title": "FlipTop - Loonie vs Abra", "upload_date": "2020-01-01T00:00:00Z", "duration": "PT10M", "url": "u1"},
@@ -267,6 +392,8 @@ def test_real_pipeline_stage_drops_matches_excluded_and_manual_queue():
     assert set(excluded_drops["id"]) == set(excluded["id"].astype(str))
     assert set(manual_drops["id"]) == set(manual["id"].astype(str))
     assert set(drops["stage"]) <= {
+        "upload_decision_override",
+        "upload_decision_review",
         "filter_titles_with_vs",
         "drop_non_battles",
         "manual_matchup_override",
