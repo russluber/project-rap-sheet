@@ -16,7 +16,7 @@ reimplement it.
 
 - [Architecture at a glance](#architecture-at-a-glance)
 - [Package layout](#package-layout)
-- [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`battles.py`, `uploads.py`)
+- [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`uploads.py`, `events.py`, `battles.py`)
 - [`ft_battles` schema](#ft_battles-schema)
 - [Auditing upload lineage](#auditing-upload-lineage)
 - [Derived structures](#derived-structures) (`structures.py`)
@@ -37,7 +37,7 @@ modules consume it.
 
 ```
  data/raw/youtube_videos.json ─┐
-                               ├─► uploads.py ─► battles.py ─► ft_battles ──┬─► structures.py
+                               ├─► uploads.py ─► events.py ─► battles.py ─► ft_battles ──┬─► structures.py
  data/raw/matchup_events_      ─┘   (+ emcee_aliases.csv)      │
    metadata.csv                                                ??? annotations.py (validated result store)
 
@@ -69,6 +69,7 @@ fliptop/
 ├── __init__.py         # package init: shared data-dir paths + lazy public API
 ├── battles.py          # metadata/output orchestration: raw sources -> ft_battles
 ├── uploads.py          # upload-side cleaning, title filters, and matchup parsing
+├── events.py           # event metadata parsing, date/location fixes, event joins
 ├── lineage.py          # audit tables explaining raw upload inclusion/exclusion
 ├── rename_map.py       # loads/validates the alias map from data/emcee_aliases.csv
 ├── overrides.py        # loads/validates the correction tables in data/overrides/
@@ -85,7 +86,8 @@ fliptop/
 ## The pipeline: raw → `ft_battles`
 
 `battles.py` orchestrates the metadata build. Upload-side cleaning and filters
-live in `uploads.py`; row-level audit tables live in `lineage.py`.
+live in `uploads.py`; event metadata parsing and date/location fixes live in
+`events.py`; row-level audit tables live in `lineage.py`.
 `build_battle_metadata(raw_dir=...)` runs three cleaning stages and returns the
 rich metadata table. `build_ft_battles` then joins validated battle results and
 returns the final analysis table.
@@ -136,9 +138,10 @@ and finally extracts the matchup:
 
 ### Stage 2 — attach event metadata
 
-`attach_event_metadata(df_1v1, df_events_raw)` cleans the scraped event side
-(`split_event_description` → `parse_event_date` → `clean_event_location`), then
-joins it onto the uploads by **YouTube video id**. Two special behaviors:
+`events.attach_event_metadata(df_1v1, df_events_raw)` cleans the scraped event
+side (`split_event_description` → `parse_event_date` →
+`clean_event_location`), then joins it onto the uploads by **YouTube video id**.
+Two special behaviors:
 
 - **COVID-era mask.** Event dates inside `2020-05-01 … 2022-04-27` are set to
   `NaT` on purpose — FlipTop obfuscated those dates, so the scraped values are

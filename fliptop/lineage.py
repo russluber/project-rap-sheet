@@ -16,14 +16,16 @@ from pathlib import Path
 import pandas as pd
 
 from .battles import (
+    build_battle_metadata,
+    build_ft_battles_from_metadata,
+    load_event_metadata,
+    load_youtube_uploads,
+)
+from .events import (
     EVENT_EXCLUSION_RE,
     EVENT_EXCLUSION_RULES,
     attach_event_metadata,
-    build_battle_metadata,
-    build_ft_battles_from_metadata,
     drop_excluded_events,
-    load_event_metadata,
-    load_youtube_uploads,
 )
 from .overrides import load_manual_matchups, load_upload_decisions
 from .rules import first_matching_rule
