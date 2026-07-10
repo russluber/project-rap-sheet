@@ -17,6 +17,7 @@ reimplement it.
 - [Architecture at a glance](#architecture-at-a-glance)
 - [Package layout](#package-layout)
 - [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`uploads.py`, `events.py`, `battles.py`, `publish.py`)
+- [Pipeline map](#pipeline-map)
 - [`ft_battles` schema](#ft_battles-schema)
 - [Auditing upload lineage](#auditing-upload-lineage)
 - [Derived structures](#derived-structures) (`structures.py`)
@@ -106,6 +107,22 @@ build_ft_battles
 
 Each stage is a thin orchestration over small, single-purpose transforms (most
 take a DataFrame and return a new one), which keeps them easy to read and test.
+
+## Pipeline Map
+
+This is the raw-to-output path at a glance. The public package-root functions
+(`build_battle_metadata`, `build_ft_battles`, `build_upload_lineage`, etc.) are
+lazy re-exports; the owning module below is where the behavior lives.
+
+| order | stage | owner | input | output | exits / notes |
+| ----- | ----- | ----- | ----- | ------ | ------------- |
+| 1 | load raw sources | `battles.py` | `data/raw/youtube_videos.json`, `data/raw/matchup_events_metadata.csv`, `data/raw/versetracker_event_dates.csv` | raw upload/event frames plus VerseTracker date map | File loading only; no filtering. |
+| 2 | clean and filter uploads | `uploads.py` | raw YouTube uploads, alias map, `manual_matchups.csv`, `upload_decisions.csv`, `title_exclusions.csv` | parseable 1v1 upload candidates with canonical `emcee1`, `emcee2`, `matchup_clean` | Exact upload decisions can include/exclude/review rows; title/format filters remove non-battles and unsupported multi-emcee titles unless manually resolved. |
+| 3 | attach and filter event metadata | `events.py` | 1v1 uploads plus scraped event metadata and event/location/date overrides | uploads with `event_name`, `event_date`, `event_date_source`, `event_location_clean` | COVID-era website dates are masked, post-COVID descriptions can fill missing metadata, and `event_exclusions.csv` removes out-of-scope event categories. |
+| 4 | finalize battle metadata | `battles.py` | event-enriched upload rows plus VerseTracker dates | rich one-row-per-battle metadata with `METADATA_COLUMNS` | Multi-part uploads are consolidated; event locations/dates are overridden or imputed; provenance/debug fields remain available. |
+| 5 | publish final output | `publish.py` | rich battle metadata plus `battle_results.csv` | standalone `ft_battles` table with `FINAL_COLUMNS` | Annotation results are validated and joined; list-valued multipart ids are scalarized; provenance/debug-only columns are intentionally excluded. |
+| 6 | derive analysis structures | `structures.py` | final `ft_battles` | `battle_participants.csv`, `emcees.csv`, battle network | No-show/helper participation is modeled in the participant table. |
+| audit | explain every raw upload | `lineage.py` | raw sources plus the same rules/overrides used above | `upload_lineage.csv`, `filtered_out.csv`, `manual_matchup_needed.csv`, `pipeline_summary.csv`, `pipeline_stage_drops.csv` | Mirrors the same filter trace so debug artifacts stay reproducible and aligned with the build. |
 
 ### Stage 1 — clean YouTube uploads → 1v1 uploads
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from fliptop.battles import (
+from fliptop.uploads import (
     add_matchup_and_split,
     add_matchup_clean,
     apply_emcee_rename,

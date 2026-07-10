@@ -11,7 +11,8 @@ from __future__ import annotations
 import pytest
 
 from fliptop import RAW_DATA_DIR
-from fliptop.battles import build_battle_metadata, build_ft_battles
+from fliptop.battles import build_battle_metadata
+from fliptop.publish import build_ft_battles
 
 
 @pytest.fixture(scope="session")

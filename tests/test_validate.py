@@ -11,7 +11,8 @@ from datetime import date
 
 import pandas as pd
 
-from fliptop.battles import FINAL_COLUMNS, FINAL_OUTPUT_FORBIDDEN_COLUMNS, METADATA_COLUMNS
+from fliptop.battles import METADATA_COLUMNS
+from fliptop.publish import FINAL_COLUMNS, FINAL_OUTPUT_FORBIDDEN_COLUMNS
 from fliptop.validate import (
     summarize_battle_metadata,
     summarize_ft_battles,

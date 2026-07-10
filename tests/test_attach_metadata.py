@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from fliptop.battles import attach_event_metadata
+from fliptop.events import attach_event_metadata
 
 
 def _events():

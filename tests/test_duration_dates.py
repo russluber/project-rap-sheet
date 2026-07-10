@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import pandas as pd
 
-from fliptop.battles import (
+from fliptop.events import parse_event_date
+from fliptop.uploads import (
     add_duration_columns,
     convert_video_metrics_to_numeric,
-    parse_event_date,
     parse_upload_date,
 )
 

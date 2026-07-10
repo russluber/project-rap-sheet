@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from fliptop.battles import (
+from fliptop.events import (
     _parse_event_date_range,
     _split_event_day,
     apply_manual_event_date_overrides,

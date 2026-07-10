@@ -11,7 +11,8 @@ from __future__ import annotations
 import pandas as pd
 
 from fliptop import annotations as ann
-from fliptop.battles import write_ft_battles
+from fliptop.battles import build_battle_metadata
+from fliptop.publish import write_ft_battles
 
 EXPECTED_COLUMNS = [
     "id",
@@ -115,8 +116,6 @@ def test_known_draw_annotations_remain_valid():
 def test_covid_window_dates_masked_before_imputation(raw_data_dir):
     # With the VerseTracker imputation disabled, attach_event_metadata's COVID
     # mask still clears every in-window event_date (the obfuscated-date period).
-    from fliptop.battles import build_battle_metadata
-
     masked = build_battle_metadata(raw_dir=raw_data_dir, vt_event_dates={})
     in_window = masked["upload_date"].between(COVID_START, COVID_END)
     assert in_window.any()
