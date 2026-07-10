@@ -38,6 +38,8 @@ store in `data/annotations/battle_results.csv`, and includes:
 The richer internal metadata table, available from
 `fliptop.build_battle_metadata`, keeps audit/provenance fields such as
 `description`, `duration_hms`, and `event_date_source`.
+Those provenance/debug fields are intentionally excluded from `ft_battles`,
+which is the standalone final analysis output.
 
 
 > **Note on COVID-era events.** FlipTop obfuscated the real dates and locations

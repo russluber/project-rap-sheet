@@ -258,6 +258,26 @@ Rich audit fields such as `description`, `duration_hms`, and
 
 ---
 
+## Output Layer Contract
+
+The project has four output layers with different jobs:
+
+| layer | created by | purpose |
+| ----- | ---------- | ------- |
+| `battle_metadata` | `build_battle_metadata()` | rich internal build table with provenance/debug fields such as `description`, `duration_hms`, and `event_date_source` |
+| `ft_battles.json` | `build_ft_battles()` / `fliptop-refresh` | clean standalone battle-level analysis output with only `FINAL_COLUMNS` |
+| `battle_participants.csv` | `build_battle_participants()` / `fliptop-refresh` | long participant table for event-history/survival-style analysis |
+| `data/debug/*` | `fliptop-refresh --audit` | regenerated audit surfaces for raw-row lineage, filter exits, rule ids, and upload decisions |
+
+`ft_battles.json` intentionally excludes provenance and audit-only fields. Do
+not add columns such as `event_date_source`, `description`, `duration_hms`,
+`yt_raw_title`, `rule_id`, or `upload_decision_note` to the final output. Use
+`build_battle_metadata()` when inspecting date provenance, and use
+`data/debug/upload_lineage.csv` or `data/debug/pipeline_stage_drops.csv` when
+auditing why raw uploads were included, excluded, or held for review.
+
+---
+
 ## Auditing upload lineage
 
 To verify the filters aren't dropping real battles, use the lineage audit:
@@ -448,19 +468,22 @@ supposed to guarantee:
 
 - every expected column is present (`fliptop.battles.FINAL_COLUMNS`, the single
   source of truth for the output schema);
+- no metadata/audit-only columns are present in `ft_battles` (for example
+  `event_date_source`, `rule_id`, or `upload_decision_note`);
 - one row per battle — the scalar battle key (first id for multi-part battles) is
   present and unique;
 - every battle has two non-blank emcees;
-- `event_date_source` is drawn from the known vocabulary (`website` |
-  `description` | `versetracker` | `manual`; missing is allowed for undated
-  battles);
-- `event_date` is within a plausible window (≥ 2010, not in the future).
+- `event_date` is within a plausible window (>= 2010, not in the future).
+
+`validate_battle_metadata(df)` separately guards the rich metadata table,
+including the `event_date_source` vocabulary (`website` | `description` |
+`versetracker` | `manual`; missing is allowed for undated battles).
 
 `fliptop-refresh` runs the gate after every build and **aborts before writing**
 if anything fails, so a regression fails loudly instead of overwriting the
 processed data with a broken table. `summarize_ft_battles(df)` produces the
-one-line build summary (battle count + `event_date_source` breakdown) printed on
-each refresh.
+one-line build summary (battle count + `battle_type` breakdown) printed on each
+refresh.
 
 ---
 
@@ -576,6 +599,6 @@ pytest
 Tests use small hand-built DataFrames for the unit transforms, plus end-to-end
 invariant checks against the committed raw data (schema, no null emcees,
 multi-part `id`/`url` are lists, the COVID window is masked before imputation and
-fully dated after it, `event_date_source` is tagged from a known vocabulary,
+fully dated after it, metadata `event_date_source` is tagged from a known vocabulary,
 excluded ids disjoint from final battles, …). See `tests/README`-style headers
 in each `tests/test_*.py` for what each file covers.

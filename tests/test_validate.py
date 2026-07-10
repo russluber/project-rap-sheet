@@ -11,6 +11,7 @@ from datetime import date
 
 import pandas as pd
 
+from fliptop.battles import FINAL_COLUMNS, FINAL_OUTPUT_FORBIDDEN_COLUMNS, METADATA_COLUMNS
 from fliptop.validate import (
     summarize_battle_metadata,
     summarize_ft_battles,
@@ -73,6 +74,11 @@ def test_valid_frame_has_no_problems():
     assert validate_ft_battles(_valid_final(), today=date(2020, 1, 1)) == []
 
 
+def test_final_schema_excludes_metadata_and_audit_only_columns():
+    assert set(FINAL_OUTPUT_FORBIDDEN_COLUMNS).isdisjoint(FINAL_COLUMNS)
+    assert {"description", "duration_hms", "event_date_source"} <= set(METADATA_COLUMNS)
+
+
 def test_missing_metadata_event_date_and_source_are_allowed():
     # An undated battle (COVID-era NaT with no source) is legal, not a problem.
     df = _valid_metadata()
@@ -93,6 +99,21 @@ def test_missing_expected_columns():
     df = _valid_final().drop(columns=["matchup", "event_location"])
     problems = validate_ft_battles(df, today=date(2020, 1, 1))
     assert any("missing expected columns" in p and "matchup" in p for p in problems)
+
+
+def test_final_output_rejects_metadata_and_audit_only_columns():
+    df = _valid_final()
+    df["event_date_source"] = "website"
+    df["rule_id"] = pd.NA
+
+    problems = validate_ft_battles(df, today=date(2020, 1, 1))
+
+    assert any(
+        "metadata/audit-only" in p
+        and "event_date_source" in p
+        and "rule_id" in p
+        for p in problems
+    )
 
 
 def test_duplicate_scalar_id():
@@ -190,3 +211,7 @@ def test_real_ft_battles_passes_the_gate(ft_battles):
     # The committed pipeline output must satisfy every invariant (guards against
     # a raw-source change silently producing a malformed table).
     assert validate_ft_battles(ft_battles) == []
+
+
+def test_real_ft_battles_contains_no_metadata_or_audit_only_columns(ft_battles):
+    assert set(FINAL_OUTPUT_FORBIDDEN_COLUMNS).isdisjoint(ft_battles.columns)

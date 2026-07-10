@@ -2616,6 +2616,37 @@ FINAL_COLUMNS = [
     "votes_loser",
 ]
 
+# Columns that may appear in rich metadata or debug/audit surfaces, but should
+# never be published in ft_battles.json. The final table is intended to stand as
+# a clean analysis output, not a provenance dump.
+FINAL_OUTPUT_FORBIDDEN_COLUMNS = [
+    "description",
+    "duration_hms",
+    "event_date_source",
+    "yt_raw_title",
+    "event_description",
+    "video_id",
+    "matchup_clean",
+    "event_location_clean",
+    "source_part_number",
+    "pipeline_status",
+    "stage",
+    "excluded_reason",
+    "exit_category",
+    "matched_keyword",
+    "rule_id",
+    "rule_note",
+    "upload_decision",
+    "upload_decision_reason",
+    "upload_decision_note",
+    "manual_note",
+    "annotation_status",
+    "helper_emcee",
+    "emcee1_status",
+    "emcee2_status",
+    "helper_status",
+]
+
 
 def finalize_battles(
     df_with_meta: pd.DataFrame,

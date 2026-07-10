@@ -130,7 +130,8 @@ dates are static — rather than refreshed by `fliptop-refresh --fetch`.
 
 > ⚠️ These dates are accurate to within ~days, not exact — VerseTracker appears to
 > use the event **flyer-post** date for some events. Battles dated from this file
-> are tagged `versetracker` in `ft_battles`' `event_date_source` column.
+> are tagged `versetracker` in the internal metadata table's
+> `event_date_source` column.
 
 ---
 
@@ -149,7 +150,7 @@ empty table, so the pipeline still runs without them.
 | `event_locations.csv` | `event_name` → `event_location` | exact event name | battles whose venue couldn't be extracted (COVID-era obfuscation, or a no-`@` description that leaked the event name into the location) |
 | `event_location_patterns.csv` | `contains` → `event_location` | substring of the location | a location string that carries junk around the real venue (e.g. `D' mention …`) |
 | `location_aliases.csv` | `location` → `canonical` | exact value | normalize known location strings (e.g. Davao variants) |
-| `event_dates.csv` | `id` → `event_date` | exact YouTube id | a battle whose own description mis-dates it, where the FlipTop site is authoritative (tagged `manual` in `ft_battles`) |
+| `event_dates.csv` | `id` → `event_date` | exact YouTube id | a battle whose own description mis-dates it, where the FlipTop site is authoritative (tagged `manual` in `battle_metadata`) |
 | `manual_matchups.csv` | `id` → matchup + participation roles | exact YouTube id | no-show or ambiguous titles such as `A + B vs C`; records scheduled emcees, helper emcee, and appeared/no-show status |
 | `upload_decisions.csv` | `id` → include/exclude/review decision | exact YouTube id | one-off upload-level judgments that should not become broad rules |
 
@@ -231,6 +232,8 @@ The full column-by-column schema is documented in the
 The final file keeps the analysis columns only. Rich audit fields such as
 `description`, `duration_hms`, and `event_date_source` live in the internal
 metadata table returned by `fliptop.build_battle_metadata()`.
+Lineage/debug fields such as `rule_id`, `upload_decision_note`, and
+`matched_keyword` live in `data/debug/` audit outputs, not in `ft_battles.json`.
 
 - Process of Illumination and tryout events are excluded after event metadata is
   attached; they remain visible in `build_excluded_uploads` with an exclusion

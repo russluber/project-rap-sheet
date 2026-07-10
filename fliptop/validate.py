@@ -24,7 +24,7 @@ from datetime import date
 import pandas as pd
 
 from .annotations import BATTLE_TYPES, NA, battle_key, validate_votes, validate_winner
-from .battles import FINAL_COLUMNS, METADATA_COLUMNS
+from .battles import FINAL_COLUMNS, FINAL_OUTPUT_FORBIDDEN_COLUMNS, METADATA_COLUMNS
 
 # event_date_source is a small closed vocabulary; missing (undated battles) is ok.
 EVENT_DATE_SOURCES = {"website", "description", "versetracker", "manual"}
@@ -147,15 +147,23 @@ def validate_ft_battles(df: pd.DataFrame, *, today: date | None = None) -> list[
     """
     Return data-quality problems with the final result-enriched ``ft_battles``.
 
-    Checks the published output schema, one scalar id per battle, non-blank
-    emcees, plausible event dates, valid result fields, and winners that match
-    one of the two emcees when a judged battle has a winner.
+    Checks the published output schema, rejects metadata/audit-only columns,
+    requires one scalar id per battle, verifies non-blank emcees, plausible
+    event dates, valid result fields, and winners that match one of the two
+    emcees when a judged battle has a winner.
     """
     problems: list[str] = []
 
     if df.empty:
         problems.append("ft_battles is empty")
         return problems
+
+    forbidden = [c for c in FINAL_OUTPUT_FORBIDDEN_COLUMNS if c in df.columns]
+    if forbidden:
+        problems.append(
+            "ft_battles contains metadata/audit-only column(s): "
+            + ", ".join(forbidden)
+        )
 
     problems.extend(_check_expected_columns(df, FINAL_COLUMNS, "ft_battles"))
     problems.extend(_check_battle_identity(df, label="ft_battles", allow_list_ids=False))
