@@ -17,6 +17,9 @@ data/
 │   ├── location_aliases.csv
 │   ├── event_dates.csv
 │   └── manual_matchups.csv
+├── rules/                 # reviewable exclusion rules applied during the build
+│   ├── title_exclusions.csv
+│   └── event_exclusions.csv
 ├── processed/             # clean tables built by the fliptop package
 │   ├── ft_battles.json
 │   ├── battle_participants.csv
@@ -28,14 +31,16 @@ data/
 ```
 
 **Data flow.** `raw/` is produced by [`scripts/`](../scripts/); `processed/` is
-built from `raw/` (plus `emcee_aliases.csv` and the `overrides/` tables) by the
-[`fliptop`](../fliptop/) package; `annotations/` is filled in by hand via
-`fliptop-annotate`; refresh validates those annotations and joins the core result fields into the processed `ft_battles.json`.
+built from `raw/` (plus `emcee_aliases.csv`, `rules/`, and the `overrides/`
+tables) by the [`fliptop`](../fliptop/) package; `annotations/` is filled in by
+hand via `fliptop-annotate`; refresh validates those annotations and joins the
+core result fields into the processed `ft_battles.json`.
 
 ```
 scripts/ ─► raw/ ─┐
 emcee_aliases.csv ┤
 overrides/ ───────┼─► fliptop (build) ─► processed/
+rules/ ───────────┤
                   │                          │
                   ????????????? annotations/ ?(validated join)??
 ```
@@ -47,6 +52,7 @@ overrides/ ───────┼─► fliptop (build) ─► processed/
 - [`emcee_aliases.csv`](#emcee_aliasescsv)
 - [`raw/`](#raw)
 - [`overrides/`](#overrides)
+- [`rules/`](#rules)
 - [`processed/`](#processed)
 - [`annotations/`](#annotations)
 - [`secret/`](#secret)
@@ -147,6 +153,36 @@ empty table, so the pipeline still runs without them.
 To register a correction, add a row (with a `note`). Matching is exact and
 case-sensitive except `event_location_patterns.csv`, which matches any location
 *containing* the substring.
+
+---
+
+## `rules/`
+
+Reviewable exclusion rules used by the build to decide which uploads/events are
+outside the analysis table. These are core pipeline rules rather than one-off
+corrections: edit them deliberately, then run `fliptop-refresh --audit` and
+review `data/debug/pipeline_stage_drops.csv`.
+
+Loaded and validated by [`fliptop.rules`](../fliptop/rules.py). A missing rules
+file is an error because silently disabling exclusions would change the project
+scope.
+
+| file | applied to | purpose |
+| ---- | ---------- | ------- |
+| `title_exclusions.csv` | YouTube upload `title` before 1v1 filtering | removes non-battle uploads and title-identifiable out-of-scope categories such as tryout titles |
+| `event_exclusions.csv` | scraped `event_name` after event metadata attachment | removes out-of-scope event categories such as Process of Illumination and tryouts |
+
+Both files use:
+
+| column | notes |
+| ------ | ----- |
+| `rule_id` | stable identifier surfaced in audit files |
+| `pattern` | substring or regex to match |
+| `match_type` | `substring` or `regex` |
+| `excluded_reason` | human-readable compatibility reason such as `non-battle keyword` or `excluded event` |
+| `exit_category` | structured category such as `not_battle` or `out_of_scope_event` |
+| `note` | why the rule exists |
+| `active` | `true`/`false`; inactive rows are ignored but kept for review history |
 
 ---
 
@@ -257,7 +293,7 @@ fliptop-refresh --audit                # also write local data/debug audit files
 ```
 
 `processed/` is fully reproducible from `raw/` + `emcee_aliases.csv` +
-`overrides/` + `annotations/`. `raw/` is
+`rules/` + `overrides/` + `annotations/`. `raw/` is
 reproducible from the network via [`scripts/`](../scripts/) — a full
 `--fetch` overwrites the events CSV with a clean scrape, while `--events-since`
 **merges** only recent events in (faster, but accumulates scrape history; see

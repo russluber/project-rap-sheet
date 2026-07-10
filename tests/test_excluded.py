@@ -38,7 +38,11 @@ def test_excluded_tags_each_filter_reason(tmp_path):
     }
     assert "keep1" not in set(ex["id"])  # a clean 1v1 is not excluded
     # the matched exclusion keyword is recorded for the non-battle drop
-    assert ex.loc[ex["id"] == "bbox", "matched_keyword"].iloc[0] == "beatbox"
+    bbox = ex.loc[ex["id"] == "bbox"].iloc[0]
+    assert bbox["matched_keyword"] == "beatbox"
+    assert bbox["rule_id"] == "title_beatbox"
+    assert bbox["exit_category"] == "not_battle"
+    assert ex.loc[ex["id"] == "three", "exit_category"].iloc[0] == "format_not_supported"
 
 
 def test_excluded_tags_event_name_filter(tmp_path):
@@ -59,8 +63,10 @@ def test_excluded_tags_event_name_filter(tmp_path):
     row = ex.loc[ex["id"] == "poione"].iloc[0]
 
     assert row["excluded_reason"] == "excluded event"
+    assert row["exit_category"] == "out_of_scope_event"
     assert row["event_name"] == "Process of Illumination 6 (Visayas)"
     assert row["matched_keyword"].casefold() == "process of illumination"
+    assert row["rule_id"] == "event_process_of_illumination"
     assert "keep1" not in set(ex["id"])
 
 

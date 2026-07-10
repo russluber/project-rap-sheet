@@ -49,6 +49,12 @@ from .overrides import (
     load_manual_matchups,
 )
 from .rename_map import load_rename_map
+from .rules import (
+    compile_exclusion_pattern,
+    first_matching_rule,
+    load_event_exclusion_rules,
+    load_title_exclusion_rules,
+)
 
 # ---------------------------------------------------------------------------
 # I. Types and simple aliases
@@ -206,23 +212,16 @@ def convert_video_metrics_to_numeric(
     )
 
 
-EXCLUDE_KEYWORDS = [
-    "tryout", "tryouts", "beatbox", "beat box", "flyer",
-    "anygma machine", "unggoyan", "pre-battle interviews", "interview", "interviews",
-    "salitang ugat", "trailer", "video flyer", "[live]", "silip", "sound check",
-    "tribute", "anniversary party", "tutok", "review", "abangan",
-]
-
-EXCLUDE_RE = re.compile("|".join(re.escape(w) for w in EXCLUDE_KEYWORDS), flags=re.IGNORECASE)
+TITLE_EXCLUSION_RULES = load_title_exclusion_rules()
+EXCLUDE_KEYWORDS = [rule.pattern for rule in TITLE_EXCLUSION_RULES]
+EXCLUDE_RE = compile_exclusion_pattern(TITLE_EXCLUSION_RULES)
 
 # Event names are unavailable during the title filters above. These domain-level
 # exclusions run after event metadata is attached so they also catch uploads
 # whose YouTube titles do not identify them as tryouts / POI.
-EXCLUDE_EVENT_KEYWORDS = ["process of illumination", "tryout"]
-EXCLUDE_EVENT_RE = re.compile(
-    "|".join(re.escape(w) for w in EXCLUDE_EVENT_KEYWORDS),
-    flags=re.IGNORECASE,
-)
+EVENT_EXCLUSION_RULES = load_event_exclusion_rules()
+EXCLUDE_EVENT_KEYWORDS = [rule.pattern for rule in EVENT_EXCLUSION_RULES]
+EXCLUDE_EVENT_RE = compile_exclusion_pattern(EVENT_EXCLUSION_RULES)
 
 
 def filter_titles_with_vs(df: pd.DataFrame) -> pd.DataFrame:
@@ -236,7 +235,7 @@ def filter_titles_with_vs(df: pd.DataFrame) -> pd.DataFrame:
 
 def drop_non_battles(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Drop rows whose 'title' matches known non-battle keywords.
+    Drop rows whose 'title' matches active title exclusion rules.
     """
     if "title" not in df:
         return df
@@ -247,7 +246,7 @@ def drop_excluded_events(
     df: pd.DataFrame,
     event_col: str = "event_name",
 ) -> pd.DataFrame:
-    """Drop rows whose event name matches a known excluded event category."""
+    """Drop rows whose event name matches active event exclusion rules."""
     if event_col not in df:
         return df
     return df[~df[event_col].astype("string").str.contains(EXCLUDE_EVENT_RE, na=False)]
@@ -1221,18 +1220,30 @@ def _event_name_lookup(df_events: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _matched_exclusion_keyword(row):
-    """Keyword responsible for a keyword-based exclusion, if any."""
+def _rule_audit_fields(row) -> dict[str, object]:
+    """Structured rule metadata responsible for a row exit, if any."""
     if row["excluded_reason"] == "non-battle keyword":
-        value, pattern = row.get("title"), EXCLUDE_RE
+        match = first_matching_rule(row.get("title"), TITLE_EXCLUSION_RULES)
     elif row["excluded_reason"] == "excluded event":
-        value, pattern = row.get("event_name"), EXCLUDE_EVENT_RE
+        match = first_matching_rule(row.get("event_name"), EVENT_EXCLUSION_RULES)
     else:
-        return pd.NA
-    if not isinstance(value, str):
-        return pd.NA
-    m = pattern.search(value)
-    return m.group(0) if m else pd.NA
+        match = None
+
+    if match is None:
+        return {
+            "matched_keyword": pd.NA,
+            "rule_id": pd.NA,
+            "rule_note": pd.NA,
+            "exit_category": row.get("exit_category", pd.NA),
+        }
+
+    rule, matched_keyword = match
+    return {
+        "matched_keyword": matched_keyword,
+        "rule_id": rule.rule_id,
+        "rule_note": rule.note,
+        "exit_category": rule.exit_category,
+    }
 
 
 def _upload_stage_trace(
@@ -1257,11 +1268,13 @@ def _upload_stage_trace(
         after: pd.DataFrame,
         reason: str,
         stage: str,
+        exit_category: str,
     ) -> pd.DataFrame:
         out = before[~before["id"].isin(after["id"])].copy()
         out["pipeline_status"] = "excluded"
         out["stage"] = stage
         out["excluded_reason"] = reason
+        out["exit_category"] = exit_category
         return out
 
     after_vs = filter_titles_with_vs(pre)
@@ -1293,6 +1306,7 @@ def _upload_stage_trace(
     if not needs_manual.empty:
         needs_manual["pipeline_status"] = "needs_manual_matchup"
         needs_manual["stage"] = "manual_matchup_override"
+        needs_manual["exit_category"] = "manual_review_required"
         needs_manual["manual_note"] = needs_manual["id"].astype(str).map(
             _manual_matchup_notes(manual_matchups)
         )
@@ -1301,6 +1315,7 @@ def _upload_stage_trace(
         pending_event_excluded["pipeline_status"] = "excluded"
         pending_event_excluded["stage"] = "drop_excluded_events"
         pending_event_excluded["excluded_reason"] = "excluded event"
+        pending_event_excluded["exit_category"] = "out_of_scope_event"
         pending_event_excluded["manual_note"] = pending_event_excluded["id"].astype(str).map(
             _manual_matchup_notes(manual_matchups)
         )
@@ -1315,19 +1330,33 @@ def _upload_stage_trace(
 
     excluded = pd.concat(
         [
-            _dropped(pre, after_vs, "no 'vs' token", "filter_titles_with_vs"),
+            _dropped(
+                pre,
+                after_vs,
+                "no 'vs' token",
+                "filter_titles_with_vs",
+                "not_battle",
+            ),
             _dropped(
                 after_vs,
                 after_nonbattle,
                 "non-battle keyword",
                 "drop_non_battles",
+                pd.NA,
             ),
-            _dropped(not_pending, after_1v1, "not 1v1", "keep_1v1"),
+            _dropped(
+                not_pending,
+                after_1v1,
+                "not 1v1",
+                "keep_1v1",
+                "format_not_supported",
+            ),
             _dropped(
                 with_event_meta,
                 after_event_filter,
                 "excluded event",
                 "drop_excluded_events",
+                "out_of_scope_event",
             ),
             pending_event_excluded,
         ],
@@ -1357,7 +1386,17 @@ def _upload_stage_trace(
                 needs_manual["event_name"] = needs_manual["_event_name_lookup"]
             needs_manual = needs_manual.drop(columns=["_event_name_lookup"])
 
-    excluded["matched_keyword"] = excluded.apply(_matched_exclusion_keyword, axis=1)
+    rule_cols = ["matched_keyword", "rule_id", "rule_note", "exit_category"]
+    if excluded.empty:
+        for col in rule_cols:
+            excluded[col] = pd.Series(dtype="object")
+    else:
+        rule_fields = excluded.apply(_rule_audit_fields, axis=1, result_type="expand")
+        for col in rule_cols:
+            if col not in excluded.columns:
+                excluded[col] = pd.NA
+            if col in rule_fields.columns:
+                excluded[col] = excluded[col].combine_first(rule_fields[col])
     trace = {
         "raw_youtube": df_yt.copy(),
         "prepare_uploads": pre,
@@ -1410,7 +1449,7 @@ def build_excluded_uploads(
     exclusions, recording the first stage that removed each video:
 
         - "no 'vs' token"      (filter_titles_with_vs)
-        - "non-battle keyword" (drop_non_battles; the matched word is recorded)
+        - "non-battle keyword" (drop_non_battles; rule metadata is recorded)
         - "not 1v1"            (keep_1v1)
         - "excluded event"     (drop_excluded_events; event keyword recorded)
 
@@ -1418,7 +1457,7 @@ def build_excluded_uploads(
     -------
     pd.DataFrame
         One row per excluded upload, with id, both titles, upload_date, url,
-        `excluded_reason`, and `matched_keyword` (for non-battle drops).
+        `excluded_reason`, `exit_category`, and rule metadata where applicable.
     """
     raw_dir = Path(raw_dir)
     df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
@@ -1437,7 +1476,10 @@ def build_excluded_uploads(
         "upload_date",
         "url",
         "excluded_reason",
+        "exit_category",
         "matched_keyword",
+        "rule_id",
+        "rule_note",
     ]
     excluded = excluded[[c for c in cols if c in excluded.columns]]
     if "upload_date" in excluded.columns:
@@ -1454,7 +1496,10 @@ UPLOAD_LINEAGE_COLUMNS = [
     "pipeline_status",
     "stage",
     "excluded_reason",
+    "exit_category",
     "matched_keyword",
+    "rule_id",
+    "rule_note",
     "manual_note",
     "event_name",
     "event_date",
@@ -1493,7 +1538,10 @@ PIPELINE_STAGE_DROP_COLUMNS = [
     "pipeline_status",
     "stage",
     "excluded_reason",
+    "exit_category",
     "matched_keyword",
+    "rule_id",
+    "rule_note",
     "manual_note",
     "yt_raw_title",
     "title",
@@ -1569,7 +1617,10 @@ def build_upload_lineage(
             "pipeline_status",
             "stage",
             "excluded_reason",
+            "exit_category",
             "matched_keyword",
+            "rule_id",
+            "rule_note",
             "manual_note",
         ]:
             if col not in excluded_lookup.columns:
@@ -1587,7 +1638,7 @@ def build_upload_lineage(
         manual_lookup["id"] = manual_lookup["id"].astype(str)
         manual_lookup = manual_lookup.set_index("id")
         is_manual = lineage["id"].isin(manual_lookup.index)
-        for col in ["pipeline_status", "stage", "manual_note"]:
+        for col in ["pipeline_status", "stage", "exit_category", "manual_note"]:
             lineage.loc[is_manual, col] = lineage.loc[is_manual, "id"].map(
                 manual_lookup[col]
             )
@@ -1728,6 +1779,7 @@ def build_manual_matchup_review_uploads(
         "upload_date",
         "url",
         "stage",
+        "exit_category",
         "manual_note",
     ]
     needs_manual = needs_manual[[c for c in cols if c in needs_manual.columns]]

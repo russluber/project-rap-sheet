@@ -68,6 +68,7 @@ fliptop/
 ├── battles.py          # the pipeline: raw sources -> ft_battles
 ├── rename_map.py       # loads/validates the alias map from data/emcee_aliases.csv
 ├── overrides.py        # loads/validates the correction tables in data/overrides/
+├── rules.py            # loads/validates reviewable exclusion rules in data/rules/
 ├── structures.py       # structures derived from ft_battles (emcee table + battle network)
 ├── validate.py         # output data-quality gate for ft_battles
 ├── annotations.py      # battle-results store (winner/judging/notes) + helpers
@@ -113,7 +114,7 @@ counts as a battle:
 | filter | keeps / drops |
 | ------ | ------------- |
 | `filter_titles_with_vs` | keep only titles containing the token `vs` |
-| `drop_non_battles` | drop titles matching `EXCLUDE_KEYWORDS` (beatbox, tryout, flyer, `[LIVE]`, …) — matched as **substrings**, case-insensitive. Title-labeled promo battles are kept and classified later via annotations. |
+| `drop_non_battles` | drop titles matching active rules in `data/rules/title_exclusions.csv` (beatbox, tryout, flyer, `[LIVE]`, ...) — currently matched as **substrings**, case-insensitive. Title-labeled promo battles are kept and classified later via annotations. |
 | `keep_1v1_or_manual_matchup` | drop multi-emcee formats (`>1 vs`, `/`, `+`, `N on M`, `and ... vs ... and`) unless a resolved row in `data/overrides/manual_matchups.csv` supplies the actual 1v1 matchup |
 
 and finally extracts the matchup:
@@ -145,11 +146,12 @@ where each date came from — `website` initially, cleared inside the COVID wind
 `manual` as it imputes/overrides.
 
 After metadata attachment, `drop_excluded_events` removes rows whose
-`event_name` contains `Process of Illumination` or `tryout` (case-insensitive).
-These categories cannot be filtered reliably during Stage 1 because many of
-their YouTube titles contain neither phrase. The event exclusions are separate
-from `EXCLUDE_KEYWORDS`, which remains title-only. Event exclusions still win
-over manual no-show handling: a known no-show battle in a POI/tryout event stays
+`event_name` matches active rules in `data/rules/event_exclusions.csv`, such as
+`Process of Illumination` or `tryout` (case-insensitive). These categories
+cannot be filtered reliably during Stage 1 because many of their YouTube titles
+contain neither phrase. The event exclusions are separate from
+`title_exclusions.csv`, which remains title-only. Event exclusions still win over
+manual no-show handling: a known no-show battle in a POI/tryout event stays
 excluded with the rest of that event category.
 
 `clean_event_location` also normalizes known messiness: prefers the text after
@@ -266,7 +268,8 @@ multiple possible emcees and whose actual 1v1 matchup still needs to be filled
 in `data/overrides/manual_matchups.csv`, unless the row is excluded by event
 category first. The lineage includes the filter stage, exclusion reason, matched
 keyword, final battle key, canonical matchup, manual note, and annotation status
-where applicable.
+where applicable. Rule-based exits also carry `rule_id`, `rule_note`, and
+`exit_category` from `data/rules/`.
 
 For the narrower compatibility view, `build_excluded_uploads(raw_dir)` returns
 only the removed uploads, tagged with the reason (`no 'vs' token`,

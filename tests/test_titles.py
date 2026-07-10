@@ -85,7 +85,7 @@ def test_drop_non_battles_keyword_matching(title, kept):
 
 
 def test_drop_non_battles_matches_substrings_not_words():
-    # Documents a known over-match: EXCLUDE_KEYWORDS are matched as substrings,
+    # Documents a known over-match: title exclusion rules match substrings,
     # so "Reviewing" trips the "review" keyword even though it is a real battle.
     # If this is ever judged wrong, this test is the place to change it.
     df = pd.DataFrame({"title": ["Reviewing Loonie vs Abra"]})

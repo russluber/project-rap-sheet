@@ -1,0 +1,3 @@
+rule_id,pattern,match_type,excluded_reason,exit_category,note,active
+event_process_of_illumination,process of illumination,substring,excluded event,out_of_scope_event,Process of Illumination events are outside current analysis scope,true
+event_tryout,tryout,substring,excluded event,out_of_scope_event,Tryout events are outside current analysis scope,true

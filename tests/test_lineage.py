@@ -159,10 +159,15 @@ def test_pipeline_stage_drops_lists_exact_filter_and_manual_exits(tmp_path):
     assert set(drops.index) == {"novs", "bbox", "three", "manual"}
     assert drops.loc["novs", "stage"] == "filter_titles_with_vs"
     assert drops.loc["novs", "excluded_reason"] == "no 'vs' token"
+    assert drops.loc["novs", "exit_category"] == "not_battle"
     assert drops.loc["bbox", "stage"] == "drop_non_battles"
     assert drops.loc["bbox", "matched_keyword"] == "beatbox"
+    assert drops.loc["bbox", "rule_id"] == "title_beatbox"
+    assert drops.loc["bbox", "exit_category"] == "not_battle"
     assert drops.loc["three", "stage"] == "keep_1v1"
+    assert drops.loc["three", "exit_category"] == "format_not_supported"
     assert drops.loc["manual", "pipeline_status"] == "needs_manual_matchup"
+    assert drops.loc["manual", "exit_category"] == "manual_review_required"
     assert drops.loc["manual", "manual_note"] == "needs watching"
 
 
@@ -302,7 +307,9 @@ def test_real_no_show_manual_matchups_are_not_generic_exclusions_unless_event_ex
 
     poi_excluded = excluded.set_index("id").loc[POI_NO_SHOW_ID]
     assert poi_excluded["excluded_reason"] == "excluded event"
+    assert poi_excluded["exit_category"] == "out_of_scope_event"
     assert poi_excluded["matched_keyword"].casefold() == "process of illumination"
+    assert poi_excluded["rule_id"] == "event_process_of_illumination"
     assert lineage.set_index("id").loc[POI_NO_SHOW_ID, "pipeline_status"] == "excluded"
 
 

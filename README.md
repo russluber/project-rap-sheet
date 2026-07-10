@@ -71,6 +71,9 @@ project-rap-sheet/
 │   │   ├── event_location_patterns.csv
 │   │   ├── location_aliases.csv
 │   │   └── event_dates.csv
+│   ├── rules/
+│   │   ├── title_exclusions.csv
+│   │   └── event_exclusions.csv
 │   ├── processed/
 │   │   ├── ft_battles.json
 │   │   └── emcees.csv
@@ -84,6 +87,7 @@ project-rap-sheet/
 │   ├── battles.py
 │   ├── rename_map.py
 │   ├── overrides.py
+│   ├── rules.py
 │   ├── structures.py
 │   ├── refresh.py
 │   ├── annotations.py

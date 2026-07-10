@@ -1,0 +1,22 @@
+rule_id,pattern,match_type,excluded_reason,exit_category,note,active
+title_tryout,tryout,substring,non-battle keyword,out_of_scope_event,Tryout-related title outside current battle scope,true
+title_tryouts,tryouts,substring,non-battle keyword,out_of_scope_event,Tryout-related title outside current battle scope,true
+title_beatbox,beatbox,substring,non-battle keyword,not_battle,Beatbox upload rather than rap battle,true
+title_beat_box,beat box,substring,non-battle keyword,not_battle,Beatbox upload rather than rap battle,true
+title_flyer,flyer,substring,non-battle keyword,not_battle,Event flyer or promotional upload,true
+title_anygma_machine,anygma machine,substring,non-battle keyword,not_battle,Anygma Machine upload rather than battle,true
+title_unggoyan,unggoyan,substring,non-battle keyword,not_battle,Unggoyan segment rather than battle,true
+title_pre_battle_interviews,pre-battle interviews,substring,non-battle keyword,not_battle,Interview upload rather than battle,true
+title_interview,interview,substring,non-battle keyword,not_battle,Interview upload rather than battle,true
+title_interviews,interviews,substring,non-battle keyword,not_battle,Interview upload rather than battle,true
+title_salitang_ugat,salitang ugat,substring,non-battle keyword,not_battle,Salitang Ugat segment rather than battle,true
+title_trailer,trailer,substring,non-battle keyword,not_battle,Trailer rather than battle,true
+title_video_flyer,video flyer,substring,non-battle keyword,not_battle,Video flyer rather than battle,true
+title_live,[live],substring,non-battle keyword,not_battle,Live stream marker for non-battle upload,true
+title_silip,silip,substring,non-battle keyword,not_battle,Silip preview segment rather than battle,true
+title_sound_check,sound check,substring,non-battle keyword,not_battle,Sound check rather than battle,true
+title_tribute,tribute,substring,non-battle keyword,not_battle,Tribute upload rather than battle,true
+title_anniversary_party,anniversary party,substring,non-battle keyword,not_battle,Anniversary party upload rather than battle,true
+title_tutok,tutok,substring,non-battle keyword,not_battle,Tutok segment rather than battle,true
+title_review,review,substring,non-battle keyword,not_battle,Review upload rather than battle,true
+title_abangan,abangan,substring,non-battle keyword,not_battle,Abangan teaser rather than battle,true
