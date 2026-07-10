@@ -18,7 +18,6 @@ dependencies = [
     "networkx",
     "beautifulsoup4",
     "requests",
-    "openpyxl",
 ]
 
 [project.optional-dependencies]
