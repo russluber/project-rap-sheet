@@ -22,6 +22,8 @@ notebooks/imputation.ipynb
 # --------------------------------------
 .env
 *.env
+.venv/
+.uv-cache/
 
 # Ignore secret folder completely
 data/secret/
@@ -48,6 +50,7 @@ tasks.md
 *.tmp
 *.bak
 .pytest-tmp/
+.pytest-tmp*/
 
 # --------------------------------------
 # OS junk

@@ -351,7 +351,7 @@ excluded["excluded_reason"].value_counts()
 To write the local debug artifacts, run:
 
 ```bash
-fliptop-refresh --audit
+uv run fliptop-refresh --audit
 ```
 
 This writes `data/debug/upload_lineage.csv`,
@@ -529,10 +529,10 @@ refresh.
 way to regenerate the processed datasets.
 
 ```bash
-fliptop-refresh                        # rebuild ft_battles.json + emcees.csv from existing raw data
-fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first, then rebuild
-fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
-fliptop-refresh --audit                # rebuild and write data/debug audit files
+uv run fliptop-refresh                        # rebuild ft_battles.json + emcees.csv from existing raw data
+uv run fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first, then rebuild
+uv run fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
+uv run fliptop-refresh --audit                # rebuild and write data/debug audit files
 ```
 
 - `rebuild_processed()` builds `ft_battles` once, runs the
@@ -626,10 +626,10 @@ datetime dtypes and skips the JSON round-trip entirely.)
 ## Testing
 
 The pipeline's transforms are covered by a `pytest` suite at the repo root
-(`tests/`). Run it from the activated environment:
+(`tests/`). Run it through the locked uv environment:
 
 ```bash
-pytest
+uv run pytest -q --basetemp .pytest-tmp
 ```
 
 Tests use small hand-built DataFrames for the unit transforms, plus end-to-end

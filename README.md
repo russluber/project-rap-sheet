@@ -108,46 +108,60 @@ project-rap-sheet/
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml
+├── uv.lock
+├── .python-version
 ├── environment.yml
 └── .gitignore
 ```
 
 ## Setup
 
-The project ships a conda environment that installs all dependencies and the
-`fliptop` package itself (in editable mode):
+`uv` is the canonical environment manager for this project. The repository pins
+Python 3.12 in `.python-version` and locks the resolved dependencies in
+`uv.lock`.
 
 ```bash
-conda env create -f environment.yml
-conda activate fliptop-analysis
+uv sync
 ```
 
-Or, into an existing Python (3.11+) environment:
+That creates a project-local `.venv/`, installs the `fliptop` package in
+editable mode, and includes the default developer tooling (`pytest` and
+`ruff`). Run project commands through `uv run` so they use the locked
+environment:
 
 ```bash
-pip install -e .              # core pipeline only
-pip install -e ".[analysis]"  # + notebook/analysis stack (plotting, lifelines, …)
+uv run python --version
+uv run fliptop-refresh --audit
 ```
+
+For notebooks and analysis packages:
+
+```bash
+uv sync --extra analysis
+uv run python -m ipykernel install --user --name project-rap-sheet --display-name "Project Rap Sheet"
+```
+
+`environment.yml` is kept as a legacy conda reference for the old analysis
+environment, but `uv` is the reproducible setup path used by the project.
 
 ## Development
 
-Install the developer tooling (tests + linter) and run the checks that CI runs:
+Run the checks that CI runs:
 
 ```bash
-pip install -e ".[dev]"   # pytest + ruff
-
-pytest                    # run the test suite
-ruff check .              # lint
-ruff check --fix .        # lint and auto-fix what's safe
+uv run pytest -q --basetemp .pytest-tmp
+uv run ruff check fliptop tests
+uv run ruff check --fix fliptop tests
+uv lock --check
 ```
 
 Every push and pull request to `main` runs the same lint and test suite on
-Python 3.11 and 3.12 via GitHub Actions (see `.github/workflows/ci.yml`).
+Python 3.12 via GitHub Actions (see `.github/workflows/ci.yml`).
 
 Optionally, install the git hooks so lint runs before each commit:
 
 ```bash
-pip install pre-commit
+uv tool install pre-commit
 pre-commit install
 ```
 
@@ -156,10 +170,10 @@ pre-commit install
 The whole pipeline is wrapped in a single command, `fliptop-refresh`:
 
 ```bash
-fliptop-refresh                        # rebuild processed outputs from existing raw data
-fliptop-refresh --fetch                # fetch fresh raw data (YouTube + web) first, then rebuild
-fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (faster), then rebuild
-fliptop-refresh --audit                # also write local data/debug audit files
+uv run fliptop-refresh                        # rebuild processed outputs from existing raw data
+uv run fliptop-refresh --fetch                # fetch fresh raw data (YouTube + web) first, then rebuild
+uv run fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (faster), then rebuild
+uv run fliptop-refresh --audit                # also write local data/debug audit files
 ```
 
 - The default (no flags) is fast, deterministic, and needs no network or API
@@ -198,8 +212,8 @@ against the battle metadata and joins the core result fields into the published
 `ft_battles.json`. Use the interactive tool to record results:
 
 ```bash
-fliptop-annotate            # walk through battles that aren't annotated yet
-fliptop-annotate --limit 20 # do a batch of 20
+uv run fliptop-annotate            # walk through battles that aren't annotated yet
+uv run fliptop-annotate --limit 20 # do a batch of 20
 ```
 
 It is incremental and resumable. After fetching new raw data you only annotate

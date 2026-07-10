@@ -7,7 +7,7 @@ name = "fliptop"
 version = "0.1.0"
 description = "Reproducible data pipeline for cleaning and analyzing FlipTop rap battle data."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 license = { file = "LICENSE" }
 authors = [{ name = "Russel Luber" }]
 dependencies = [
@@ -34,6 +34,8 @@ analysis = [
     "scikit-survival",
     "pyvis",
 ]
+
+[dependency-groups]
 # Developer tooling (tests + lint). Kept out of the runtime and analysis installs.
 dev = [
     "pytest",
@@ -52,7 +54,7 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 # Research notebooks carry exploratory imports / long cells; don't lint them.
 extend-exclude = ["notebooks"]
 
