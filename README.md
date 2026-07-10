@@ -110,7 +110,6 @@ project-rap-sheet/
 ├── pyproject.toml
 ├── uv.lock
 ├── .python-version
-├── environment.yml
 └── .gitignore
 ```
 
@@ -140,9 +139,6 @@ For notebooks and analysis packages:
 uv sync --extra analysis
 uv run python -m ipykernel install --user --name project-rap-sheet --display-name "Project Rap Sheet"
 ```
-
-`environment.yml` is kept as a legacy conda reference for the old analysis
-environment, but `uv` is the reproducible setup path used by the project.
 
 ## Development
 
