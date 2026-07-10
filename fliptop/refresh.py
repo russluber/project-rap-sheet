@@ -46,8 +46,8 @@ from .battles import (
     build_battle_metadata,
     build_ft_battles_from_metadata,
     save_ft_battles,
-    write_audit_outputs,
 )
+from .lineage import write_audit_outputs
 from .structures import build_battle_participants, write_emcees_table
 from .validate import (
     summarize_battle_metadata,

@@ -16,7 +16,7 @@ reimplement it.
 
 - [Architecture at a glance](#architecture-at-a-glance)
 - [Package layout](#package-layout)
-- [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`battles.py`)
+- [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`battles.py`, `uploads.py`)
 - [`ft_battles` schema](#ft_battles-schema)
 - [Auditing upload lineage](#auditing-upload-lineage)
 - [Derived structures](#derived-structures) (`structures.py`)
@@ -37,11 +37,12 @@ modules consume it.
 
 ```
  data/raw/youtube_videos.json ─┐
-                               ├─► battles.py ──► ft_battles ──┬─► structures.py  (emcee table, network)
+                               ├─► uploads.py ─► battles.py ─► ft_battles ──┬─► structures.py
  data/raw/matchup_events_      ─┘   (+ emcee_aliases.csv)      │
    metadata.csv                                                ??? annotations.py (validated result store)
 
  scripts/ (fetch raw) ──► data/raw/        refresh.py orchestrates: fetch (optional) → build → write
+                                           lineage.py writes audit/debug tables
                                            annotate.py records battle results into data/annotations/
 ```
 
@@ -50,8 +51,9 @@ modules consume it.
 - **Two layers, one public output.** `build_battle_metadata()` keeps the rich
   audit table with provenance fields; `build_ft_battles()` joins validated
   annotations and emits the final analysis table.
-- **Logic is separate from CLI.** `battles.py` ↔ `refresh.py` (build ↔ command)
-  and `annotations.py` ↔ `annotate.py` (store ↔ command) are deliberate splits.
+- **Logic is separate from CLI.** `battles.py`/`lineage.py` ↔ `refresh.py`
+  (build/audit ↔ command) and `annotations.py` ↔ `annotate.py` (store ↔ command)
+  are deliberate splits.
 - **Hand-maintained data lives in `data/` files, not in code** — emcee aliases,
   battle results, etc. are CSVs you can edit like any other data.
 - **Imports stay cheap.** `import fliptop` pulls in nothing heavy; the public
@@ -65,7 +67,9 @@ modules consume it.
 ```
 fliptop/
 ├── __init__.py         # package init: shared data-dir paths + lazy public API
-├── battles.py          # the pipeline: raw sources -> ft_battles
+├── battles.py          # metadata/output orchestration: raw sources -> ft_battles
+├── uploads.py          # upload-side cleaning, title filters, and matchup parsing
+├── lineage.py          # audit tables explaining raw upload inclusion/exclusion
 ├── rename_map.py       # loads/validates the alias map from data/emcee_aliases.csv
 ├── overrides.py        # loads/validates the correction tables in data/overrides/
 ├── rules.py            # loads/validates reviewable exclusion rules in data/rules/
@@ -80,9 +84,11 @@ fliptop/
 
 ## The pipeline: raw → `ft_battles`
 
-`battles.py` is the heart of the package. `build_battle_metadata(raw_dir=...)`
-runs three cleaning stages and returns the rich metadata table. `build_ft_battles`
-then joins validated battle results and returns the final analysis table.
+`battles.py` orchestrates the metadata build. Upload-side cleaning and filters
+live in `uploads.py`; row-level audit tables live in `lineage.py`.
+`build_battle_metadata(raw_dir=...)` runs three cleaning stages and returns the
+rich metadata table. `build_ft_battles` then joins validated battle results and
+returns the final analysis table.
 
 ```
 build_ft_battles
@@ -97,7 +103,8 @@ take a DataFrame and return a new one), which keeps them easy to read and test.
 
 ### Stage 1 — clean YouTube uploads → 1v1 uploads
 
-`make_df_1v1_uploads(df_yt)` first runs the shared **`prepare_uploads`** step:
+`uploads.make_df_1v1_uploads(df_yt)` first runs the shared
+**`prepare_uploads`** step:
 
 | transform | what it does |
 | --------- | ------------ |
@@ -301,8 +308,13 @@ and, for keyword drops, the matched title or event keyword. Both audit views
 share the same filter trace so they cannot drift apart.
 
 ```python
-from fliptop import RAW_DATA_DIR, build_excluded_uploads, build_upload_lineage
-from fliptop.battles import build_pipeline_stage_drops, build_pipeline_stage_summary
+from fliptop import (
+    RAW_DATA_DIR,
+    build_excluded_uploads,
+    build_pipeline_stage_drops,
+    build_pipeline_stage_summary,
+    build_upload_lineage,
+)
 
 lineage = build_upload_lineage(RAW_DATA_DIR)
 excluded = build_excluded_uploads(RAW_DATA_DIR)

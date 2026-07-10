@@ -56,14 +56,14 @@ _LAZY = {
     "build_battle_metadata": (".battles", "build_battle_metadata"),
     "build_ft_battles": (".battles", "build_ft_battles"),
     "build_ft_battles_from_metadata": (".battles", "build_ft_battles_from_metadata"),
-    "build_excluded_uploads": (".battles", "build_excluded_uploads"),
-    "build_upload_lineage": (".battles", "build_upload_lineage"),
+    "build_excluded_uploads": (".lineage", "build_excluded_uploads"),
+    "build_upload_lineage": (".lineage", "build_upload_lineage"),
     "build_manual_matchup_review_uploads": (
-        ".battles",
+        ".lineage",
         "build_manual_matchup_review_uploads",
     ),
-    "build_pipeline_stage_summary": (".battles", "build_pipeline_stage_summary"),
-    "build_pipeline_stage_drops": (".battles", "build_pipeline_stage_drops"),
+    "build_pipeline_stage_summary": (".lineage", "build_pipeline_stage_summary"),
+    "build_pipeline_stage_drops": (".lineage", "build_pipeline_stage_drops"),
     "build_battle_participants": (".structures", "build_battle_participants"),
     "write_battle_participants_table": (
         ".structures",
@@ -81,9 +81,11 @@ if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
     from .annotations import merge_results
     from .battles import (
         build_battle_metadata,
-        build_excluded_uploads,
         build_ft_battles,
         build_ft_battles_from_metadata,
+    )
+    from .lineage import (
+        build_excluded_uploads,
         build_manual_matchup_review_uploads,
         build_pipeline_stage_drops,
         build_pipeline_stage_summary,
