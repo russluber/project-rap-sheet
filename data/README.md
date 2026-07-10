@@ -15,9 +15,11 @@ data/
 │   ├── event_locations.csv
 │   ├── event_location_patterns.csv
 │   ├── location_aliases.csv
-│   └── event_dates.csv
+│   ├── event_dates.csv
+│   └── manual_matchups.csv
 ├── processed/             # clean tables built by the fliptop package
 │   ├── ft_battles.json
+│   ├── battle_participants.csv
 │   └── emcees.csv
 ├── annotations/           # hand-collected results, kept separate from processed
 │   └── battle_results.csv
@@ -140,6 +142,7 @@ empty table, so the pipeline still runs without them.
 | `event_location_patterns.csv` | `contains` → `event_location` | substring of the location | a location string that carries junk around the real venue (e.g. `D' mention …`) |
 | `location_aliases.csv` | `location` → `canonical` | exact value | normalize known location strings (e.g. Davao variants) |
 | `event_dates.csv` | `id` → `event_date` | exact YouTube id | a battle whose own description mis-dates it, where the FlipTop site is authoritative (tagged `manual` in `ft_battles`) |
+| `manual_matchups.csv` | `id` → matchup + participation roles | exact YouTube id | no-show or ambiguous titles such as `A + B vs C`; records scheduled emcees, helper emcee, and appeared/no-show status |
 
 To register a correction, add a row (with a `note`). Matching is exact and
 case-sensitive except `event_location_patterns.csv`, which matches any location
@@ -192,6 +195,13 @@ The distinct, canonicalized emcees that appear in `ft_battles`, with a stable id
 | `emcee_name` | `$tep G` | canonical name |
 
 Built by [`fliptop.structures.write_emcees_table`](../fliptop/structures.py).
+
+### `battle_participants.csv`
+
+Long-format participation table for event-history and survival-style analysis.
+Regular battles have two scheduled participants with `appearance_credit=true`.
+Manual no-show battles add the scheduled no-show with `appearance_credit=false`
+and the helper emcee with `appearance_credit=true` but `battle_credit=false`.
 
 ---
 
@@ -257,9 +267,9 @@ reproducible — it's hand-entered, so it's the one thing here worth guarding.
 ---
 
 `data/debug/` is git-ignored and regenerated on demand with
-`fliptop-refresh --audit`. It includes `filtered_out.csv` plus
-`upload_lineage.csv`, a one-row-per-raw-YouTube-upload audit of what the pipeline
-did with each source row.
+`fliptop-refresh --audit`. It includes `filtered_out.csv`,
+`manual_matchup_needed.csv`, plus `upload_lineage.csv`, a one-row-per-raw-upload
+audit of what the pipeline did with each source row.
 
 ## Conventions
 

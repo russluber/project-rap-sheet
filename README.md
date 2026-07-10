@@ -155,7 +155,8 @@ fliptop-refresh --audit                # also write local data/debug audit files
 ```
 
 - The default (no flags) is fast, deterministic, and needs no network or API
-  key: it rebuilds `data/processed/ft_battles.json` and `data/processed/emcees.csv`
+  key: it rebuilds `data/processed/ft_battles.json`,
+  `data/processed/battle_participants.csv`, and `data/processed/emcees.csv`
   from the raw files already in `data/raw/` plus
   `data/annotations/battle_results.csv`.
 - `--fetch` first runs the two collection scripts in `scripts/` to refresh the
@@ -166,9 +167,10 @@ fliptop-refresh --audit                # also write local data/debug audit files
   into the existing data — much faster for routine top-ups. See
   `scripts/README.md` for the trade-off.
 - `--audit` writes regenerated local debug files:
-  `data/debug/filtered_out.csv` and `data/debug/upload_lineage.csv`. The lineage
-  file has one row per raw YouTube upload and records whether each upload was
-  included, excluded, or folded into a multi-part battle.
+  `data/debug/filtered_out.csv`, `data/debug/upload_lineage.csv`, and
+  `data/debug/manual_matchup_needed.csv`. The lineage file has one row per raw
+  YouTube upload and records whether each upload was included, excluded, folded
+  into a multi-part battle, or held for manual matchup resolution.
 
 Under the hood the command runs three stages — fetch YouTube uploads, scrape
 FlipTop event metadata, then build the cleaned tables. You can also drive these

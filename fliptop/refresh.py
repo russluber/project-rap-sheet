@@ -22,11 +22,13 @@ merged into the existing CSV - which is much faster for routine updates:
 
 Outputs written (under data/processed by default):
     - ft_battles.json   (final result-enriched table, one battle per line)
+    - battle_participants.csv
     - emcees.csv
 
 With ``--audit`` it also writes reproducible debug files under ``data/debug``:
     - filtered_out.csv
     - upload_lineage.csv
+    - manual_matchup_needed.csv
 """
 
 from __future__ import annotations
@@ -44,7 +46,7 @@ from .battles import (
     save_ft_battles,
     write_audit_outputs,
 )
-from .structures import write_emcees_table
+from .structures import build_battle_participants, write_emcees_table
 from .validate import (
     summarize_battle_metadata,
     summarize_ft_battles,
@@ -167,8 +169,13 @@ def rebuild_processed(
     )
     print(f"[build] wrote {len(ft_battles)} battles -> {battles_path}")
 
+    participants = build_battle_participants(ft_battles)
+    participants_path = processed_dir / "battle_participants.csv"
+    participants.to_csv(participants_path, index=False)
+    print(f"[build] wrote {len(participants)} participant rows -> {participants_path}")
+
     emcees_path = processed_dir / "emcees.csv"
-    write_emcees_table(ft_battles, emcees_path)
+    write_emcees_table(ft_battles, emcees_path, participants=participants)
     print(f"[build] wrote emcees table -> {emcees_path}")
 
     return battles_path, emcees_path
@@ -233,7 +240,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--audit",
         action="store_true",
-        help="Also write debug audit files (filtered_out.csv and upload_lineage.csv).",
+        help=(
+            "Also write debug audit files (filtered_out.csv, upload_lineage.csv, "
+            "manual_matchup_needed.csv)."
+        ),
     )
     parser.add_argument(
         "--debug-dir",
@@ -258,12 +268,13 @@ def main(argv: list[str] | None = None) -> None:
     rebuild_processed(raw_dir=args.raw_dir, processed_dir=args.processed_dir)
 
     if args.audit:
-        excluded_path, lineage_path = write_audit_outputs(
+        excluded_path, lineage_path, manual_path = write_audit_outputs(
             raw_dir=args.raw_dir,
             debug_dir=args.debug_dir,
         )
         print(f"[audit] wrote filtered uploads -> {excluded_path}")
         print(f"[audit] wrote upload lineage -> {lineage_path}")
+        print(f"[audit] wrote manual matchup queue -> {manual_path}")
 
     print("[done] refresh complete.")
 

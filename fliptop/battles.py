@@ -46,6 +46,7 @@ from .overrides import (
     load_event_location_overrides,
     load_event_location_patterns,
     load_location_aliases,
+    load_manual_matchups,
 )
 from .rename_map import load_rename_map
 
@@ -55,6 +56,7 @@ from .rename_map import load_rename_map
 
 PathLike = str | Path
 RenameMap = Mapping[str, str]
+ManualMatchupMap = Mapping[str, Mapping[str, str | None]]
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +286,100 @@ def keep_1v1(df: pd.DataFrame) -> pd.DataFrame:
     return df.loc[~not_1v1]
 
 
+def _resolved_manual_matchup_ids(
+    manual_matchups: ManualMatchupMap | None,
+) -> set[str]:
+    if not manual_matchups:
+        return set()
+    return {
+        str(battle_id)
+        for battle_id, row in manual_matchups.items()
+        if row.get("emcee1") and row.get("emcee2")
+    }
+
+
+def _pending_manual_matchup_ids(
+    manual_matchups: ManualMatchupMap | None,
+) -> set[str]:
+    if not manual_matchups:
+        return set()
+    return {
+        str(battle_id)
+        for battle_id, row in manual_matchups.items()
+        if not (row.get("emcee1") and row.get("emcee2"))
+    }
+
+
+def _manual_matchup_notes(manual_matchups: ManualMatchupMap | None) -> dict[str, object]:
+    if not manual_matchups:
+        return {}
+    return {
+        str(battle_id): row.get("note") or pd.NA
+        for battle_id, row in manual_matchups.items()
+    }
+
+
+def _manual_matchup_audit_fields(
+    manual_matchups: ManualMatchupMap | None,
+    rename_map: RenameMap | None = None,
+) -> pd.DataFrame:
+    if not manual_matchups:
+        return pd.DataFrame(
+            columns=[
+                "battle_key",
+                "helper_emcee",
+                "emcee1_status",
+                "emcee2_status",
+                "helper_status",
+                "manual_note",
+            ]
+        )
+    if rename_map is None:
+        rename_map = load_rename_map()
+
+    rows = []
+    for battle_id, row in manual_matchups.items():
+        helper = row.get("helper_emcee")
+        if helper:
+            helper = rename_map.get(str(helper).strip(), str(helper).strip())
+        rows.append(
+            {
+                "battle_key": str(battle_id),
+                "helper_emcee": helper or pd.NA,
+                "emcee1_status": row.get("emcee1_status") or pd.NA,
+                "emcee2_status": row.get("emcee2_status") or pd.NA,
+                "helper_status": row.get("helper_status") or pd.NA,
+                "manual_note": row.get("note") or pd.NA,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def keep_1v1_or_manual_matchup(
+    df: pd.DataFrame,
+    manual_matchups: ManualMatchupMap | None = None,
+) -> pd.DataFrame:
+    """
+    Keep normal 1v1-looking titles plus explicitly resolved manual matchups.
+
+    This lets a hand-reviewed no-show title such as ``A + B vs C`` enter the
+    pipeline once ``manual_matchups.csv`` records the actual 1v1 matchup, while
+    keeping the broad ``+`` heuristic conservative for everything else.
+    """
+    kept = keep_1v1(df)
+    resolved_ids = _resolved_manual_matchup_ids(manual_matchups)
+    if not resolved_ids or "id" not in df.columns:
+        return kept
+
+    already_kept = set(kept["id"].astype(str)) if "id" in kept.columns else set()
+    manual = df[
+        df["id"].astype(str).isin(resolved_ids - already_kept)
+    ]
+    if manual.empty:
+        return kept
+    return pd.concat([kept, manual], ignore_index=True)
+
+
 def copy_yt_title(df: pd.DataFrame) -> pd.DataFrame:
     """
     Preserve the cleaned YouTube title (including any 'pt. N' suffix)
@@ -396,6 +492,36 @@ def add_matchup_and_split(df: pd.DataFrame) -> pd.DataFrame:
     out["emcee1"] = out["emcee1"].str.strip()
     out["emcee2"] = out["emcee2"].str.strip()
 
+    return out
+
+
+def apply_manual_matchup_overrides(
+    df: pd.DataFrame,
+    manual_matchups: ManualMatchupMap | None = None,
+) -> pd.DataFrame:
+    """
+    Override ``matchup``, ``emcee1``, and ``emcee2`` for resolved manual rows.
+
+    Pending rows in ``manual_matchups.csv`` use ``NA`` for both names and are
+    ignored here; they are only surfaced in audit output.
+    """
+    if not manual_matchups or "id" not in df.columns:
+        return df
+
+    out = df.copy()
+    ids = out["id"].astype(str)
+    for battle_id, row in manual_matchups.items():
+        emcee1 = row.get("emcee1")
+        emcee2 = row.get("emcee2")
+        if not emcee1 or not emcee2:
+            continue
+
+        mask = ids == str(battle_id)
+        if not bool(mask.any()):
+            continue
+        out.loc[mask, "matchup"] = f"{emcee1} vs {emcee2}"
+        out.loc[mask, "emcee1"] = emcee1
+        out.loc[mask, "emcee2"] = emcee2
     return out
 
 
@@ -1004,6 +1130,7 @@ def impute_event_dates_from_versetracker(
 def make_df_1v1_uploads(
     df_yt: pd.DataFrame,
     rename_map: RenameMap | None = None,
+    manual_matchups: ManualMatchupMap | None = None,
 ) -> pd.DataFrame:
     """
     From raw YouTube uploads to a clean table of 1v1 battle uploads.
@@ -1019,8 +1146,9 @@ def make_df_1v1_uploads(
         -> strip_pt_suffix_from_title   (remove 'pt. N' from working title)
         -> filter_titles_with_vs        (keep only titles containing 'vs')
         -> drop_non_battles             (remove flyers/trailers/etc)
-        -> keep_1v1                     (heuristics to keep likely 1v1 battles)
+        -> keep_1v1_or_manual_matchup   (heuristics + resolved manual no-shows)
         -> add_matchup_and_split        (matchup, emcee1, emcee2)
+        -> apply_manual_matchup_overrides
         -> apply_emcee_rename           (canonicalize emcee names)
         -> add_matchup_clean            ('emcee1 vs emcee2' using canonical names)
 
@@ -1039,13 +1167,16 @@ def make_df_1v1_uploads(
     """
     if rename_map is None:
         rename_map = load_rename_map()
+    if manual_matchups is None:
+        manual_matchups = load_manual_matchups()
 
     df = (
         prepare_uploads(df_yt)
         .pipe(filter_titles_with_vs)
         .pipe(drop_non_battles)
-        .pipe(keep_1v1)
+        .pipe(keep_1v1_or_manual_matchup, manual_matchups=manual_matchups)
         .pipe(add_matchup_and_split)
+        .pipe(apply_manual_matchup_overrides, manual_matchups=manual_matchups)
         .pipe(apply_emcee_rename, rename_map=rename_map)
         .pipe(add_matchup_clean)
     )
@@ -1107,13 +1238,17 @@ def _matched_exclusion_keyword(row):
 def _filter_upload_stages(
     df_yt: pd.DataFrame,
     df_events: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    manual_matchups: ManualMatchupMap | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
-    Run the upload filters once and return ``(prepared, kept, excluded)``.
+    Run the upload filters once and return ``(prepared, kept, excluded, pending)``.
 
     ``excluded`` records the first stage that removed each upload. This is the
     shared spine for both ``build_excluded_uploads`` and ``build_upload_lineage``.
     """
+    if manual_matchups is None:
+        manual_matchups = load_manual_matchups()
+
     pre = prepare_uploads(df_yt)
 
     def _dropped(
@@ -1130,7 +1265,50 @@ def _filter_upload_stages(
 
     after_vs = filter_titles_with_vs(pre)
     after_nonbattle = drop_non_battles(after_vs)
-    after_1v1 = keep_1v1(after_nonbattle)
+
+    pending_ids = _pending_manual_matchup_ids(manual_matchups)
+    is_pending_manual = (
+        after_nonbattle["id"].astype(str).isin(pending_ids)
+        if "id" in after_nonbattle.columns
+        else pd.Series(False, index=after_nonbattle.index)
+    )
+    pending_manual = after_nonbattle.loc[is_pending_manual].copy()
+    if not pending_manual.empty:
+        event_lookup = _event_name_lookup(df_events)
+        if not event_lookup.empty:
+            pending_manual = pending_manual.merge(event_lookup, on="id", how="left")
+            pending_manual["event_name"] = pending_manual["_event_name_lookup"]
+            pending_manual = pending_manual.drop(columns=["_event_name_lookup"])
+
+    if "event_name" in pending_manual.columns:
+        pending_excluded_event = pending_manual["event_name"].astype("string").str.contains(
+            EXCLUDE_EVENT_RE,
+            na=False,
+        )
+    else:
+        pending_excluded_event = pd.Series(False, index=pending_manual.index)
+
+    needs_manual = pending_manual.loc[~pending_excluded_event].copy()
+    if not needs_manual.empty:
+        needs_manual["pipeline_status"] = "needs_manual_matchup"
+        needs_manual["stage"] = "manual_matchup_override"
+        needs_manual["manual_note"] = needs_manual["id"].astype(str).map(
+            _manual_matchup_notes(manual_matchups)
+        )
+    pending_event_excluded = pending_manual.loc[pending_excluded_event].copy()
+    if not pending_event_excluded.empty:
+        pending_event_excluded["pipeline_status"] = "excluded"
+        pending_event_excluded["stage"] = "drop_excluded_events"
+        pending_event_excluded["excluded_reason"] = "excluded event"
+        pending_event_excluded["manual_note"] = pending_event_excluded["id"].astype(str).map(
+            _manual_matchup_notes(manual_matchups)
+        )
+
+    not_pending = after_nonbattle.loc[~is_pending_manual]
+    after_1v1 = keep_1v1_or_manual_matchup(
+        not_pending,
+        manual_matchups=manual_matchups,
+    )
     with_event_meta = attach_event_metadata(after_1v1, df_events)
     after_event_filter = drop_excluded_events(with_event_meta)
 
@@ -1143,13 +1321,14 @@ def _filter_upload_stages(
                 "non-battle keyword",
                 "drop_non_battles",
             ),
-            _dropped(after_nonbattle, after_1v1, "not 1v1", "keep_1v1"),
+            _dropped(not_pending, after_1v1, "not 1v1", "keep_1v1"),
             _dropped(
                 with_event_meta,
                 after_event_filter,
                 "excluded event",
                 "drop_excluded_events",
             ),
+            pending_event_excluded,
         ],
         ignore_index=True,
     )
@@ -1167,14 +1346,25 @@ def _filter_upload_stages(
             excluded["event_name"] = excluded["_event_name_lookup"]
         excluded = excluded.drop(columns=["_event_name_lookup"])
 
+        if not needs_manual.empty:
+            needs_manual = needs_manual.merge(event_lookup, on="id", how="left")
+            if "event_name" in needs_manual.columns:
+                needs_manual["event_name"] = needs_manual["event_name"].fillna(
+                    needs_manual["_event_name_lookup"]
+                )
+            else:
+                needs_manual["event_name"] = needs_manual["_event_name_lookup"]
+            needs_manual = needs_manual.drop(columns=["_event_name_lookup"])
+
     excluded["matched_keyword"] = excluded.apply(_matched_exclusion_keyword, axis=1)
-    return pre, after_event_filter, excluded
+    return pre, after_event_filter, excluded, needs_manual
 
 
 def build_excluded_uploads(
     raw_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
     events_csv_name: str = "matchup_events_metadata.csv",
+    manual_matchups: ManualMatchupMap | None = None,
 ) -> pd.DataFrame:
     """
     Return the raw uploads that the pipeline drops, tagged with the reason.
@@ -1198,7 +1388,11 @@ def build_excluded_uploads(
     raw_dir = Path(raw_dir)
     df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
     df_events = load_event_metadata(raw_dir / events_csv_name)
-    _, _, excluded = _filter_upload_stages(df_yt, df_events)
+    _, _, excluded, _ = _filter_upload_stages(
+        df_yt,
+        df_events,
+        manual_matchups=manual_matchups,
+    )
 
     cols = [
         "id",
@@ -1226,6 +1420,7 @@ UPLOAD_LINEAGE_COLUMNS = [
     "stage",
     "excluded_reason",
     "matched_keyword",
+    "manual_note",
     "event_name",
     "event_date",
     "event_date_source",
@@ -1234,6 +1429,10 @@ UPLOAD_LINEAGE_COLUMNS = [
     "final_matchup",
     "emcee1",
     "emcee2",
+    "helper_emcee",
+    "emcee1_status",
+    "emcee2_status",
+    "helper_status",
     "source_part_number",
     "annotation_status",
     "battle_type",
@@ -1249,6 +1448,7 @@ def build_upload_lineage(
     events_csv_name: str = "matchup_events_metadata.csv",
     versetracker_csv_name: str = "versetracker_event_dates.csv",
     rename_map: RenameMap | None = None,
+    manual_matchups: ManualMatchupMap | None = None,
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
     battle_metadata: pd.DataFrame | None = None,
     results: pd.DataFrame | None = None,
@@ -1260,6 +1460,8 @@ def build_upload_lineage(
     ``youtube_videos.json`` row is tagged as:
 
     - ``excluded``: removed by the first recorded filter stage;
+    - ``needs_manual_matchup``: explicitly known battle whose title needs a
+      hand-entered 1v1 matchup before it can enter the final output;
     - ``included``: source upload is the published battle key;
     - ``consolidated_part``: source upload was folded into a multi-part battle
       whose key is another source id.
@@ -1273,7 +1475,13 @@ def build_upload_lineage(
     raw_dir = Path(raw_dir)
     df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
     df_events = load_event_metadata(raw_dir / events_csv_name)
-    prepared, _kept, excluded = _filter_upload_stages(df_yt, df_events)
+    if manual_matchups is None:
+        manual_matchups = load_manual_matchups()
+    prepared, _kept, excluded, needs_manual = _filter_upload_stages(
+        df_yt,
+        df_events,
+        manual_matchups=manual_matchups,
+    )
 
     base_cols = ["id", "yt_raw_title", "title", "upload_date", "url"]
     lineage = prepared[[c for c in base_cols if c in prepared.columns]].copy()
@@ -1296,13 +1504,35 @@ def build_upload_lineage(
         excluded_lookup["id"] = excluded_lookup["id"].astype(str)
         excluded_lookup = excluded_lookup.set_index("id")
         is_excluded = lineage["id"].isin(excluded_lookup.index)
-        for col in ["pipeline_status", "stage", "excluded_reason", "matched_keyword"]:
+        for col in [
+            "pipeline_status",
+            "stage",
+            "excluded_reason",
+            "matched_keyword",
+            "manual_note",
+        ]:
+            if col not in excluded_lookup.columns:
+                continue
             lineage.loc[is_excluded, col] = lineage.loc[is_excluded, "id"].map(
                 excluded_lookup[col]
             )
         if "event_name" in excluded_lookup.columns:
             lineage.loc[is_excluded, "event_name"] = lineage.loc[is_excluded, "id"].map(
                 excluded_lookup["event_name"]
+            )
+
+    if not needs_manual.empty:
+        manual_lookup = needs_manual.drop_duplicates(subset=["id"]).copy()
+        manual_lookup["id"] = manual_lookup["id"].astype(str)
+        manual_lookup = manual_lookup.set_index("id")
+        is_manual = lineage["id"].isin(manual_lookup.index)
+        for col in ["pipeline_status", "stage", "manual_note"]:
+            lineage.loc[is_manual, col] = lineage.loc[is_manual, "id"].map(
+                manual_lookup[col]
+            )
+        if "event_name" in manual_lookup.columns:
+            lineage.loc[is_manual, "event_name"] = lineage.loc[is_manual, "id"].map(
+                manual_lookup["event_name"]
             )
 
     if battle_metadata is None:
@@ -1312,6 +1542,7 @@ def build_upload_lineage(
             events_csv_name=events_csv_name,
             versetracker_csv_name=versetracker_csv_name,
             rename_map=rename_map,
+            manual_matchups=manual_matchups,
             vt_event_dates=vt_event_dates,
         )
 
@@ -1362,6 +1593,22 @@ def build_upload_lineage(
                 final_lookup[col]
             )
 
+    manual_fields = _manual_matchup_audit_fields(manual_matchups, rename_map=rename_map)
+    if not manual_fields.empty:
+        manual_lookup = manual_fields.set_index("battle_key")
+        lineage_keys = lineage["battle_key"].where(lineage["battle_key"].notna(), lineage["id"])
+        is_manual = lineage_keys.isin(manual_lookup.index)
+        for col in [
+            "helper_emcee",
+            "emcee1_status",
+            "emcee2_status",
+            "helper_status",
+            "manual_note",
+        ]:
+            lineage.loc[is_manual, col] = lineage_keys.loc[is_manual].map(
+                manual_lookup[col]
+            )
+
     if results is None:
         results = load_results()
 
@@ -1389,18 +1636,59 @@ def build_upload_lineage(
     return lineage
 
 
+def build_manual_matchup_review_uploads(
+    raw_dir: PathLike,
+    youtube_json_name: str = "youtube_videos.json",
+    events_csv_name: str = "matchup_events_metadata.csv",
+    manual_matchups: ManualMatchupMap | None = None,
+) -> pd.DataFrame:
+    """
+    Return known battle uploads awaiting a hand-entered 1v1 matchup.
+
+    These rows are listed in ``data/overrides/manual_matchups.csv`` with
+    ``emcee1=NA`` and ``emcee2=NA``. They are intentionally removed from the
+    generic ``filtered_out.csv`` audit, but are not included in final battle
+    metadata until the two emcee columns are resolved.
+    """
+    raw_dir = Path(raw_dir)
+    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
+    df_events = load_event_metadata(raw_dir / events_csv_name)
+    _, _, _, needs_manual = _filter_upload_stages(
+        df_yt,
+        df_events,
+        manual_matchups=manual_matchups,
+    )
+
+    cols = [
+        "id",
+        "yt_raw_title",
+        "title",
+        "event_name",
+        "upload_date",
+        "url",
+        "stage",
+        "manual_note",
+    ]
+    needs_manual = needs_manual[[c for c in cols if c in needs_manual.columns]]
+    if "upload_date" in needs_manual.columns:
+        needs_manual = needs_manual.sort_values("upload_date").reset_index(drop=True)
+    return needs_manual
+
+
 def write_audit_outputs(
     raw_dir: PathLike,
     debug_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
     events_csv_name: str = "matchup_events_metadata.csv",
-) -> tuple[Path, Path]:
+    manual_matchups: ManualMatchupMap | None = None,
+) -> tuple[Path, Path, Path]:
     """
     Write the reproducible debug audit files and return their paths.
 
     Outputs:
     - ``filtered_out.csv``: compatibility view from ``build_excluded_uploads``;
     - ``upload_lineage.csv``: one row per raw YouTube upload.
+    - ``manual_matchup_needed.csv``: known battles awaiting manual matchup rows.
     """
     debug_dir = Path(debug_dir)
     debug_dir.mkdir(parents=True, exist_ok=True)
@@ -1409,18 +1697,28 @@ def write_audit_outputs(
         raw_dir=raw_dir,
         youtube_json_name=youtube_json_name,
         events_csv_name=events_csv_name,
+        manual_matchups=manual_matchups,
     )
     lineage = build_upload_lineage(
         raw_dir=raw_dir,
         youtube_json_name=youtube_json_name,
         events_csv_name=events_csv_name,
+        manual_matchups=manual_matchups,
+    )
+    manual_needed = build_manual_matchup_review_uploads(
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+        manual_matchups=manual_matchups,
     )
 
     excluded_path = debug_dir / "filtered_out.csv"
     lineage_path = debug_dir / "upload_lineage.csv"
+    manual_path = debug_dir / "manual_matchup_needed.csv"
     excluded.to_csv(excluded_path, index=False)
     lineage.to_csv(lineage_path, index=False)
-    return excluded_path, lineage_path
+    manual_needed.to_csv(manual_path, index=False)
+    return excluded_path, lineage_path, manual_path
 
 
 def attach_event_metadata(
@@ -1782,6 +2080,7 @@ def build_battle_metadata(
     events_csv_name: str = "matchup_events_metadata.csv",
     versetracker_csv_name: str = "versetracker_event_dates.csv",
     rename_map: RenameMap | None = None,
+    manual_matchups: ManualMatchupMap | None = None,
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
 ) -> pd.DataFrame:
     """
@@ -1800,6 +2099,9 @@ def build_battle_metadata(
         COVID-masked event_dates.
     rename_map:
         Optional emcee rename map for canonicalization.
+    manual_matchups:
+        Optional manual matchup overrides for no-show/ambiguous titles. ``None``
+        loads ``data/overrides/manual_matchups.csv``; pass ``{}`` to disable.
     vt_event_dates:
         Optional ``{event_name: first-day date}`` map for date imputation. If
         ``None`` (default) it is loaded from ``raw_dir / versetracker_csv_name``;
@@ -1821,8 +2123,14 @@ def build_battle_metadata(
 
     df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
     df_events = load_event_metadata(raw_dir / events_csv_name)
+    if manual_matchups is None:
+        manual_matchups = load_manual_matchups()
 
-    df_1v1 = make_df_1v1_uploads(df_yt, rename_map=rename_map)
+    df_1v1 = make_df_1v1_uploads(
+        df_yt,
+        rename_map=rename_map,
+        manual_matchups=manual_matchups,
+    )
     df_with_meta = attach_event_metadata(df_1v1, df_events)
     df_with_meta = drop_excluded_events(df_with_meta)
     battle_metadata = finalize_battles(df_with_meta, vt_event_dates=vt_event_dates)
@@ -1885,6 +2193,7 @@ def build_ft_battles(
     events_csv_name: str = "matchup_events_metadata.csv",
     versetracker_csv_name: str = "versetracker_event_dates.csv",
     rename_map: RenameMap | None = None,
+    manual_matchups: ManualMatchupMap | None = None,
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
     results: pd.DataFrame | None = None,
     require_results: bool = True,
@@ -1903,6 +2212,7 @@ def build_ft_battles(
         events_csv_name=events_csv_name,
         versetracker_csv_name=versetracker_csv_name,
         rename_map=rename_map,
+        manual_matchups=manual_matchups,
         vt_event_dates=vt_event_dates,
     )
     return build_ft_battles_from_metadata(

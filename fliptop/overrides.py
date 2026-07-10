@@ -10,12 +10,13 @@ fixes as literal dicts in the build code, they live as small reference-data CSVs
 edited like the project's other data (see :mod:`fliptop.rename_map`) - and the build
 pipeline applies them.
 
-Four tables, each keyed differently:
+Five tables, each keyed differently:
 
     event_locations.csv          event_name -> event_location   (exact event_name match)
     event_location_patterns.csv  substring  -> event_location   (event_location contains)
     location_aliases.csv         location   -> canonical         (exact value match)
     event_dates.csv              id         -> event_date (ISO)  (exact video-id match)
+    manual_matchups.csv          id         -> matchup/roles     (exact video-id match)
 
 Every table carries a free-text ``note`` column recording *why* the correction
 exists; it is ignored on load. Loading validates the required columns, skips blank
@@ -37,6 +38,7 @@ EVENT_LOCATIONS_CSV = OVERRIDES_DIR / "event_locations.csv"
 EVENT_LOCATION_PATTERNS_CSV = OVERRIDES_DIR / "event_location_patterns.csv"
 LOCATION_ALIASES_CSV = OVERRIDES_DIR / "location_aliases.csv"
 EVENT_DATES_CSV = OVERRIDES_DIR / "event_dates.csv"
+MANUAL_MATCHUPS_CSV = OVERRIDES_DIR / "manual_matchups.csv"
 
 
 def _load_mapping(path: PathLike, key_col: str, value_col: str) -> dict[str, str]:
@@ -106,3 +108,123 @@ def load_location_aliases(path: PathLike = LOCATION_ALIASES_CSV) -> dict[str, st
 def load_event_date_overrides(path: PathLike = EVENT_DATES_CSV) -> dict[str, str]:
     """Load ``YouTube video id -> corrected event_date`` (ISO date string)."""
     return _load_mapping(path, "id", "event_date")
+
+
+def _manual_name(value: str | None) -> str | None:
+    """Normalize unresolved manual-matchup markers."""
+    value = (value or "").strip()
+    if not value or value.casefold() == "na":
+        return None
+    return value
+
+
+MANUAL_PARTICIPATION_STATUSES = {"appeared", "no_show"}
+
+
+def _manual_status(value: str | None) -> str | None:
+    """Normalize manual participation status markers."""
+    value = (value or "").strip()
+    if not value or value.casefold() == "na":
+        return None
+    status = value.casefold()
+    if status not in MANUAL_PARTICIPATION_STATUSES:
+        allowed = ", ".join(sorted(MANUAL_PARTICIPATION_STATUSES | {"NA"}))
+        raise ValueError(f"participation status must be one of: {allowed}")
+    return status
+
+
+def load_manual_matchups(
+    path: PathLike = MANUAL_MATCHUPS_CSV,
+) -> dict[str, dict[str, str | None]]:
+    """
+    Load manually resolved or pending matchup/participation overrides.
+
+    Rows with ``emcee1`` and ``emcee2`` set to ``NA`` are intentional pending
+    work: the pipeline surfaces them in audit output but does not publish them
+    as final battles until both names are filled in. Resolved no-show rows also
+    record participation status so event-history analyses can credit only the
+    emcees who actually appeared.
+    """
+    path = Path(path)
+    if not path.exists():
+        return {}
+
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        required = {
+            "id",
+            "emcee1",
+            "emcee2",
+            "helper_emcee",
+            "emcee1_status",
+            "emcee2_status",
+            "helper_status",
+        }
+        if reader.fieldnames is None or not required <= set(reader.fieldnames):
+            raise ValueError(
+                f"{path}: expected columns {sorted(required)}, got {reader.fieldnames}"
+            )
+
+        overrides: dict[str, dict[str, str | None]] = {}
+        for lineno, row in enumerate(reader, start=2):
+            battle_id = (row.get("id") or "").strip()
+            emcee1 = _manual_name(row.get("emcee1"))
+            emcee2 = _manual_name(row.get("emcee2"))
+            helper_emcee = _manual_name(row.get("helper_emcee"))
+            try:
+                emcee1_status = _manual_status(row.get("emcee1_status"))
+                emcee2_status = _manual_status(row.get("emcee2_status"))
+                helper_status = _manual_status(row.get("helper_status"))
+            except ValueError as exc:
+                raise ValueError(f"{path}:{lineno}: {exc}") from exc
+            note = (row.get("note") or "").strip() or None
+
+            if not any(
+                [
+                    battle_id,
+                    emcee1,
+                    emcee2,
+                    helper_emcee,
+                    emcee1_status,
+                    emcee2_status,
+                    helper_status,
+                    note,
+                ]
+            ):
+                continue
+            if not battle_id:
+                raise ValueError(f"{path}:{lineno}: 'id' is required")
+            if bool(emcee1) != bool(emcee2):
+                raise ValueError(
+                    f"{path}:{lineno}: emcee1 and emcee2 must both be filled "
+                    "or both be NA"
+                )
+            if bool(emcee1_status) != bool(emcee1) or bool(emcee2_status) != bool(emcee2):
+                raise ValueError(
+                    f"{path}:{lineno}: emcee1/emcee2 statuses must match "
+                    "whether emcee1/emcee2 are filled"
+                )
+            if bool(helper_emcee) != bool(helper_status):
+                raise ValueError(
+                    f"{path}:{lineno}: helper_emcee and helper_status must "
+                    "both be filled or both be NA"
+                )
+            if helper_status is not None and helper_status != "appeared":
+                raise ValueError(f"{path}:{lineno}: helper_status must be 'appeared'")
+
+            value = {
+                "emcee1": emcee1,
+                "emcee2": emcee2,
+                "helper_emcee": helper_emcee,
+                "emcee1_status": emcee1_status,
+                "emcee2_status": emcee2_status,
+                "helper_status": helper_status,
+                "note": note,
+            }
+            if battle_id in overrides and overrides[battle_id] != value:
+                raise ValueError(
+                    f"{path}:{lineno}: {battle_id!r} has conflicting manual matchups"
+                )
+            overrides[battle_id] = value
+
+    return overrides

@@ -66,7 +66,7 @@ def test_excluded_tags_event_name_filter(tmp_path):
 
 def test_excluded_ids_disjoint_from_final_battles():
     ex = build_excluded_uploads(RAW_DATA_DIR)
-    df = build_ft_battles(raw_dir=RAW_DATA_DIR)
+    df = build_ft_battles(raw_dir=RAW_DATA_DIR, require_results=False)
 
     final_ids = set()
     for v in df["id"]:
@@ -94,10 +94,13 @@ def test_real_event_exclusions_are_complete_and_keep_first_reason():
     ]
     audited = ex[ex["id"].isin(related["video_id"])]
 
+    # One known no-show battle lives under POI. Manual no-show handling lets it
+    # reach the event filter, but the POI exclusion still wins.
+    assert "IO6AaGSupuY" in set(related["video_id"])
+    assert "IO6AaGSupuY" in set(audited["id"])
     assert len(related) == len(audited) == 26
     assert audited["excluded_reason"].value_counts().to_dict() == {
-        "excluded event": 18,
+        "excluded event": 19,
         "non-battle keyword": 6,
         "no 'vs' token": 1,
-        "not 1v1": 1,
     }

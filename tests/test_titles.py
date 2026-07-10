@@ -18,6 +18,7 @@ from fliptop.battles import (
     drop_non_battles,
     filter_titles_with_vs,
     keep_1v1,
+    keep_1v1_or_manual_matchup,
 )
 
 # ---------------------------------------------------------------------------
@@ -118,3 +119,21 @@ def test_keep_1v1_non_string_titles_are_dropped():
     df = pd.DataFrame({"title": ["Loonie vs Abra", None, 12345]})
     out = keep_1v1(df)
     assert out["title"].tolist() == ["Loonie vs Abra"]
+
+
+def test_resolved_manual_matchup_can_keep_plus_title():
+    df = pd.DataFrame({"id": ["noshow"], "title": ["FlipTop - A + B vs C"]})
+    manual = {"noshow": {"emcee1": "B", "emcee2": "C", "note": "watched"}}
+
+    out = keep_1v1_or_manual_matchup(df, manual_matchups=manual)
+
+    assert out["id"].tolist() == ["noshow"]
+
+
+def test_pending_manual_matchup_does_not_keep_plus_title():
+    df = pd.DataFrame({"id": ["noshow"], "title": ["FlipTop - A + B vs C"]})
+    manual = {"noshow": {"emcee1": None, "emcee2": None, "note": "needs watching"}}
+
+    out = keep_1v1_or_manual_matchup(df, manual_matchups=manual)
+
+    assert out.empty

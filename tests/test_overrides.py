@@ -34,6 +34,37 @@ def test_load_event_date_overrides(tmp_path):
     assert ov.load_event_date_overrides(csv) == {"IdPP-JPtk4M": "2023-09-29"}
 
 
+def test_load_manual_matchups_with_pending_and_resolved_rows(tmp_path):
+    csv = _write(
+        tmp_path / "m.csv",
+        "id,emcee1,emcee2,helper_emcee,emcee1_status,emcee2_status,helper_status,note",
+        [
+            "pending,NA,NA,NA,NA,NA,NA,needs watching",
+            "resolved,A,B,C,appeared,no_show,appeared,watched",
+        ],
+    )
+    assert ov.load_manual_matchups(csv) == {
+        "pending": {
+            "emcee1": None,
+            "emcee2": None,
+            "helper_emcee": None,
+            "emcee1_status": None,
+            "emcee2_status": None,
+            "helper_status": None,
+            "note": "needs watching",
+        },
+        "resolved": {
+            "emcee1": "A",
+            "emcee2": "B",
+            "helper_emcee": "C",
+            "emcee1_status": "appeared",
+            "emcee2_status": "no_show",
+            "helper_status": "appeared",
+            "note": "watched",
+        },
+    }
+
+
 def test_load_location_aliases(tmp_path):
     csv = _write(
         tmp_path / "a.csv",
@@ -104,6 +135,36 @@ def test_half_empty_row_raises(tmp_path):
         ov.load_event_date_overrides(p)
 
 
+def test_manual_matchups_require_both_emcees_or_na(tmp_path):
+    csv = _write(
+        tmp_path / "m.csv",
+        "id,emcee1,emcee2,helper_emcee,emcee1_status,emcee2_status,helper_status,note",
+        ["abc,A,NA,NA,appeared,NA,NA,partial"],
+    )
+    with pytest.raises(ValueError, match="both be filled"):
+        ov.load_manual_matchups(csv)
+
+
+def test_manual_matchups_require_statuses_for_filled_emcees(tmp_path):
+    csv = _write(
+        tmp_path / "m.csv",
+        "id,emcee1,emcee2,helper_emcee,emcee1_status,emcee2_status,helper_status,note",
+        ["abc,A,B,NA,appeared,NA,NA,missing status"],
+    )
+    with pytest.raises(ValueError, match="statuses must match"):
+        ov.load_manual_matchups(csv)
+
+
+def test_manual_matchups_reject_bad_status(tmp_path):
+    csv = _write(
+        tmp_path / "m.csv",
+        "id,emcee1,emcee2,helper_emcee,emcee1_status,emcee2_status,helper_status,note",
+        ["abc,A,B,C,appeared,absent,appeared,bad"],
+    )
+    with pytest.raises(ValueError, match="participation status"):
+        ov.load_manual_matchups(csv)
+
+
 # ---------------------------------------------------------------------------
 # the committed data
 # ---------------------------------------------------------------------------
@@ -121,3 +182,7 @@ def test_shipped_csvs_load_with_expected_keys():
         "D' mention",
         "FlipTop Baraks, Mandaluyong City, Philippines",
     )
+    manual = ov.load_manual_matchups()
+    assert manual["Um2XyeCDEew"]["helper_emcee"] == "Aelekz"
+    assert manual["Um2XyeCDEew"]["emcee2_status"] == "no_show"
+    assert manual["IO6AaGSupuY"]["emcee2"] is None

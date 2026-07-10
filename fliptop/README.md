@@ -114,12 +114,14 @@ counts as a battle:
 | ------ | ------------- |
 | `filter_titles_with_vs` | keep only titles containing the token `vs` |
 | `drop_non_battles` | drop titles matching `EXCLUDE_KEYWORDS` (beatbox, tryout, flyer, `[LIVE]`, …) — matched as **substrings**, case-insensitive. Title-labeled promo battles are kept and classified later via annotations. |
-| `keep_1v1` | drop multi-emcee formats: `>1 vs`, `/`, `+`, `N on M`, `and … vs … and` |
+| `keep_1v1_or_manual_matchup` | drop multi-emcee formats (`>1 vs`, `/`, `+`, `N on M`, `and ... vs ... and`) unless a resolved row in `data/overrides/manual_matchups.csv` supplies the actual 1v1 matchup |
 
 and finally extracts the matchup:
 
 - `add_matchup_and_split` → `matchup`, `emcee1`, `emcee2` (also strips a trailing
   `- Finals`-style annotation)
+- `apply_manual_matchup_overrides` → replace ambiguous no-show titles with a
+  hand-entered `emcee1 vs emcee2` when available
 - `apply_emcee_rename` → canonicalize names via the alias map (**exact, case-sensitive** match)
 - `add_matchup_clean` → `matchup_clean` from the canonical names
 
@@ -146,7 +148,9 @@ After metadata attachment, `drop_excluded_events` removes rows whose
 `event_name` contains `Process of Illumination` or `tryout` (case-insensitive).
 These categories cannot be filtered reliably during Stage 1 because many of
 their YouTube titles contain neither phrase. The event exclusions are separate
-from `EXCLUDE_KEYWORDS`, which remains title-only.
+from `EXCLUDE_KEYWORDS`, which remains title-only. Event exclusions still win
+over manual no-show handling: a known no-show battle in a POI/tryout event stays
+excluded with the rest of that event category.
 
 `clean_event_location` also normalizes known messiness: prefers the text after
 `@`, fixes the country separator (`City. Philippines` / `Metro Manila
@@ -256,9 +260,13 @@ Rich audit fields such as `description`, `duration_hms`, and
 To verify the filters aren't dropping real battles, use the lineage audit:
 `build_upload_lineage(raw_dir)` returns **one row per raw YouTube upload** and
 records what happened to it. Rows are tagged as `included`, `excluded`, or
-`consolidated_part` (for the second upload in a multi-part battle), with the
-filter stage, exclusion reason, matched keyword, final battle key, canonical
-matchup, and annotation status where applicable.
+`consolidated_part` (for the second upload in a multi-part battle). A fourth
+status, `needs_manual_matchup`, marks known no-show battles whose title names
+multiple possible emcees and whose actual 1v1 matchup still needs to be filled
+in `data/overrides/manual_matchups.csv`, unless the row is excluded by event
+category first. The lineage includes the filter stage, exclusion reason, matched
+keyword, final battle key, canonical matchup, manual note, and annotation status
+where applicable.
 
 For the narrower compatibility view, `build_excluded_uploads(raw_dir)` returns
 only the removed uploads, tagged with the reason (`no 'vs' token`,
@@ -282,8 +290,9 @@ fliptop-refresh --audit
 ```
 
 This writes `data/debug/upload_lineage.csv` and
-`data/debug/filtered_out.csv`. The `data/debug/` directory is git-ignored; these
-files are regenerated audit outputs, not hand-maintained data.
+`data/debug/filtered_out.csv`, plus `data/debug/manual_matchup_needed.csv` for
+pending no-show/ambiguous titles. The `data/debug/` directory is git-ignored;
+these files are regenerated audit outputs, not hand-maintained data.
 
 ---
 
@@ -297,14 +306,23 @@ be a natural addition here.)
 - **Emcee table** (`build_emcees_table`) — every distinct name across
   `emcee1`/`emcee2`, sorted, with a stable 1-based `emcee_id`;
   `write_emcees_table` writes it to `data/processed/emcees.csv`.
+- **Battle participants** (`build_battle_participants`) — one row per emcee
+  participation. Use `appearance_credit` for event-history / survival analyses;
+  no-show opponents have `appearance_credit=False`, while helper emcees have
+  `appearance_credit=True` and `battle_credit=False`.
 - **Battle network** (`build_battle_network`) — an undirected weighted graph:
   nodes are emcees (with a `battle_count`), edges mean two emcees battled (with
   `weight` = how many times).
 
 ```python
-from fliptop.structures import build_emcees_table, build_battle_network
+from fliptop.structures import (
+    build_battle_network,
+    build_battle_participants,
+    build_emcees_table,
+)
 
-df_emcees = build_emcees_table(ft_battles)
+participants = build_battle_participants(ft_battles)
+df_emcees = build_emcees_table(ft_battles, participants=participants)
 G = build_battle_network(ft_battles)   # networkx.Graph
 ```
 
@@ -457,8 +475,9 @@ fliptop-refresh --audit                # rebuild and write data/debug audit file
   [`scripts/README.md`](../scripts/README.md) for the overwrite-vs-merge
   trade-off.
 - `--audit` writes `data/debug/filtered_out.csv` and
-  `data/debug/upload_lineage.csv` after a successful rebuild, so the local debug
-  files always come from the current code and raw data.
+  `data/debug/upload_lineage.csv`, plus
+  `data/debug/manual_matchup_needed.csv` after a successful rebuild, so the local
+  debug files always come from the current code and raw data.
 
 This is the recommended way to regenerate data. The Python API below is for when
 you want the table in memory or finer control.
@@ -477,6 +496,9 @@ from fliptop import (
     build_ft_battles,        # raw + annotations -> final ft_battles
     build_excluded_uploads,  # audit of dropped uploads
     build_upload_lineage,    # audit of every raw YouTube upload
+    build_manual_matchup_review_uploads,  # pending manual matchup queue
+    build_battle_participants,  # ft_battles -> long participant table
+    write_battle_participants_table,
     build_emcees_table,      # ft_battles -> emcee table
     write_emcees_table,
     build_battle_network,    # ft_battles -> networkx graph
