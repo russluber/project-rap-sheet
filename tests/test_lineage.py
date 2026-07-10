@@ -13,6 +13,8 @@ from fliptop.battles import (
     build_battle_metadata,
     build_excluded_uploads,
     build_manual_matchup_review_uploads,
+    build_pipeline_stage_drops,
+    build_pipeline_stage_summary,
     build_upload_lineage,
     load_youtube_uploads,
     write_audit_outputs,
@@ -87,6 +89,81 @@ def test_pending_manual_matchup_is_surfaced_not_filtered(tmp_path):
     assert lineage.loc["noshow", "pipeline_status"] == "needs_manual_matchup"
     assert lineage.loc["noshow", "manual_note"] == "needs watching"
     assert needed["id"].tolist() == ["noshow"]
+
+
+def test_pipeline_stage_summary_counts_filters_and_manual_queue(tmp_path):
+    videos = [
+        {"id": "keep1", "title": "FlipTop - Loonie vs Abra", "upload_date": "2020-01-01T00:00:00Z", "duration": "PT10M", "url": "u1"},
+        {"id": "novs", "title": "FlipTop Trailer", "upload_date": "2020-01-02T00:00:00Z", "duration": "PT10M", "url": "u2"},
+        {"id": "bbox", "title": "FlipTop - A vs B beatbox", "upload_date": "2020-01-03T00:00:00Z", "duration": "PT10M", "url": "u3"},
+        {"id": "three", "title": "FlipTop - A vs B vs C", "upload_date": "2020-01-04T00:00:00Z", "duration": "PT10M", "url": "u4"},
+        {"id": "manual", "title": "FlipTop - A + B vs C", "upload_date": "2020-01-05T00:00:00Z", "duration": "PT10M", "url": "u5"},
+    ]
+    manual = {
+        "manual": {
+            "emcee1": None,
+            "emcee2": None,
+            "helper_emcee": None,
+            "emcee1_status": None,
+            "emcee2_status": None,
+            "helper_status": None,
+            "note": "needs watching",
+        }
+    }
+
+    summary = build_pipeline_stage_summary(
+        _write_raw(tmp_path, videos),
+        rename_map={},
+        manual_matchups=manual,
+        vt_event_dates={},
+    ).set_index("stage")
+
+    assert summary.loc["raw_youtube", "output_rows"] == 5
+    assert summary.loc["filter_titles_with_vs", "output_rows"] == 4
+    assert summary.loc["filter_titles_with_vs", "exit_rows"] == 1
+    assert summary.loc["drop_non_battles", "output_rows"] == 3
+    assert summary.loc["drop_non_battles", "exit_rows"] == 1
+    assert summary.loc["manual_matchup_review_split", "output_rows"] == 2
+    assert summary.loc["manual_matchup_review_split", "exit_rows"] == 1
+    assert summary.loc["keep_1v1_or_manual_matchup", "output_rows"] == 1
+    assert summary.loc["keep_1v1_or_manual_matchup", "exit_rows"] == 1
+    assert summary.loc["finalize_battle_metadata", "output_rows"] == 1
+    assert summary.loc["publish_ft_battles", "output_rows"] == 1
+
+
+def test_pipeline_stage_drops_lists_exact_filter_and_manual_exits(tmp_path):
+    videos = [
+        {"id": "keep1", "title": "FlipTop - Loonie vs Abra", "upload_date": "2020-01-01T00:00:00Z", "duration": "PT10M", "url": "u1"},
+        {"id": "novs", "title": "FlipTop Trailer", "upload_date": "2020-01-02T00:00:00Z", "duration": "PT10M", "url": "u2"},
+        {"id": "bbox", "title": "FlipTop - A vs B beatbox", "upload_date": "2020-01-03T00:00:00Z", "duration": "PT10M", "url": "u3"},
+        {"id": "three", "title": "FlipTop - A vs B vs C", "upload_date": "2020-01-04T00:00:00Z", "duration": "PT10M", "url": "u4"},
+        {"id": "manual", "title": "FlipTop - A + B vs C", "upload_date": "2020-01-05T00:00:00Z", "duration": "PT10M", "url": "u5"},
+    ]
+    manual = {
+        "manual": {
+            "emcee1": None,
+            "emcee2": None,
+            "helper_emcee": None,
+            "emcee1_status": None,
+            "emcee2_status": None,
+            "helper_status": None,
+            "note": "needs watching",
+        }
+    }
+
+    drops = build_pipeline_stage_drops(
+        _write_raw(tmp_path, videos),
+        manual_matchups=manual,
+    ).set_index("id")
+
+    assert set(drops.index) == {"novs", "bbox", "three", "manual"}
+    assert drops.loc["novs", "stage"] == "filter_titles_with_vs"
+    assert drops.loc["novs", "excluded_reason"] == "no 'vs' token"
+    assert drops.loc["bbox", "stage"] == "drop_non_battles"
+    assert drops.loc["bbox", "matched_keyword"] == "beatbox"
+    assert drops.loc["three", "stage"] == "keep_1v1"
+    assert drops.loc["manual", "pipeline_status"] == "needs_manual_matchup"
+    assert drops.loc["manual", "manual_note"] == "needs watching"
 
 
 def test_resolved_manual_matchup_survives_plus_title_for_in_scope_event(tmp_path):
@@ -174,6 +251,25 @@ def test_real_lineage_has_one_row_per_raw_upload_and_matches_excluded_view():
     assert reasons == expected_reasons
 
 
+def test_real_pipeline_stage_drops_matches_excluded_and_manual_queue():
+    excluded = build_excluded_uploads(RAW_DATA_DIR)
+    manual = build_manual_matchup_review_uploads(RAW_DATA_DIR)
+    drops = build_pipeline_stage_drops(RAW_DATA_DIR)
+
+    excluded_drops = drops[drops["pipeline_status"] == "excluded"]
+    manual_drops = drops[drops["pipeline_status"] == "needs_manual_matchup"]
+
+    assert set(excluded_drops["id"]) == set(excluded["id"].astype(str))
+    assert set(manual_drops["id"]) == set(manual["id"].astype(str))
+    assert set(drops["stage"]) <= {
+        "filter_titles_with_vs",
+        "drop_non_battles",
+        "manual_matchup_override",
+        "keep_1v1",
+        "drop_excluded_events",
+    }
+
+
 def test_real_lineage_accounts_for_every_upload_once():
     lineage = build_upload_lineage(RAW_DATA_DIR)
 
@@ -211,17 +307,34 @@ def test_real_no_show_manual_matchups_are_not_generic_exclusions_unless_event_ex
 
 
 def test_write_audit_outputs_writes_filtered_and_lineage_files(tmp_path):
-    excluded_path, lineage_path, manual_path = write_audit_outputs(RAW_DATA_DIR, tmp_path)
+    (
+        excluded_path,
+        lineage_path,
+        manual_path,
+        summary_path,
+        drops_path,
+    ) = write_audit_outputs(RAW_DATA_DIR, tmp_path)
 
     assert excluded_path.exists()
     assert lineage_path.exists()
     assert manual_path.exists()
+    assert summary_path.exists()
+    assert drops_path.exists()
     assert excluded_path.name == "filtered_out.csv"
     assert lineage_path.name == "upload_lineage.csv"
     assert manual_path.name == "manual_matchup_needed.csv"
+    assert summary_path.name == "pipeline_summary.csv"
+    assert drops_path.name == "pipeline_stage_drops.csv"
 
     lineage = pd.read_csv(lineage_path)
     manual = pd.read_csv(manual_path)
+    summary = pd.read_csv(summary_path)
+    drops = pd.read_csv(drops_path)
     raw = load_youtube_uploads(RAW_DATA_DIR / "youtube_videos.json")
     assert len(lineage) == len(raw)
     assert manual.empty
+    assert summary.loc[summary["stage"] == "raw_youtube", "output_rows"].iloc[0] == len(raw)
+    non_final = lineage[
+        lineage["pipeline_status"].isin(["excluded", "needs_manual_matchup"])
+    ]
+    assert set(drops["id"]) == set(non_final["id"])

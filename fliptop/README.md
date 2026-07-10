@@ -276,9 +276,12 @@ they cannot drift apart.
 
 ```python
 from fliptop import RAW_DATA_DIR, build_excluded_uploads, build_upload_lineage
+from fliptop.battles import build_pipeline_stage_drops, build_pipeline_stage_summary
 
 lineage = build_upload_lineage(RAW_DATA_DIR)
 excluded = build_excluded_uploads(RAW_DATA_DIR)
+summary = build_pipeline_stage_summary(RAW_DATA_DIR)
+drops = build_pipeline_stage_drops(RAW_DATA_DIR)
 lineage["pipeline_status"].value_counts()
 excluded["excluded_reason"].value_counts()
 ```
@@ -289,10 +292,15 @@ To write the local debug artifacts, run:
 fliptop-refresh --audit
 ```
 
-This writes `data/debug/upload_lineage.csv` and
-`data/debug/filtered_out.csv`, plus `data/debug/manual_matchup_needed.csv` for
-pending no-show/ambiguous titles. The `data/debug/` directory is git-ignored;
-these files are regenerated audit outputs, not hand-maintained data.
+This writes `data/debug/upload_lineage.csv`,
+`data/debug/filtered_out.csv`, `data/debug/manual_matchup_needed.csv`,
+`data/debug/pipeline_summary.csv`, and
+`data/debug/pipeline_stage_drops.csv`. The summary file gives row counts at
+each major stage. The stage-drops file lists exact ids exiting at
+filter/manual-review stages, while `filtered_out.csv` remains the narrower
+compatibility view of true exclusions. The `data/debug/` directory is
+git-ignored; these files are regenerated audit outputs, not hand-maintained
+data.
 
 ---
 
@@ -474,9 +482,10 @@ fliptop-refresh --audit                # rebuild and write data/debug audit file
   Run a plain `--fetch` periodically for a clean full reconcile. See
   [`scripts/README.md`](../scripts/README.md) for the overwrite-vs-merge
   trade-off.
-- `--audit` writes `data/debug/filtered_out.csv` and
-  `data/debug/upload_lineage.csv`, plus
-  `data/debug/manual_matchup_needed.csv` after a successful rebuild, so the local
+- `--audit` writes `data/debug/filtered_out.csv`,
+  `data/debug/upload_lineage.csv`, `data/debug/manual_matchup_needed.csv`,
+  `data/debug/pipeline_summary.csv`, and
+  `data/debug/pipeline_stage_drops.csv` after a successful rebuild, so the local
   debug files always come from the current code and raw data.
 
 This is the recommended way to regenerate data. The Python API below is for when

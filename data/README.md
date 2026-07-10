@@ -268,8 +268,12 @@ reproducible — it's hand-entered, so it's the one thing here worth guarding.
 
 `data/debug/` is git-ignored and regenerated on demand with
 `fliptop-refresh --audit`. It includes `filtered_out.csv`,
-`manual_matchup_needed.csv`, plus `upload_lineage.csv`, a one-row-per-raw-upload
-audit of what the pipeline did with each source row.
+`manual_matchup_needed.csv`, `pipeline_summary.csv`,
+`pipeline_stage_drops.csv`, plus `upload_lineage.csv`, a one-row-per-raw-upload
+audit of what the pipeline did with each source row. Use
+`pipeline_summary.csv` for stage-by-stage row counts and
+`pipeline_stage_drops.csv` for the exact ids that exited at filter/manual-review
+stages.
 
 ## Conventions
 

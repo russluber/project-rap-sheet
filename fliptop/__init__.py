@@ -38,6 +38,8 @@ __all__ = [
     "build_excluded_uploads",
     "build_upload_lineage",
     "build_manual_matchup_review_uploads",
+    "build_pipeline_stage_summary",
+    "build_pipeline_stage_drops",
     "build_battle_participants",
     "write_battle_participants_table",
     "build_emcees_table",
@@ -60,6 +62,8 @@ _LAZY = {
         ".battles",
         "build_manual_matchup_review_uploads",
     ),
+    "build_pipeline_stage_summary": (".battles", "build_pipeline_stage_summary"),
+    "build_pipeline_stage_drops": (".battles", "build_pipeline_stage_drops"),
     "build_battle_participants": (".structures", "build_battle_participants"),
     "write_battle_participants_table": (
         ".structures",
@@ -81,6 +85,8 @@ if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
         build_ft_battles,
         build_ft_battles_from_metadata,
         build_manual_matchup_review_uploads,
+        build_pipeline_stage_drops,
+        build_pipeline_stage_summary,
         build_upload_lineage,
     )
     from .structures import (

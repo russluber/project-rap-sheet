@@ -1235,16 +1235,17 @@ def _matched_exclusion_keyword(row):
     return m.group(0) if m else pd.NA
 
 
-def _filter_upload_stages(
+def _upload_stage_trace(
     df_yt: pd.DataFrame,
     df_events: pd.DataFrame,
     manual_matchups: ManualMatchupMap | None = None,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+) -> tuple[dict[str, pd.DataFrame], pd.DataFrame, pd.DataFrame]:
     """
-    Run the upload filters once and return ``(prepared, kept, excluded, pending)``.
+    Run the upload filters once and return stage frames plus row exits.
 
-    ``excluded`` records the first stage that removed each upload. This is the
-    shared spine for both ``build_excluded_uploads`` and ``build_upload_lineage``.
+    ``excluded`` records the first filter that removed each upload. ``pending``
+    records known battle uploads held for manual matchup resolution. This is
+    the shared spine for the exclusion audit, lineage audit, and stage summary.
     """
     if manual_matchups is None:
         manual_matchups = load_manual_matchups()
@@ -1304,7 +1305,7 @@ def _filter_upload_stages(
             _manual_matchup_notes(manual_matchups)
         )
 
-    not_pending = after_nonbattle.loc[~is_pending_manual]
+    not_pending = after_nonbattle.loc[~is_pending_manual].copy()
     after_1v1 = keep_1v1_or_manual_matchup(
         not_pending,
         manual_matchups=manual_matchups,
@@ -1357,7 +1358,41 @@ def _filter_upload_stages(
             needs_manual = needs_manual.drop(columns=["_event_name_lookup"])
 
     excluded["matched_keyword"] = excluded.apply(_matched_exclusion_keyword, axis=1)
-    return pre, after_event_filter, excluded, needs_manual
+    trace = {
+        "raw_youtube": df_yt.copy(),
+        "prepare_uploads": pre,
+        "filter_titles_with_vs": after_vs,
+        "drop_non_battles": after_nonbattle,
+        "manual_matchup_review_split": not_pending,
+        "keep_1v1_or_manual_matchup": after_1v1,
+        "attach_event_metadata": with_event_meta,
+        "drop_excluded_events": after_event_filter,
+    }
+    return trace, excluded, needs_manual
+
+
+def _filter_upload_stages(
+    df_yt: pd.DataFrame,
+    df_events: pd.DataFrame,
+    manual_matchups: ManualMatchupMap | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Run the upload filters once and return ``(prepared, kept, excluded, pending)``.
+
+    ``excluded`` records the first stage that removed each upload. This is the
+    compatibility API shared by the older audit helpers.
+    """
+    trace, excluded, needs_manual = _upload_stage_trace(
+        df_yt,
+        df_events,
+        manual_matchups=manual_matchups,
+    )
+    return (
+        trace["prepare_uploads"],
+        trace["drop_excluded_events"],
+        excluded,
+        needs_manual,
+    )
 
 
 def build_excluded_uploads(
@@ -1439,6 +1474,32 @@ UPLOAD_LINEAGE_COLUMNS = [
     "winner",
     "votes_winner",
     "votes_loser",
+]
+
+PIPELINE_SUMMARY_COLUMNS = [
+    "stage_order",
+    "stage",
+    "input_rows",
+    "output_rows",
+    "delta_rows",
+    "exit_rows",
+    "exit_status",
+    "note",
+]
+
+PIPELINE_STAGE_DROP_COLUMNS = [
+    "stage_order",
+    "id",
+    "pipeline_status",
+    "stage",
+    "excluded_reason",
+    "matched_keyword",
+    "manual_note",
+    "yt_raw_title",
+    "title",
+    "event_name",
+    "upload_date",
+    "url",
 ]
 
 
@@ -1675,13 +1736,255 @@ def build_manual_matchup_review_uploads(
     return needs_manual
 
 
+def _summary_delta(input_rows: object, output_rows: object) -> object:
+    if input_rows is pd.NA or output_rows is pd.NA:
+        return pd.NA
+    return int(output_rows) - int(input_rows)
+
+
+def _pipeline_summary_row(
+    *,
+    stage_order: int,
+    stage: str,
+    input_rows: object,
+    output_rows: object,
+    exit_rows: int = 0,
+    exit_status: str = "",
+    note: str = "",
+) -> dict[str, object]:
+    return {
+        "stage_order": stage_order,
+        "stage": stage,
+        "input_rows": input_rows,
+        "output_rows": output_rows,
+        "delta_rows": _summary_delta(input_rows, output_rows),
+        "exit_rows": int(exit_rows),
+        "exit_status": exit_status,
+        "note": note,
+    }
+
+
+def build_pipeline_stage_summary(
+    raw_dir: PathLike,
+    youtube_json_name: str = "youtube_videos.json",
+    events_csv_name: str = "matchup_events_metadata.csv",
+    versetracker_csv_name: str = "versetracker_event_dates.csv",
+    rename_map: RenameMap | None = None,
+    manual_matchups: ManualMatchupMap | None = None,
+    vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
+    battle_metadata: pd.DataFrame | None = None,
+    ft_battles: pd.DataFrame | None = None,
+) -> pd.DataFrame:
+    """
+    Summarize raw-to-output row counts at each major wrangling stage.
+
+    This is the compact companion to ``upload_lineage.csv``: it explains the
+    row-count changes step by step, while ``build_pipeline_stage_drops`` lists
+    the exact upload ids that exited at filter/manual-review stages.
+    """
+    raw_dir = Path(raw_dir)
+    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
+    df_events = load_event_metadata(raw_dir / events_csv_name)
+    if manual_matchups is None:
+        manual_matchups = load_manual_matchups()
+
+    trace, excluded, needs_manual = _upload_stage_trace(
+        df_yt,
+        df_events,
+        manual_matchups=manual_matchups,
+    )
+
+    event_drops = excluded[excluded["stage"] == "drop_excluded_events"]
+    event_stage_ids = (
+        set(trace["attach_event_metadata"]["id"].astype(str))
+        if "id" in trace["attach_event_metadata"].columns
+        else set()
+    )
+    pending_event_drops = event_drops[
+        ~event_drops["id"].astype(str).isin(event_stage_ids)
+    ]
+
+    if battle_metadata is None:
+        battle_metadata = build_battle_metadata(
+            raw_dir=raw_dir,
+            youtube_json_name=youtube_json_name,
+            events_csv_name=events_csv_name,
+            versetracker_csv_name=versetracker_csv_name,
+            rename_map=rename_map,
+            manual_matchups=manual_matchups,
+            vt_event_dates=vt_event_dates,
+        )
+    if ft_battles is None:
+        ft_battles = build_ft_battles_from_metadata(
+            battle_metadata,
+            require_results=False,
+        )
+
+    def drop_count(stage: str) -> int:
+        return int((excluded["stage"] == stage).sum())
+
+    raw_n = len(trace["raw_youtube"])
+    prepared_n = len(trace["prepare_uploads"])
+    with_vs_n = len(trace["filter_titles_with_vs"])
+    nonbattle_n = len(trace["drop_non_battles"])
+    manual_flow_n = len(trace["manual_matchup_review_split"])
+    manual_output_n = manual_flow_n + len(pending_event_drops)
+    one_v_one_n = len(trace["keep_1v1_or_manual_matchup"])
+    with_event_n = len(trace["attach_event_metadata"])
+    event_input_n = with_event_n + len(pending_event_drops)
+    event_output_n = len(trace["drop_excluded_events"])
+    metadata_n = len(battle_metadata)
+    final_n = len(ft_battles)
+
+    rows = [
+        _pipeline_summary_row(
+            stage_order=1,
+            stage="raw_youtube",
+            input_rows=pd.NA,
+            output_rows=raw_n,
+            note="Rows loaded from youtube_videos.json.",
+        ),
+        _pipeline_summary_row(
+            stage_order=2,
+            stage="prepare_uploads",
+            input_rows=raw_n,
+            output_rows=prepared_n,
+            note="Clean titles, parse dates/durations, numeric metrics, and preserve yt_raw_title.",
+        ),
+        _pipeline_summary_row(
+            stage_order=3,
+            stage="filter_titles_with_vs",
+            input_rows=prepared_n,
+            output_rows=with_vs_n,
+            exit_rows=drop_count("filter_titles_with_vs"),
+            exit_status="excluded",
+            note="Keep uploads whose working title contains a standalone 'vs' token.",
+        ),
+        _pipeline_summary_row(
+            stage_order=4,
+            stage="drop_non_battles",
+            input_rows=with_vs_n,
+            output_rows=nonbattle_n,
+            exit_rows=drop_count("drop_non_battles"),
+            exit_status="excluded",
+            note="Remove title-keyword matches such as flyers, trailers, interviews, and other non-battles.",
+        ),
+        _pipeline_summary_row(
+            stage_order=5,
+            stage="manual_matchup_review_split",
+            input_rows=nonbattle_n,
+            output_rows=manual_output_n,
+            exit_rows=len(needs_manual),
+            exit_status="needs_manual_matchup",
+            note=(
+                "Hold unresolved manual matchups for review; resolved manual rows continue. "
+                "Pending rows in excluded event categories are credited to drop_excluded_events."
+            ),
+        ),
+        _pipeline_summary_row(
+            stage_order=6,
+            stage="keep_1v1_or_manual_matchup",
+            input_rows=manual_flow_n,
+            output_rows=one_v_one_n,
+            exit_rows=drop_count("keep_1v1"),
+            exit_status="excluded",
+            note="Keep normal 1v1-looking titles plus explicitly resolved manual matchups.",
+        ),
+        _pipeline_summary_row(
+            stage_order=7,
+            stage="attach_event_metadata",
+            input_rows=one_v_one_n,
+            output_rows=with_event_n,
+            note="Merge scraped event name, date, and location metadata by upload id.",
+        ),
+        _pipeline_summary_row(
+            stage_order=8,
+            stage="drop_excluded_events",
+            input_rows=event_input_n,
+            output_rows=event_output_n,
+            exit_rows=drop_count("drop_excluded_events"),
+            exit_status="excluded",
+            note="Remove excluded event categories such as Process of Illumination and tryouts.",
+        ),
+        _pipeline_summary_row(
+            stage_order=9,
+            stage="finalize_battle_metadata",
+            input_rows=event_output_n,
+            output_rows=metadata_n,
+            exit_rows=max(event_output_n - metadata_n, 0),
+            exit_status="row_count_change",
+            note="Consolidate multi-part uploads, apply date/location fixes, and select metadata columns.",
+        ),
+        _pipeline_summary_row(
+            stage_order=10,
+            stage="publish_ft_battles",
+            input_rows=metadata_n,
+            output_rows=final_n,
+            exit_rows=max(metadata_n - final_n, 0),
+            exit_status="row_count_change",
+            note="Join annotation results by battle key and select the final analysis columns.",
+        ),
+    ]
+    return pd.DataFrame(rows, columns=PIPELINE_SUMMARY_COLUMNS)
+
+
+def build_pipeline_stage_drops(
+    raw_dir: PathLike,
+    youtube_json_name: str = "youtube_videos.json",
+    events_csv_name: str = "matchup_events_metadata.csv",
+    manual_matchups: ManualMatchupMap | None = None,
+) -> pd.DataFrame:
+    """
+    Return the exact raw upload rows that exit at filter/manual-review stages.
+
+    ``filtered_out.csv`` remains the narrower compatibility view of excluded
+    rows. This table keeps the stage/status columns, so manual-review holds are
+    visible alongside true exclusions.
+    """
+    raw_dir = Path(raw_dir)
+    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
+    df_events = load_event_metadata(raw_dir / events_csv_name)
+    if manual_matchups is None:
+        manual_matchups = load_manual_matchups()
+
+    _, excluded, needs_manual = _upload_stage_trace(
+        df_yt,
+        df_events,
+        manual_matchups=manual_matchups,
+    )
+
+    exits = pd.concat([excluded, needs_manual], ignore_index=True)
+    if exits.empty:
+        return pd.DataFrame(columns=PIPELINE_STAGE_DROP_COLUMNS)
+
+    stage_order = {
+        "filter_titles_with_vs": 3,
+        "drop_non_battles": 4,
+        "manual_matchup_override": 5,
+        "keep_1v1": 6,
+        "drop_excluded_events": 8,
+    }
+    exits["stage_order"] = exits["stage"].map(stage_order).fillna(99).astype(int)
+
+    for col in PIPELINE_STAGE_DROP_COLUMNS:
+        if col not in exits.columns:
+            exits[col] = pd.NA
+
+    exits = exits[PIPELINE_STAGE_DROP_COLUMNS]
+    sort_cols = ["stage_order"]
+    if "upload_date" in exits.columns:
+        sort_cols.append("upload_date")
+    sort_cols.append("id")
+    return exits.sort_values(sort_cols, na_position="last").reset_index(drop=True)
+
+
 def write_audit_outputs(
     raw_dir: PathLike,
     debug_dir: PathLike,
     youtube_json_name: str = "youtube_videos.json",
     events_csv_name: str = "matchup_events_metadata.csv",
     manual_matchups: ManualMatchupMap | None = None,
-) -> tuple[Path, Path, Path]:
+) -> tuple[Path, Path, Path, Path, Path]:
     """
     Write the reproducible debug audit files and return their paths.
 
@@ -1689,6 +1992,8 @@ def write_audit_outputs(
     - ``filtered_out.csv``: compatibility view from ``build_excluded_uploads``;
     - ``upload_lineage.csv``: one row per raw YouTube upload.
     - ``manual_matchup_needed.csv``: known battles awaiting manual matchup rows.
+    - ``pipeline_summary.csv``: row counts at each major pipeline stage.
+    - ``pipeline_stage_drops.csv``: exact ids exiting at filter/manual stages.
     """
     debug_dir = Path(debug_dir)
     debug_dir.mkdir(parents=True, exist_ok=True)
@@ -1711,14 +2016,30 @@ def write_audit_outputs(
         events_csv_name=events_csv_name,
         manual_matchups=manual_matchups,
     )
+    pipeline_summary = build_pipeline_stage_summary(
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+        manual_matchups=manual_matchups,
+    )
+    pipeline_drops = build_pipeline_stage_drops(
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+        manual_matchups=manual_matchups,
+    )
 
     excluded_path = debug_dir / "filtered_out.csv"
     lineage_path = debug_dir / "upload_lineage.csv"
     manual_path = debug_dir / "manual_matchup_needed.csv"
+    summary_path = debug_dir / "pipeline_summary.csv"
+    drops_path = debug_dir / "pipeline_stage_drops.csv"
     excluded.to_csv(excluded_path, index=False)
     lineage.to_csv(lineage_path, index=False)
     manual_needed.to_csv(manual_path, index=False)
-    return excluded_path, lineage_path, manual_path
+    pipeline_summary.to_csv(summary_path, index=False)
+    pipeline_drops.to_csv(drops_path, index=False)
+    return excluded_path, lineage_path, manual_path, summary_path, drops_path
 
 
 def attach_event_metadata(

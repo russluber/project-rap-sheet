@@ -167,10 +167,14 @@ fliptop-refresh --audit                # also write local data/debug audit files
   into the existing data — much faster for routine top-ups. See
   `scripts/README.md` for the trade-off.
 - `--audit` writes regenerated local debug files:
-  `data/debug/filtered_out.csv`, `data/debug/upload_lineage.csv`, and
-  `data/debug/manual_matchup_needed.csv`. The lineage file has one row per raw
-  YouTube upload and records whether each upload was included, excluded, folded
-  into a multi-part battle, or held for manual matchup resolution.
+  `data/debug/filtered_out.csv`, `data/debug/upload_lineage.csv`,
+  `data/debug/manual_matchup_needed.csv`, `data/debug/pipeline_summary.csv`,
+  and `data/debug/pipeline_stage_drops.csv`. The lineage file has one row per
+  raw YouTube upload and records whether each upload was included, excluded,
+  folded into a multi-part battle, or held for manual matchup resolution.
+  `pipeline_summary.csv` gives the row counts stage by stage, while
+  `pipeline_stage_drops.csv` lists the exact ids exiting at filter/manual-review
+  stages.
 
 Under the hood the command runs three stages — fetch YouTube uploads, scrape
 FlipTop event metadata, then build the cleaned tables. You can also drive these

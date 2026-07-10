@@ -29,6 +29,8 @@ With ``--audit`` it also writes reproducible debug files under ``data/debug``:
     - filtered_out.csv
     - upload_lineage.csv
     - manual_matchup_needed.csv
+    - pipeline_summary.csv
+    - pipeline_stage_drops.csv
 """
 
 from __future__ import annotations
@@ -242,7 +244,8 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help=(
             "Also write debug audit files (filtered_out.csv, upload_lineage.csv, "
-            "manual_matchup_needed.csv)."
+            "manual_matchup_needed.csv, pipeline_summary.csv, "
+            "pipeline_stage_drops.csv)."
         ),
     )
     parser.add_argument(
@@ -268,13 +271,21 @@ def main(argv: list[str] | None = None) -> None:
     rebuild_processed(raw_dir=args.raw_dir, processed_dir=args.processed_dir)
 
     if args.audit:
-        excluded_path, lineage_path, manual_path = write_audit_outputs(
+        (
+            excluded_path,
+            lineage_path,
+            manual_path,
+            summary_path,
+            drops_path,
+        ) = write_audit_outputs(
             raw_dir=args.raw_dir,
             debug_dir=args.debug_dir,
         )
         print(f"[audit] wrote filtered uploads -> {excluded_path}")
         print(f"[audit] wrote upload lineage -> {lineage_path}")
         print(f"[audit] wrote manual matchup queue -> {manual_path}")
+        print(f"[audit] wrote pipeline summary -> {summary_path}")
+        print(f"[audit] wrote pipeline stage drops -> {drops_path}")
 
     print("[done] refresh complete.")
 
