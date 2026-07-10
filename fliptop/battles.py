@@ -8,7 +8,8 @@ one-row-per-battle metadata table, then publish the result-enriched
 Typical notebook usage:
 
     from fliptop import RAW_DATA_DIR, PROCESSED_DATA_DIR
-    from fliptop.battles import build_ft_battles, build_battle_metadata, write_ft_battles
+    from fliptop import build_ft_battles, build_battle_metadata
+    from fliptop.publish import write_ft_battles
 
     battle_metadata = build_battle_metadata(raw_dir=RAW_DATA_DIR)
     ft_battles = build_ft_battles(raw_dir=RAW_DATA_DIR)
@@ -38,6 +39,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import events as _events
+from . import publish as _publish
 from . import uploads as _uploads
 from .overrides import (
     load_manual_matchups,
@@ -332,57 +334,8 @@ METADATA_COLUMNS = [
     "url",
 ]
 
-# The columns build_ft_battles() emits, in order. This is the final wrangling
-# artifact: battle metadata plus the core result fields, with only the columns
-# needed for downstream analysis.
-FINAL_COLUMNS = [
-    "id",
-    "title",
-    "upload_date",
-    "duration_seconds",
-    "emcee1",
-    "emcee2",
-    "matchup",
-    "event_name",
-    "event_date",
-    "event_location",
-    "url",
-    "battle_type",
-    "winner",
-    "votes_winner",
-    "votes_loser",
-]
-
-# Columns that may appear in rich metadata or debug/audit surfaces, but should
-# never be published in ft_battles.json. The final table is intended to stand as
-# a clean analysis output, not a provenance dump.
-FINAL_OUTPUT_FORBIDDEN_COLUMNS = [
-    "description",
-    "duration_hms",
-    "event_date_source",
-    "yt_raw_title",
-    "event_description",
-    "video_id",
-    "matchup_clean",
-    "event_location_clean",
-    "source_part_number",
-    "pipeline_status",
-    "stage",
-    "excluded_reason",
-    "exit_category",
-    "matched_keyword",
-    "rule_id",
-    "rule_note",
-    "upload_decision",
-    "upload_decision_reason",
-    "upload_decision_note",
-    "manual_note",
-    "annotation_status",
-    "helper_emcee",
-    "emcee1_status",
-    "emcee2_status",
-    "helper_status",
-]
+FINAL_COLUMNS = _publish.FINAL_COLUMNS
+FINAL_OUTPUT_FORBIDDEN_COLUMNS = _publish.FINAL_OUTPUT_FORBIDDEN_COLUMNS
 
 
 def finalize_battles(
@@ -559,190 +512,32 @@ def build_battle_metadata(
 
 
 def build_ft_battles_from_metadata(
-    battle_metadata: pd.DataFrame,
-    results: pd.DataFrame | None = None,
-    *,
-    require_results: bool = True,
+    *args,
+    **kwargs,
 ) -> pd.DataFrame:
-    """
-    Publish the final result-enriched ``ft_battles`` table from metadata.
-
-    This is the final data-wrangling artifact. It joins the id-keyed battle
-    results onto the metadata table, converts multi-part ``id`` values to their
-    scalar battle key, and selects the stable analysis columns in
-    :data:`FINAL_COLUMNS`.
-
-    Parameters
-    ----------
-    battle_metadata:
-        Rich one-row-per-battle metadata from :func:`build_battle_metadata`.
-    results:
-        Optional battle-results DataFrame. If omitted,
-        ``data/annotations/battle_results.csv`` is loaded.
-    require_results:
-        When true, every battle must have a valid result row and every result row
-        must point to a battle in ``battle_metadata``. This should stay true for
-        the published output; pass false only for exploratory workflows.
-    """
-    from .annotations import battle_key, load_results, merge_results, validate_results_store
-
-    if results is None:
-        results = load_results()
-
-    problems = validate_results_store(
-        results,
-        battle_metadata,
-        require_complete=require_results,
-    )
-    if require_results and problems:
-        raise ValueError(
-            "battle results failed validation; refusing to build ft_battles:\n"
-            + "\n".join(f"  - {p}" for p in problems)
-        )
-
-    merged = merge_results(battle_metadata, results)
-    merged["id"] = merged["id"].map(battle_key)
-
-    existing_cols = [c for c in FINAL_COLUMNS if c in merged.columns]
-    return merged[existing_cols]
+    """Compatibility wrapper for :func:`fliptop.publish.build_ft_battles_from_metadata`."""
+    return _publish.build_ft_battles_from_metadata(*args, **kwargs)
 
 
 def build_ft_battles(
-    raw_dir: PathLike,
-    youtube_json_name: str = "youtube_videos.json",
-    events_csv_name: str = "matchup_events_metadata.csv",
-    versetracker_csv_name: str = "versetracker_event_dates.csv",
-    rename_map: RenameMap | None = None,
-    manual_matchups: ManualMatchupMap | None = None,
-    upload_decisions: UploadDecisionMap | None = None,
-    vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
-    results: pd.DataFrame | None = None,
-    require_results: bool = True,
+    *args,
+    **kwargs,
 ) -> pd.DataFrame:
-    """
-    Build the final result-enriched ``ft_battles`` table from raw files.
-
-    The output keeps only the project-level analysis columns and joins
-    ``battle_type``, ``winner``, ``votes_winner``, and ``votes_loser`` from the
-    annotations store. Use :func:`build_battle_metadata` when you need the rich
-    intermediate metadata with description/provenance columns.
-    """
-    battle_metadata = build_battle_metadata(
-        raw_dir=raw_dir,
-        youtube_json_name=youtube_json_name,
-        events_csv_name=events_csv_name,
-        versetracker_csv_name=versetracker_csv_name,
-        rename_map=rename_map,
-        manual_matchups=manual_matchups,
-        upload_decisions=upload_decisions,
-        vt_event_dates=vt_event_dates,
-    )
-    return build_ft_battles_from_metadata(
-        battle_metadata,
-        results=results,
-        require_results=require_results,
-    )
+    """Compatibility wrapper for :func:`fliptop.publish.build_ft_battles`."""
+    return _publish.build_ft_battles(*args, **kwargs)
 
 
 def write_ft_battles(
-    out_path: PathLike,
-    raw_dir: PathLike,
-    youtube_json_name: str = "youtube_videos.json",
-    events_csv_name: str = "matchup_events_metadata.csv",
-    rename_map: RenameMap | None = None,
-    manual_matchups: ManualMatchupMap | None = None,
-    upload_decisions: UploadDecisionMap | None = None,
-    fmt: str = "json",
+    *args,
+    **kwargs,
 ) -> Path:
-    """
-    Convenience helper to build the final result-enriched ft_battles table and
-    save it to disk.
-
-    Parameters
-    ----------
-    out_path:
-        Where to write the file, for example:
-          - data/processed/ft_battles.csv
-          - data/processed/ft_battles.json
-    raw_dir:
-        Directory that contains the raw data files under data/raw.
-    youtube_json_name:
-        File name of the YouTube uploads JSON.
-    events_csv_name:
-        File name of the scraped events CSV.
-    rename_map:
-        Optional emcee rename map for canonicalization.
-    manual_matchups:
-        Optional manual matchup overrides for ambiguous/no-show titles.
-    upload_decisions:
-        Optional exact include/exclude/review decisions for upload ids.
-    fmt:
-        "json" (default) or "csv". JSON is the default because consolidated
-        multi-part battles may store list-valued `url` values, which CSV cannot
-        represent or round-trip cleanly. The JSON output is newline-delimited
-        (one battle per line); reload it with `pd.read_json(path, lines=True)`.
-
-    Returns
-    -------
-    Path
-        The path that was written.
-    """
-    ft_battles = build_ft_battles(
-        raw_dir=raw_dir,
-        youtube_json_name=youtube_json_name,
-        events_csv_name=events_csv_name,
-        rename_map=rename_map,
-        manual_matchups=manual_matchups,
-        upload_decisions=upload_decisions,
-    )
-
-    return save_ft_battles(ft_battles, out_path, fmt=fmt)
+    """Compatibility wrapper for :func:`fliptop.publish.write_ft_battles`."""
+    return _publish.write_ft_battles(*args, **kwargs)
 
 
 def save_ft_battles(
-    ft_battles: pd.DataFrame,
-    out_path: PathLike,
-    fmt: str = "json",
+    *args,
+    **kwargs,
 ) -> Path:
-    """
-    Serialize an already-built ft_battles table to disk.
-
-    Split out from `write_ft_battles` so callers that already hold a built
-    ft_battles (for example the refresh CLI, which also writes the emcees
-    table from the same frame) do not have to rebuild it.
-
-    Parameters
-    ----------
-    ft_battles:
-        The battle-level table to write.
-    out_path:
-        Destination path, e.g. data/processed/ft_battles.json.
-    fmt:
-        "json" (default) or "csv". See `write_ft_battles` for why JSON is the
-        default (nested values do not round-trip through CSV cleanly).
-
-    Returns
-    -------
-    Path
-        The path that was written.
-    """
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    fmt = fmt.lower()
-    if fmt == "csv":
-        ft_battles.to_csv(out_path, index=False)
-    elif fmt == "json":
-        # newline-delimited JSON, one battle per line, UTF-8 friendly
-        ft_battles.to_json(
-            out_path,
-            orient="records",
-            lines=True,
-            date_format="epoch",
-            date_unit="ms",
-            force_ascii=False,
-        )
-    else:
-        raise ValueError(f"Unsupported fmt {fmt!r}; use 'csv' or 'json'.")
-
-    return out_path
+    """Compatibility wrapper for :func:`fliptop.publish.save_ft_battles`."""
+    return _publish.save_ft_battles(*args, **kwargs)

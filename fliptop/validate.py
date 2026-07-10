@@ -24,7 +24,8 @@ from datetime import date
 import pandas as pd
 
 from .annotations import BATTLE_TYPES, NA, battle_key, validate_votes, validate_winner
-from .battles import FINAL_COLUMNS, FINAL_OUTPUT_FORBIDDEN_COLUMNS, METADATA_COLUMNS
+from .battles import METADATA_COLUMNS
+from .publish import FINAL_COLUMNS, FINAL_OUTPUT_FORBIDDEN_COLUMNS
 
 # event_date_source is a small closed vocabulary; missing (undated battles) is ok.
 EVENT_DATE_SOURCES = {"website", "description", "versetracker", "manual"}

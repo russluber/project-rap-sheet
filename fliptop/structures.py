@@ -17,7 +17,7 @@ analysis) belong here too.
 Typical usage:
 
     from fliptop import RAW_DATA_DIR
-    from fliptop.battles import build_ft_battles
+    from fliptop import build_ft_battles
     from fliptop.structures import (
         build_battle_participants,
         build_emcees_table,

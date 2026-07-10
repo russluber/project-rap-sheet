@@ -54,8 +54,8 @@ __all__ = [
 # `import fliptop` does not eagerly load pandas/networkx.
 _LAZY = {
     "build_battle_metadata": (".battles", "build_battle_metadata"),
-    "build_ft_battles": (".battles", "build_ft_battles"),
-    "build_ft_battles_from_metadata": (".battles", "build_ft_battles_from_metadata"),
+    "build_ft_battles": (".publish", "build_ft_battles"),
+    "build_ft_battles_from_metadata": (".publish", "build_ft_battles_from_metadata"),
     "build_excluded_uploads": (".lineage", "build_excluded_uploads"),
     "build_upload_lineage": (".lineage", "build_upload_lineage"),
     "build_manual_matchup_review_uploads": (
@@ -79,11 +79,7 @@ _LAZY = {
 
 if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
     from .annotations import merge_results
-    from .battles import (
-        build_battle_metadata,
-        build_ft_battles,
-        build_ft_battles_from_metadata,
-    )
+    from .battles import build_battle_metadata
     from .lineage import (
         build_excluded_uploads,
         build_manual_matchup_review_uploads,
@@ -91,6 +87,7 @@ if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
         build_pipeline_stage_summary,
         build_upload_lineage,
     )
+    from .publish import build_ft_battles, build_ft_battles_from_metadata
     from .structures import (
         build_battle_network,
         build_battle_participants,

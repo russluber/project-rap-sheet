@@ -42,12 +42,12 @@ from datetime import date
 from pathlib import Path
 
 from . import DATA_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
-from .battles import (
-    build_battle_metadata,
+from .battles import build_battle_metadata
+from .lineage import write_audit_outputs
+from .publish import (
     build_ft_battles_from_metadata,
     save_ft_battles,
 )
-from .lineage import write_audit_outputs
 from .structures import build_battle_participants, write_emcees_table
 from .validate import (
     summarize_battle_metadata,

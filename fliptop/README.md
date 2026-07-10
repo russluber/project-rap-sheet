@@ -16,7 +16,7 @@ reimplement it.
 
 - [Architecture at a glance](#architecture-at-a-glance)
 - [Package layout](#package-layout)
-- [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`uploads.py`, `events.py`, `battles.py`)
+- [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`uploads.py`, `events.py`, `battles.py`, `publish.py`)
 - [`ft_battles` schema](#ft_battles-schema)
 - [Auditing upload lineage](#auditing-upload-lineage)
 - [Derived structures](#derived-structures) (`structures.py`)
@@ -37,7 +37,7 @@ modules consume it.
 
 ```
  data/raw/youtube_videos.json ─┐
-                               ├─► uploads.py ─► events.py ─► battles.py ─► ft_battles ──┬─► structures.py
+                               ├─► uploads.py ─► events.py ─► battles.py ─► publish.py ─► ft_battles ──┬─► structures.py
  data/raw/matchup_events_      ─┘   (+ emcee_aliases.csv)      │
    metadata.csv                                                ??? annotations.py (validated result store)
 
@@ -70,6 +70,7 @@ fliptop/
 ├── battles.py          # metadata/output orchestration: raw sources -> ft_battles
 ├── uploads.py          # upload-side cleaning, title filters, and matchup parsing
 ├── events.py           # event metadata parsing, date/location fixes, event joins
+├── publish.py          # final ft_battles schema, annotation join, and file writes
 ├── lineage.py          # audit tables explaining raw upload inclusion/exclusion
 ├── rename_map.py       # loads/validates the alias map from data/emcee_aliases.csv
 ├── overrides.py        # loads/validates the correction tables in data/overrides/
@@ -87,7 +88,8 @@ fliptop/
 
 `battles.py` orchestrates the metadata build. Upload-side cleaning and filters
 live in `uploads.py`; event metadata parsing and date/location fixes live in
-`events.py`; row-level audit tables live in `lineage.py`.
+`events.py`; final `ft_battles` publishing lives in `publish.py`; row-level
+audit tables live in `lineage.py`.
 `build_battle_metadata(raw_dir=...)` runs three cleaning stages and returns the
 rich metadata table. `build_ft_battles` then joins validated battle results and
 returns the final analysis table.
@@ -97,7 +99,9 @@ build_ft_battles
   ├─ make_df_1v1_uploads      Stage 1: raw YouTube uploads -> clean 1v1 uploads
   ├─ attach_event_metadata    Stage 2: merge event name / date / location
   ├─ drop_excluded_events              remove excluded event categories
-  └─ finalize_battles         Stage 3: consolidate parts, tidy, override, order
+  ├─ finalize_battles         Stage 3: consolidate parts, tidy, override, order
+  └─ publish.build_ft_battles_from_metadata
+                               Stage 4: join annotations and select final columns
 ```
 
 Each stage is a thin orchestration over small, single-purpose transforms (most
@@ -575,7 +579,7 @@ pass `fmt="json"` (the function also supports `fmt="csv"`):
 
 ```python
 from fliptop import RAW_DATA_DIR, PROCESSED_DATA_DIR
-from fliptop.battles import write_ft_battles
+from fliptop.publish import write_ft_battles
 
 write_ft_battles(
     out_path=PROCESSED_DATA_DIR / "ft_battles.json",

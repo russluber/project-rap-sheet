@@ -17,7 +17,6 @@ import pandas as pd
 
 from .battles import (
     build_battle_metadata,
-    build_ft_battles_from_metadata,
     load_event_metadata,
     load_youtube_uploads,
 )
@@ -28,6 +27,7 @@ from .events import (
     drop_excluded_events,
 )
 from .overrides import load_manual_matchups, load_upload_decisions
+from .publish import build_ft_battles_from_metadata
 from .rules import first_matching_rule
 from .uploads import (
     TITLE_EXCLUSION_RULES,
