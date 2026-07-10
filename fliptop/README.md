@@ -554,7 +554,9 @@ uv run fliptop-refresh --audit                # rebuild and write data/debug aud
   debug files always come from the current code and raw data.
 
 This is the recommended way to regenerate data. The Python API below is for when
-you want the table in memory or finer control.
+you want the table in memory or finer control. For the step-by-step maintainer
+routine to catch up after new uploads, see
+[`docs/workflows.md`](../docs/workflows.md).
 
 ---
 

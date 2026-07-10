@@ -200,6 +200,9 @@ stages directly; see `scripts/README.md` (collection) and `fliptop/README.md`
 (building in Python). The `notebooks/wrangling.ipynb` notebook walks through the
 build interactively.
 
+For the conversational maintainer routine to catch up after a few weeks of new
+uploads, see [`docs/workflows.md`](docs/workflows.md).
+
 ### Recording battle results
 
 Wins, judged draws, and promos are collected by hand in an id-keyed store
