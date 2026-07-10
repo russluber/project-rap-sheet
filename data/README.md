@@ -84,7 +84,7 @@ behind the canonical choices is documented in the
 ## `raw/`
 
 Original data straight from the sources, before any cleaning. Produced by the
-collection scripts in [`scripts/`](../scripts/) (or `fliptop-refresh --fetch`).
+collection scripts in [`scripts/`](../scripts/) (or `uv run fliptop-refresh --fetch`).
 Treat these as **read-only inputs** — the pipeline never writes here.
 
 ### `youtube_videos.json`
@@ -120,7 +120,7 @@ A small reference table of **COVID-era event dates** recovered from
 [`processed/`](#processed) below). Written by
 [`fetch_versetracker_event_dates.py`](../scripts/fetch_versetracker_event_dates.py).
 Unlike the other raw files this one is **scraped on demand and committed** — the
-dates are static — rather than refreshed by `fliptop-refresh --fetch`.
+dates are static — rather than refreshed by `uv run fliptop-refresh --fetch`.
 
 | column | example | notes |
 | ------ | ------- | ----- |
@@ -216,7 +216,7 @@ Both files use:
 ## `processed/`
 
 Clean, analysis-ready tables built by the `fliptop` package via
-`fliptop-refresh`. **Regenerated, not hand-edited** — anything you change here is
+`uv run fliptop-refresh`. **Regenerated, not hand-edited** — anything you change here is
 overwritten on the next refresh.
 
 ### `ft_battles.json`
@@ -273,7 +273,7 @@ and the helper emcee with `appearance_credit=true` but `battle_credit=false`.
 ## `annotations/`
 
 Hand-collected data kept **deliberately separate** from the auto-built metadata,
-so rebuilding never clobbers manual work. `fliptop-refresh` validates it and
+so rebuilding never clobbers manual work. `uv run fliptop-refresh` validates it and
 joins the core result fields into the published `ft_battles.json`.
 
 ### `battle_results.csv`
@@ -328,6 +328,9 @@ reproducible from the network via [`scripts/`](../scripts/) — a full
 **merges** only recent events in (faster, but accumulates scrape history; see
 [`scripts/README.md`](../scripts/README.md)). `annotations/` is **not**
 reproducible — it's hand-entered, so it's the one thing here worth guarding.
+
+For the conversational routine refresh playbook, see
+[`docs/workflows.md`](../docs/workflows.md).
 
 ---
 

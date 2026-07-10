@@ -6,7 +6,7 @@ VerseTracker) and populate [`data/raw/`](../data/raw/) with the sources
 everything else is built from.
 
 They run *before* the cleaning pipeline in [`fliptop/`](../fliptop/): the scripts
-fetch raw data, then `fliptop-refresh` cleans it into
+fetch raw data, then `uv run fliptop-refresh` cleans it into
 [`data/processed/`](../data/processed/).
 
 ```
@@ -57,7 +57,10 @@ The end-to-end flow they fit into:
 2. Raw files land in [`data/raw/`](../data/raw/).
 3. The pipeline in [`fliptop/battles.py`](../fliptop/battles.py) cleans those
    files into [`data/processed/ft_battles.json`](../data/processed/) (the rebuild
-   step `fliptop-refresh` runs by default).
+   step `uv run fliptop-refresh` runs by default).
+
+For the normal "new uploads landed, catch up the dataset" routine, see the
+[`docs/workflows.md`](../docs/workflows.md) maintainer playbook.
 
 **`fetch_versetracker_event_dates.py` is the exception** — it is *not* bundled
 into `uv run fliptop-refresh --fetch`. The COVID-era event dates it recovers are

@@ -80,6 +80,7 @@ project-rap-sheet/
 │   │   └── event_exclusions.csv
 │   ├── processed/
 │   │   ├── ft_battles.json
+│   │   ├── battle_participants.csv
 │   │   └── emcees.csv
 │   ├── annotations/
 │   │   └── battle_results.csv
@@ -89,13 +90,18 @@ project-rap-sheet/
 |   ├── README.md
 │   ├── __init__.py
 │   ├── battles.py
+│   ├── uploads.py
+│   ├── events.py
+│   ├── publish.py
+│   ├── lineage.py
 │   ├── rename_map.py
 │   ├── overrides.py
 │   ├── rules.py
 │   ├── structures.py
-│   ├── refresh.py
+│   ├── validate.py
 │   ├── annotations.py
-│   └── annotate.py
+│   ├── annotate.py
+│   └── refresh.py
 ├── notebooks/
 |   ├── README.md
 │   └── wrangling.ipynb
@@ -105,6 +111,8 @@ project-rap-sheet/
 |   ├── fetch_events_metadata_from_fliptop_web.py
 |   └── fetch_versetracker_event_dates.py
 ├── tests/
+├── docs/
+|   └── workflows.md
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml
