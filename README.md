@@ -130,7 +130,7 @@ environment:
 
 ```bash
 uv run python --version
-uv run fliptop-refresh --audit
+uv run fliptop-refresh
 ```
 
 For notebooks and analysis packages:
@@ -169,14 +169,15 @@ The whole pipeline is wrapped in a single command, `fliptop-refresh`:
 uv run fliptop-refresh                        # rebuild processed outputs from existing raw data
 uv run fliptop-refresh --fetch                # fetch fresh raw data (YouTube + web) first, then rebuild
 uv run fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (faster), then rebuild
-uv run fliptop-refresh --audit                # also write local data/debug audit files
+uv run fliptop-refresh --no-audit             # rebuild processed outputs without local audit files
 ```
 
 - The default (no flags) is fast, deterministic, and needs no network or API
   key: it rebuilds `data/processed/ft_battles.json`,
   `data/processed/battle_participants.csv`, and `data/processed/emcees.csv`
   from the raw files already in `data/raw/` plus
-  `data/annotations/battle_results.csv`.
+  `data/annotations/battle_results.csv`, and writes the local audit files in
+  `data/debug/`.
 - `--fetch` first runs the two collection scripts in `scripts/` to refresh the
   raw data (this needs a YouTube API key — see `data/README.md`), then rebuilds.
   Override the channel or scrape years with `--channel`, `--start`, `--end`.
@@ -184,7 +185,7 @@ uv run fliptop-refresh --audit                # also write local data/debug audi
   `--events-since YEAR` instead scrapes only recent events and **merges** them
   into the existing data — much faster for routine top-ups. See
   `scripts/README.md` for the trade-off.
-- `--audit` writes regenerated local debug files:
+- The audit step writes regenerated local debug files:
   `data/debug/filtered_out.csv`, `data/debug/upload_lineage.csv`,
   `data/debug/manual_matchup_needed.csv`, `data/debug/pipeline_summary.csv`,
   and `data/debug/pipeline_stage_drops.csv`. The lineage file has one row per
@@ -192,7 +193,8 @@ uv run fliptop-refresh --audit                # also write local data/debug audi
   folded into a multi-part battle, or held for manual matchup resolution.
   `pipeline_summary.csv` gives the row counts stage by stage, while
   `pipeline_stage_drops.csv` lists the exact ids exiting at filter/manual-review
-  stages.
+  stages. Use `--no-audit` only when you intentionally want to skip these local
+  debug outputs.
 
 Under the hood the command runs three stages — fetch YouTube uploads, scrape
 FlipTop event metadata, then build the cleaned tables. You can also drive these

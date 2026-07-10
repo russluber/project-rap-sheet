@@ -27,14 +27,14 @@ scripts/  ──fetch──►  data/raw/  ──build (fliptop)──►  data/
 
 ## When to run these
 
-You normally **don't** run these by hand. The `fliptop-refresh --fetch` command
+You normally **don't** run these by hand. The `uv run fliptop-refresh --fetch` command
 ([`fliptop/refresh.py`](../fliptop/refresh.py)) runs both of them — with the
 right channel id and a `2010 → current year` scrape window — and then rebuilds
 the processed datasets in one shot:
 
 ```bash
-fliptop-refresh --fetch    # fetch both raw sources, then rebuild ft_battles + emcees
-fliptop-refresh            # rebuild only, from the raw data already on disk (no network)
+uv run fliptop-refresh --fetch    # fetch both raw sources, then rebuild ft_battles + emcees
+uv run fliptop-refresh            # rebuild only, from the raw data already on disk (no network)
 ```
 
 By default `--fetch` does a **full** website re-scrape (2010 → now), which is
@@ -42,7 +42,7 @@ slow. For routine updates use the **incremental** form, which only scrapes
 recent years and *merges* them into the existing events CSV:
 
 ```bash
-fliptop-refresh --fetch --events-since 2025   # scrape just 2025→now, merge, rebuild
+uv run fliptop-refresh --fetch --events-since 2025   # scrape just 2025->now, merge, rebuild
 ```
 
 (The YouTube fetch is always incremental — it only pulls videos you don't have
@@ -53,14 +53,14 @@ single year, pointing at a different channel, or writing to a scratch path.
 
 The end-to-end flow they fit into:
 
-1. Fetch raw data with the scripts here (or `fliptop-refresh --fetch`).
+1. Fetch raw data with the scripts here (or `uv run fliptop-refresh --fetch`).
 2. Raw files land in [`data/raw/`](../data/raw/).
 3. The pipeline in [`fliptop/battles.py`](../fliptop/battles.py) cleans those
    files into [`data/processed/ft_battles.json`](../data/processed/) (the rebuild
    step `fliptop-refresh` runs by default).
 
 **`fetch_versetracker_event_dates.py` is the exception** — it is *not* bundled
-into `fliptop-refresh --fetch`. The COVID-era event dates it recovers are
+into `uv run fliptop-refresh --fetch`. The COVID-era event dates it recovers are
 effectively static, so you run it **by hand, once**, to (re)build the reference
 file, then commit that file. After that the build just reads the CSV. Re-run it
 only if new quarantine-era battles surface (i.e. `event_date` is `NaT` again).
@@ -159,7 +159,7 @@ if the site is down mid-run it can drop events you'd already captured. `--merge`
 upserts instead (keyed by `video_id`), so events outside the scraped range
 survive untouched and a narrowed `--start` is safe. The trade-off: merged data
 is path-dependent and stale rows (a matchup removed from a page) linger — so run
-a plain full overwrite periodically to reconcile. `fliptop-refresh
+a plain full overwrite periodically to reconcile. `uv run fliptop-refresh
 --events-since YEAR` bundles `--start YEAR --merge --skip-known` for you.
 
 **Output** → [`data/raw/matchup_events_metadata.csv`](../data/raw/):

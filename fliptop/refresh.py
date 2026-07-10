@@ -25,12 +25,15 @@ Outputs written (under data/processed by default):
     - battle_participants.csv
     - emcees.csv
 
-With ``--audit`` it also writes reproducible debug files under ``data/debug``:
+By default it also writes reproducible debug files under ``data/debug``:
     - filtered_out.csv
     - upload_lineage.csv
     - manual_matchup_needed.csv
     - pipeline_summary.csv
     - pipeline_stage_drops.csv
+
+Use ``--no-audit`` to skip the debug files. ``--audit`` is still accepted for
+backwards compatibility, but audit output is now the default maintainer path.
 """
 
 from __future__ import annotations
@@ -239,20 +242,30 @@ def main(argv: list[str] | None = None) -> None:
         default=PROCESSED_DATA_DIR,
         help="Directory to write processed outputs into.",
     )
-    parser.add_argument(
+    audit_group = parser.add_mutually_exclusive_group()
+    audit_group.add_argument(
         "--audit",
+        dest="audit",
         action="store_true",
         help=(
-            "Also write debug audit files (filtered_out.csv, upload_lineage.csv, "
+            "Write debug audit files (filtered_out.csv, upload_lineage.csv, "
             "manual_matchup_needed.csv, pipeline_summary.csv, "
-            "pipeline_stage_drops.csv)."
+            "pipeline_stage_drops.csv). This is the default; the flag is kept "
+            "for compatibility."
         ),
     )
+    audit_group.add_argument(
+        "--no-audit",
+        dest="audit",
+        action="store_false",
+        help="Skip writing data/debug audit files.",
+    )
+    parser.set_defaults(audit=True)
     parser.add_argument(
         "--debug-dir",
         type=Path,
         default=DEBUG_DATA_DIR,
-        help="Directory to write --audit debug outputs into.",
+        help="Directory to write debug audit outputs into.",
     )
 
     args = parser.parse_args(argv)

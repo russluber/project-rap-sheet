@@ -81,3 +81,76 @@ def test_rebuild_validate_false_bypasses_gate(tmp_path, monkeypatch):
     assert battles_path.exists()
     assert emcees_path.exists()
     assert (tmp_path / "battle_participants.csv").exists()
+
+
+def test_main_writes_audit_outputs_by_default(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_rebuild_processed(**kwargs):
+        calls.append(("rebuild", kwargs))
+        return tmp_path / "ft_battles.json", tmp_path / "emcees.csv"
+
+    def fake_write_audit_outputs(**kwargs):
+        calls.append(("audit", kwargs))
+        return (
+            tmp_path / "filtered_out.csv",
+            tmp_path / "upload_lineage.csv",
+            tmp_path / "manual_matchup_needed.csv",
+            tmp_path / "pipeline_summary.csv",
+            tmp_path / "pipeline_stage_drops.csv",
+        )
+
+    monkeypatch.setattr(refresh_mod, "rebuild_processed", fake_rebuild_processed)
+    monkeypatch.setattr(refresh_mod, "write_audit_outputs", fake_write_audit_outputs)
+
+    refresh_mod.main(["--processed-dir", str(tmp_path), "--debug-dir", str(tmp_path / "debug")])
+
+    assert [name for name, _ in calls] == ["rebuild", "audit"]
+    assert calls[1][1]["debug_dir"] == tmp_path / "debug"
+
+
+def test_main_no_audit_skips_audit_outputs(tmp_path, monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        refresh_mod,
+        "rebuild_processed",
+        lambda **kwargs: calls.append(("rebuild", kwargs))
+        or (tmp_path / "ft_battles.json", tmp_path / "emcees.csv"),
+    )
+    monkeypatch.setattr(
+        refresh_mod,
+        "write_audit_outputs",
+        lambda **kwargs: calls.append(("audit", kwargs)),
+    )
+
+    refresh_mod.main(["--processed-dir", str(tmp_path), "--no-audit"])
+
+    assert [name for name, _ in calls] == ["rebuild"]
+
+
+def test_main_audit_flag_remains_accepted(tmp_path, monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(
+        refresh_mod,
+        "rebuild_processed",
+        lambda **kwargs: calls.append(("rebuild", kwargs))
+        or (tmp_path / "ft_battles.json", tmp_path / "emcees.csv"),
+    )
+    monkeypatch.setattr(
+        refresh_mod,
+        "write_audit_outputs",
+        lambda **kwargs: calls.append(("audit", kwargs))
+        or (
+            tmp_path / "filtered_out.csv",
+            tmp_path / "upload_lineage.csv",
+            tmp_path / "manual_matchup_needed.csv",
+            tmp_path / "pipeline_summary.csv",
+            tmp_path / "pipeline_stage_drops.csv",
+        ),
+    )
+
+    refresh_mod.main(["--processed-dir", str(tmp_path), "--audit"])
+
+    assert [name for name, _ in calls] == ["rebuild", "audit"]

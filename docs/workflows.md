@@ -43,24 +43,28 @@ event metadata to re-scrape and merge.
 As of 2026, a routine top-up can usually start at the current year:
 
 ```powershell
-uv run fliptop-refresh --fetch --events-since 2026 --audit
+uv run fliptop-refresh --fetch --events-since 2026
 ```
 
 If you are near a year boundary, catching up after a long gap, or suspicious
 that an older event page was edited, widen the window:
 
 ```powershell
-uv run fliptop-refresh --fetch --events-since 2025 --audit
+uv run fliptop-refresh --fetch --events-since 2025
 ```
 
 Use a full fetch only when you want a clean reconcile of the entire FlipTop
 website event scrape:
 
 ```powershell
-uv run fliptop-refresh --fetch --audit
+uv run fliptop-refresh --fetch
 ```
 
 That is slower, but useful periodically.
+
+All of those refresh commands write `data/debug/` audit files by default. Use
+`--no-audit` only for a deliberately quiet rebuild where you do not need the
+lineage/debug surfaces.
 
 ### 3. Read The Build Summary First
 
@@ -135,7 +139,7 @@ data/overrides/upload_decisions.csv
 Then rerun:
 
 ```powershell
-uv run fliptop-refresh --audit
+uv run fliptop-refresh
 ```
 
 Keep repeating this loop until `manual_matchup_needed.csv` is empty or contains
@@ -159,7 +163,7 @@ Useful reminders:
 After annotation, rebuild:
 
 ```powershell
-uv run fliptop-refresh --audit
+uv run fliptop-refresh
 ```
 
 ### 7. Validate Before Committing
@@ -240,6 +244,6 @@ data/overrides/event_locations.csv
 Then rerun:
 
 ```powershell
-uv run fliptop-refresh --audit
+uv run fliptop-refresh
 uv run pytest -q --basetemp .pytest-tmp
 ```

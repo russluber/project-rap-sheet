@@ -298,7 +298,7 @@ The project has four output layers with different jobs:
 | `battle_metadata` | `build_battle_metadata()` | rich internal build table with provenance/debug fields such as `description`, `duration_hms`, and `event_date_source` |
 | `ft_battles.json` | `build_ft_battles()` / `fliptop-refresh` | clean standalone battle-level analysis output with only `FINAL_COLUMNS` |
 | `battle_participants.csv` | `build_battle_participants()` / `fliptop-refresh` | long participant table for event-history/survival-style analysis |
-| `data/debug/*` | `fliptop-refresh --audit` | regenerated audit surfaces for raw-row lineage, filter exits, rule ids, and upload decisions |
+| `data/debug/*` | `fliptop-refresh` | regenerated audit surfaces for raw-row lineage, filter exits, rule ids, and upload decisions |
 
 `ft_battles.json` intentionally excludes provenance and audit-only fields. Do
 not add columns such as `event_date_source`, `description`, `duration_hms`,
@@ -351,7 +351,7 @@ excluded["excluded_reason"].value_counts()
 To write the local debug artifacts, run:
 
 ```bash
-uv run fliptop-refresh --audit
+uv run fliptop-refresh
 ```
 
 This writes `data/debug/upload_lineage.csv`,
@@ -532,7 +532,7 @@ way to regenerate the processed datasets.
 uv run fliptop-refresh                        # rebuild ft_battles.json + emcees.csv from existing raw data
 uv run fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first, then rebuild
 uv run fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
-uv run fliptop-refresh --audit                # rebuild and write data/debug audit files
+uv run fliptop-refresh --no-audit             # rebuild without writing data/debug audit files
 ```
 
 - `rebuild_processed()` builds `ft_battles` once, runs the
@@ -547,11 +547,12 @@ uv run fliptop-refresh --audit                # rebuild and write data/debug aud
   Run a plain `--fetch` periodically for a clean full reconcile. See
   [`scripts/README.md`](../scripts/README.md) for the overwrite-vs-merge
   trade-off.
-- `--audit` writes `data/debug/filtered_out.csv`,
+- By default, refresh also writes `data/debug/filtered_out.csv`,
   `data/debug/upload_lineage.csv`, `data/debug/manual_matchup_needed.csv`,
   `data/debug/pipeline_summary.csv`, and
   `data/debug/pipeline_stage_drops.csv` after a successful rebuild, so the local
-  debug files always come from the current code and raw data.
+  debug files always come from the current code and raw data. Use `--no-audit`
+  only when you intentionally want to skip those local audit outputs.
 
 This is the recommended way to regenerate data. The Python API below is for when
 you want the table in memory or finer control. For the step-by-step maintainer
