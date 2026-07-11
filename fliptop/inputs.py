@@ -119,18 +119,18 @@ def load_pipeline_inputs(
             for path in (
                 youtube_path,
                 events_path,
-                versetracker_path,
-                aliases_path,
-                manual_path,
-                decisions_path,
+                versetracker_path if vt_event_dates is None else None,
+                aliases_path if rename_map is None else None,
+                manual_path if manual_matchups is None else None,
+                decisions_path if upload_decisions is None else None,
                 event_locations_path,
                 event_location_patterns_path,
                 location_aliases_path,
                 event_dates_path,
                 title_rules_path,
                 event_rules_path,
-                results_path,
+                results_path if results is None else None,
             )
-            if path.exists()
+            if path is not None and path.exists()
         ),
     )

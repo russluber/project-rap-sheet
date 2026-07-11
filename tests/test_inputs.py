@@ -44,6 +44,14 @@ def test_explicit_empty_overrides_are_not_reloaded():
     assert inputs.manual_matchups == {}
     assert inputs.upload_decisions == {}
     assert inputs.vt_event_dates == {}
+    assert {path.name for path in inputs.source_files}.isdisjoint(
+        {
+            "emcee_aliases.csv",
+            "manual_matchups.csv",
+            "upload_decisions.csv",
+            "versetracker_event_dates.csv",
+        }
+    )
 
 
 def test_loaded_snapshot_needs_no_hidden_file_reads(monkeypatch):
