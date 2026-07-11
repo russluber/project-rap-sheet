@@ -34,6 +34,8 @@ __all__ = [
     "PROCESSED_DATA_DIR",
     "PipelineRun",
     "build_pipeline_run",
+    "PipelineInputs",
+    "load_pipeline_inputs",
     "CandidateArtifacts",
     "build_candidate_artifacts",
     "ReleaseBlockedError",
@@ -63,6 +65,8 @@ __all__ = [
 _LAZY = {
     "PipelineRun": (".pipeline", "PipelineRun"),
     "build_pipeline_run": (".pipeline", "build_pipeline_run"),
+    "PipelineInputs": (".inputs", "PipelineInputs"),
+    "load_pipeline_inputs": (".inputs", "load_pipeline_inputs"),
     "CandidateArtifacts": (".release", "CandidateArtifacts"),
     "build_candidate_artifacts": (".release", "build_candidate_artifacts"),
     "ReleaseBlockedError": (".release", "ReleaseBlockedError"),
@@ -97,6 +101,7 @@ if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
     from .annotations import merge_results
     from .battles import build_battle_metadata
     from .contracts import ContractViolation, TableContract
+    from .inputs import PipelineInputs, load_pipeline_inputs
     from .lineage import (
         build_excluded_uploads,
         build_manual_matchup_review_uploads,
