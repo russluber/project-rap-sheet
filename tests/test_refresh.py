@@ -11,7 +11,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from fliptop import RAW_DATA_DIR
+from fliptop import PROCESSED_DATA_DIR, RAW_DATA_DIR
 from fliptop import refresh as refresh_mod
 from fliptop.refresh import rebuild_processed
 
@@ -48,6 +48,19 @@ def test_rebuild_outputs_are_consistent(tmp_path):
     )
     assert set(emcees["emcee_name"]) == names_in_battles
     assert emcees["emcee_id"].is_unique
+
+
+def test_committed_processed_outputs_match_current_pipeline(tmp_path):
+    """Data-only commits must include exactly regenerated processed outputs."""
+    rebuild_processed(raw_dir=RAW_DATA_DIR, processed_dir=tmp_path)
+
+    for filename in ("ft_battles.json", "battle_participants.csv", "emcees.csv"):
+        generated = (tmp_path / filename).read_bytes()
+        committed = (PROCESSED_DATA_DIR / filename).read_bytes()
+        assert generated == committed, (
+            f"data/processed/{filename} is stale; run `uv run fliptop-refresh` "
+            "and commit the regenerated output"
+        )
 
 
 def _bad_battles():
