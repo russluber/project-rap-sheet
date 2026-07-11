@@ -33,8 +33,8 @@ reimplement it.
 ## Architecture at a glance
 
 Everything flows one way toward `ft_battles` as the hub: the pipeline builds
-metadata, validates and joins annotations, publishes `ft_battles`, and other
-modules consume it.
+metadata, `release.py` assembles and checks a complete candidate, and only a
+passing candidate replaces the three processed tables that other modules use.
 
 ```
  data/raw/youtube_videos.json ─┐
@@ -55,6 +55,9 @@ modules consume it.
 - **One execution, many outputs.** `pipeline.py` records stage frames and row
   exits once; `battles.py` exposes metadata compatibility helpers, while
   `lineage.py` projects every audit table from that exact run.
+- **Review before release.** `release.py` builds the final tables and human
+  review queues together. It records the run and proposed changes before the
+  official processed files are replaced as a rollback-safe bundle.
 - **Logic is separate from CLI.** `pipeline.py`/`lineage.py` ↔ `refresh.py`
   (build/audit ↔ command) and `annotations.py` ↔ `annotate.py` (store ↔ command)
   are deliberate splits.
@@ -95,7 +98,8 @@ fliptop/
 contains the raw inputs, stage frames, recorded exits/reviews, and final battle
 metadata. Upload-side transforms live in `uploads.py`; event metadata parsing
 and date/location fixes live in `events.py`; final publishing lives in
-`publish.py`; `lineage.py` derives row-level audit tables from the same run.
+`publish.py`; `lineage.py` derives row-level audit tables from the same run;
+`release.py` combines those products into a candidate and controls publication.
 `build_battle_metadata(raw_dir=...)` runs three cleaning stages and returns the
 rich metadata table. `build_ft_battles` then joins validated battle results and
 returns the final analysis table.
@@ -303,7 +307,7 @@ The project has four output layers with different jobs:
 | `battle_metadata` | `build_battle_metadata()` | rich internal build table with provenance/debug fields such as `description`, `duration_hms`, and `event_date_source` |
 | `ft_battles.json` | `build_ft_battles()` / `fliptop-refresh` | clean standalone battle-level analysis output with only `FINAL_COLUMNS` |
 | `battle_participants.csv` | `build_battle_participants()` / `fliptop-refresh` | long participant table for event-history/survival-style analysis |
-| `data/debug/*` | `fliptop-refresh` | regenerated audit surfaces for raw-row lineage, filter exits, rule ids, and upload decisions |
+| `data/debug/*` | `fliptop-refresh` | regenerated lineage, human review queues, release blockers, proposed changes, and a hashed run manifest |
 
 `ft_battles.json` intentionally excludes provenance and audit-only fields. Do
 not add columns such as `event_date_source`, `description`, `duration_hms`,
@@ -362,7 +366,11 @@ uv run fliptop-refresh
 This writes `data/debug/upload_lineage.csv`,
 `data/debug/filtered_out.csv`, `data/debug/manual_matchup_needed.csv`,
 `data/debug/pipeline_summary.csv`, and
-`data/debug/pipeline_stage_drops.csv`. The summary file gives row counts at
+`data/debug/pipeline_stage_drops.csv`, plus `missing_results.csv`,
+`release_blockers.txt`, `release_changes.csv`,
+`release_changes_summary.txt`, and `run_manifest.json`. The release files show
+what a human must fix, what differs from the current published battles, and the
+exact input hashes and Git commit used for the run. The summary file gives row counts at
 each major stage. The stage-drops file lists exact ids exiting at
 filter/manual-review stages, while `filtered_out.csv` remains the narrower
 compatibility view of true exclusions. The `data/debug/` directory is
@@ -520,9 +528,11 @@ supposed to guarantee:
 including the `event_date_source` vocabulary (`website` | `description` |
 `versetracker` | `manual`; missing is allowed for undated battles).
 
-`fliptop-refresh` runs the gate after every build and **aborts before writing**
-if anything fails, so a regression fails loudly instead of overwriting the
-processed data with a broken table. `summarize_ft_battles(df)` produces the
+`fliptop-refresh` builds a candidate and writes its review files first, then
+runs the gate and **aborts before changing processed data** if anything fails.
+A passing candidate is serialized into a temporary bundle and reloaded before
+all three processed tables are promoted; a promotion error restores the old
+bundle. `summarize_ft_battles(df)` produces the
 one-line build summary (battle count + `battle_type` breakdown) printed on each
 refresh.
 
@@ -540,9 +550,9 @@ uv run fliptop-refresh --fetch --events-since 2025   # incremental: only re-scra
 uv run fliptop-refresh --no-audit             # rebuild without writing data/debug audit files
 ```
 
-- `rebuild_processed()` builds `ft_battles` once, runs the
-  [validation gate](#output-validation-gate), and (if it passes) writes **both**
-  processed outputs from that single frame (fast, deterministic, no network).
+- `rebuild_processed()` receives one candidate, runs the
+  [validation gate](#output-validation-gate), and (if it passes) stages,
+  reloads, and publishes all three processed tables as one rollback-safe bundle.
 - `fetch_raw()` (only with `--fetch`) runs the two `scripts/` collectors as
   subprocesses first; this needs a YouTube API key (see `data/README.md`). The
   YouTube fetch is always incremental; the website events scrape is a **full
@@ -552,12 +562,15 @@ uv run fliptop-refresh --no-audit             # rebuild without writing data/deb
   Run a plain `--fetch` periodically for a clean full reconcile. See
   [`scripts/README.md`](../scripts/README.md) for the overwrite-vs-merge
   trade-off.
-- By default, refresh also writes `data/debug/filtered_out.csv`,
+- By default, refresh writes the audit and release-review files **before** it
+  tries to publish. These include `data/debug/filtered_out.csv`,
   `data/debug/upload_lineage.csv`, `data/debug/manual_matchup_needed.csv`,
   `data/debug/pipeline_summary.csv`, and
-  `data/debug/pipeline_stage_drops.csv` after a successful rebuild, so the local
-  debug files always come from the current code and raw data. Use `--no-audit`
-  only when you intentionally want to skip those local audit outputs.
+  `data/debug/pipeline_stage_drops.csv`, plus `missing_results.csv`,
+  `release_blockers.txt`, `release_changes.csv`,
+  `release_changes_summary.txt`, and `run_manifest.json`. A blocked run still
+  leaves these instructions behind while keeping the current processed files
+  untouched. Use `--no-audit` only when you intentionally want to skip them.
 
 This is the recommended way to regenerate data. The Python API below is for when
 you want the table in memory or finer control. For the step-by-step maintainer

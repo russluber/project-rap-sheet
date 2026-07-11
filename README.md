@@ -182,11 +182,13 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
 ```
 
 - The default (no flags) is fast, deterministic, and needs no network or API
-  key: it rebuilds `data/processed/ft_battles.json`,
+  key: it first builds a candidate in memory, writes the review files, and only
+  then replaces `data/processed/ft_battles.json`,
   `data/processed/battle_participants.csv`, and `data/processed/emcees.csv`
   from the raw files already in `data/raw/` plus
   `data/annotations/battle_results.csv`, and writes the local audit files in
-  `data/debug/`.
+  `data/debug/`. If the candidate has missing results, unresolved uploads, or
+  invalid data, the command exits without changing any processed file.
 - `--fetch` first runs the two collection scripts in `scripts/` to refresh the
   raw data (this needs a YouTube API key — see `data/README.md`), then rebuilds.
   Override the channel or scrape years with `--channel`, `--start`, `--end`.
@@ -197,7 +199,12 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
 - The audit step writes regenerated local debug files:
   `data/debug/filtered_out.csv`, `data/debug/upload_lineage.csv`,
   `data/debug/manual_matchup_needed.csv`, `data/debug/pipeline_summary.csv`,
-  and `data/debug/pipeline_stage_drops.csv`. The lineage file has one row per
+  `data/debug/pipeline_stage_drops.csv`, `data/debug/missing_results.csv`,
+  `data/debug/release_blockers.txt`, `data/debug/release_changes.csv`,
+  `data/debug/release_changes_summary.txt`, and `data/debug/run_manifest.json`.
+  The release files tell you what needs human attention, what would change from
+  the current published dataset, and which exact inputs produced the run. The
+  lineage file has one row per
   raw YouTube upload and records whether each upload was included, excluded,
   folded into a multi-part battle, or held for manual matchup resolution.
   `pipeline_summary.csv` gives the row counts stage by stage, while
@@ -205,6 +212,9 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
   stages. Use `--no-audit` only when you intentionally want to skip these local
   debug outputs. The build and every audit file share one `PipelineRun`, so the
   filters execute once and the audit describes the exact rows that were built.
+- A successful candidate is written to a temporary bundle and reloaded before
+  publication. If any of the three processed files fails while being replaced,
+  all three old files are restored together.
 
 Under the hood the command runs three stages — fetch YouTube uploads, scrape
 FlipTop event metadata, then build the cleaned tables. You can also drive these
