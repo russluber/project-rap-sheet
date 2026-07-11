@@ -55,6 +55,10 @@ passing candidate replaces the three processed tables that other modules use.
 - **One execution, many outputs.** `pipeline.py` records stage frames and row
   exits once; `battles.py` exposes metadata compatibility helpers, while
   `lineage.py` projects every audit table from that exact run.
+- **One explicit input snapshot.** `inputs.py` loads raw tables, rules,
+  overrides, aliases, reference dates, and annotations once. `pipeline.py`,
+  audits, candidate construction, and manifests reuse that same immutable
+  `PipelineInputs` object instead of reading defaults midway through a run.
 - **Review before release.** `release.py` builds the final tables and human
   review queues together. It records the run and proposed changes before the
   official processed files are replaced as a rollback-safe bundle.
@@ -77,6 +81,7 @@ passing candidate replaces the three processed tables that other modules use.
 ```
 fliptop/
 ├── __init__.py         # package init: shared data-dir paths + lazy public API
+├── inputs.py           # one immutable snapshot of all file-backed run inputs
 ├── pipeline.py         # one execution: stages, exits, reviews, and battle metadata
 ├── battles.py          # battle finalization + compatibility metadata entry point
 ├── uploads.py          # upload-side cleaning, title filters, and matchup parsing
@@ -98,7 +103,7 @@ fliptop/
 ## The pipeline: raw → `ft_battles`
 
 `pipeline.py` orchestrates the metadata build and returns a `PipelineRun` that
-contains the raw inputs, stage frames, recorded exits/reviews, and final battle
+retains its `PipelineInputs` snapshot plus stage frames, recorded exits/reviews, and final battle
 metadata. Upload-side transforms live in `uploads.py`; event metadata parsing
 and date/location fixes live in `events.py`; final publishing lives in
 `publish.py`; `lineage.py` derives row-level audit tables from the same run;
@@ -111,6 +116,7 @@ returns the final analysis table.
 
 ```
 build_pipeline_run
+  ├─ PipelineInputs (all file-backed dependencies loaded once)
   ├─ upload stages + recorded exits/reviews
   ├─ attach/filter event metadata
   └─ finalize_battles -> PipelineRun.battle_metadata

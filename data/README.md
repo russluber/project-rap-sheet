@@ -31,11 +31,11 @@ data/
     └── secret.json
 ```
 
-**Data flow.** `raw/` is produced by [`scripts/`](../scripts/); `processed/` is
-built from `raw/` (plus `emcee_aliases.csv`, `rules/`, and the `overrides/`
-tables) by the [`fliptop`](../fliptop/) package; `annotations/` is filled in by
-hand via `fliptop-annotate`; refresh validates those annotations and joins the
-core result fields into the processed `ft_battles.json`.
+**Data flow.** `raw/` is produced by [`scripts/`](../scripts/). At the start of
+each build, `PipelineInputs` loads `raw/` plus `emcee_aliases.csv`, `rules/`,
+`overrides/`, and `annotations/` exactly once. The [`fliptop`](../fliptop/)
+package runs entirely from that snapshot and writes `processed/` only after the
+candidate passes. `annotations/` is filled in by hand via `fliptop-annotate`.
 
 ```
 scripts/ ─► raw/ ─┐
@@ -78,7 +78,8 @@ Hand-maintained CSV headers are intentionally exact and ordered. This makes a
 mistyped, missing, reordered, or newly invented column a visible schema change
 instead of something the pipeline silently ignores. If a schema really needs
 to change, update its versioned contract and consumers in the same code change.
-Each refresh records the active versions in `data/debug/run_manifest.json`.
+Each refresh records the active versions and hashes only the files actually
+loaded into its `PipelineInputs` snapshot in `data/debug/run_manifest.json`.
 
 A `ContractViolation` names the failing file or pipeline stage and lists all
 structural problems found together. Correct that source problem and rerun the
