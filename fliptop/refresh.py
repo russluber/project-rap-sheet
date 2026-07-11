@@ -45,20 +45,20 @@ from datetime import date
 from pathlib import Path
 
 from . import DATA_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
-from .battles import build_battle_metadata
 from .io import atomic_output_path
 from .lineage import write_audit_outputs
 from .pipeline import PipelineRun, build_pipeline_run
-from .publish import (
-    build_ft_battles_from_metadata,
-    save_ft_battles,
+from .publish import save_ft_battles
+from .release import (
+    CandidateArtifacts,
+    ReleaseBlockedError,
+    build_candidate_artifacts,
+    require_releasable,
+    write_candidate_review_outputs,
 )
-from .structures import build_battle_participants, write_emcees_table
 from .validate import (
     summarize_battle_metadata,
     summarize_ft_battles,
-    validate_battle_metadata,
-    validate_ft_battles,
 )
 
 # Default FlipTop YouTube channel (see scripts/fetch_youtube_channel_uploads.py).
@@ -133,6 +133,7 @@ def rebuild_processed(
     processed_dir: Path = PROCESSED_DATA_DIR,
     validate: bool = True,
     pipeline_run: PipelineRun | None = None,
+    candidate: CandidateArtifacts | None = None,
 ) -> tuple[Path, Path]:
     """
     Build battle metadata once, publish ft_battles from it, and write outputs.
@@ -147,48 +148,36 @@ def rebuild_processed(
     """
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    battle_metadata = (
-        pipeline_run.battle_metadata
-        if pipeline_run is not None
-        else build_battle_metadata(raw_dir=raw_dir)
+    if candidate is None:
+        if pipeline_run is None:
+            pipeline_run = build_pipeline_run(raw_dir=raw_dir)
+        candidate = build_candidate_artifacts(pipeline_run)
+
+    print(
+        f"[validate] metadata: "
+        f"{summarize_battle_metadata(candidate.pipeline_run.battle_metadata)}"
     )
-    print(f"[validate] metadata: {summarize_battle_metadata(battle_metadata)}")
+    print(f"[validate] final: {summarize_ft_battles(candidate.ft_battles)}")
 
     if validate:
-        problems = validate_battle_metadata(battle_metadata)
-        if problems:
-            raise ValueError(
-                "battle metadata failed validation; refusing to write:\n"
-                + "\n".join(f"  - {p}" for p in problems)
-            )
+        require_releasable(candidate)
 
-    ft_battles = build_ft_battles_from_metadata(
-        battle_metadata,
-        require_results=validate,
-    )
-    print(f"[validate] final: {summarize_ft_battles(ft_battles)}")
-
-    if validate:
-        problems = validate_ft_battles(ft_battles)
-        if problems:
-            raise ValueError(
-                "ft_battles failed validation; refusing to write:\n"
-                + "\n".join(f"  - {p}" for p in problems)
-            )
+    ft_battles = candidate.ft_battles
 
     battles_path = save_ft_battles(
         ft_battles, processed_dir / "ft_battles.json", fmt="json"
     )
     print(f"[build] wrote {len(ft_battles)} battles -> {battles_path}")
 
-    participants = build_battle_participants(ft_battles)
+    participants = candidate.participants
     participants_path = processed_dir / "battle_participants.csv"
     with atomic_output_path(participants_path) as temporary:
         participants.to_csv(temporary, index=False)
     print(f"[build] wrote {len(participants)} participant rows -> {participants_path}")
 
     emcees_path = processed_dir / "emcees.csv"
-    write_emcees_table(ft_battles, emcees_path, participants=participants)
+    with atomic_output_path(emcees_path) as temporary:
+        candidate.emcees.to_csv(temporary, index=False)
     print(f"[build] wrote emcees table -> {emcees_path}")
 
     return battles_path, emcees_path
@@ -290,10 +279,11 @@ def main(argv: list[str] | None = None) -> None:
         )
 
     pipeline_run = build_pipeline_run(raw_dir=args.raw_dir)
-    rebuild_processed(
-        raw_dir=args.raw_dir,
-        processed_dir=args.processed_dir,
-        pipeline_run=pipeline_run,
+    candidate = build_candidate_artifacts(pipeline_run)
+    print(
+        f"[candidate] built {len(candidate.ft_battles)} battles; "
+        f"missing_results={len(candidate.missing_results)}; "
+        f"review_uploads={len(pipeline_run.review_uploads)}"
     )
 
     if args.audit:
@@ -314,6 +304,25 @@ def main(argv: list[str] | None = None) -> None:
         print(f"[audit] wrote pipeline summary -> {summary_path}")
         print(f"[audit] wrote pipeline stage drops -> {drops_path}")
 
+        missing_path, blockers_path = write_candidate_review_outputs(
+            candidate,
+            args.debug_dir,
+        )
+        print(f"[review] wrote missing results queue -> {missing_path}")
+        print(f"[review] wrote release blockers -> {blockers_path}")
+
+    try:
+        rebuild_processed(
+            raw_dir=args.raw_dir,
+            processed_dir=args.processed_dir,
+            pipeline_run=pipeline_run,
+            candidate=candidate,
+        )
+    except ReleaseBlockedError as exc:
+        print(f"[release] blocked:\n{exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+
+    print("[release] processed outputs updated.")
     print("[done] refresh complete.")
 
 

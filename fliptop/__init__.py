@@ -36,6 +36,8 @@ __all__ = [
     "build_pipeline_run",
     "CandidateArtifacts",
     "build_candidate_artifacts",
+    "ReleaseBlockedError",
+    "require_releasable",
     "build_battle_metadata",
     "build_ft_battles",
     "build_ft_battles_from_metadata",
@@ -61,6 +63,8 @@ _LAZY = {
     "build_pipeline_run": (".pipeline", "build_pipeline_run"),
     "CandidateArtifacts": (".release", "CandidateArtifacts"),
     "build_candidate_artifacts": (".release", "build_candidate_artifacts"),
+    "ReleaseBlockedError": (".release", "ReleaseBlockedError"),
+    "require_releasable": (".release", "require_releasable"),
     "build_battle_metadata": (".battles", "build_battle_metadata"),
     "build_ft_battles": (".publish", "build_ft_battles"),
     "build_ft_battles_from_metadata": (".publish", "build_ft_battles_from_metadata"),
@@ -97,7 +101,12 @@ if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
     )
     from .pipeline import PipelineRun, build_pipeline_run
     from .publish import build_ft_battles, build_ft_battles_from_metadata
-    from .release import CandidateArtifacts, build_candidate_artifacts
+    from .release import (
+        CandidateArtifacts,
+        ReleaseBlockedError,
+        build_candidate_artifacts,
+        require_releasable,
+    )
     from .structures import (
         build_battle_network,
         build_battle_participants,

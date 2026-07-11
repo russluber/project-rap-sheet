@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 
 from .annotations import load_results, pending_battles, validate_results_store
+from .io import atomic_output_path
 from .pipeline import PipelineRun
 from .publish import build_ft_battles_from_metadata
 from .structures import build_battle_participants, build_emcees_table
 from .validate import validate_battle_metadata, validate_ft_battles
+
+PathLike = str | Path
+
+
+class ReleaseBlockedError(ValueError):
+    """Raised when candidate artifacts fail the official release gate."""
 
 MISSING_RESULTS_COLUMNS = [
     "battle_key",
@@ -100,3 +108,34 @@ def build_candidate_artifacts(
         ),
         final_problems=validate_ft_battles(ft_battles),
     )
+
+
+def require_releasable(candidate: CandidateArtifacts) -> None:
+    """Raise with all blockers when a candidate cannot be officially released."""
+    problems = candidate.release_problems
+    if not problems:
+        return
+    raise ReleaseBlockedError(
+        "candidate failed the release gate; processed outputs were not changed:\n"
+        + "\n".join(f"  - {problem}" for problem in problems)
+    )
+
+
+def write_candidate_review_outputs(
+    candidate: CandidateArtifacts,
+    debug_dir: PathLike,
+) -> tuple[Path, Path]:
+    """Write missing-result and release-blocker queues before release is attempted."""
+    debug_dir = Path(debug_dir)
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    missing_path = debug_dir / "missing_results.csv"
+    blockers_path = debug_dir / "release_blockers.txt"
+
+    with atomic_output_path(missing_path) as temporary:
+        candidate.missing_results.to_csv(temporary, index=False)
+
+    blocker_lines = candidate.release_problems or ["none"]
+    with atomic_output_path(blockers_path) as temporary:
+        temporary.write_text("\n".join(blocker_lines) + "\n", encoding="utf-8")
+
+    return missing_path, blockers_path
