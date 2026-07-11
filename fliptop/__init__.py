@@ -34,6 +34,8 @@ __all__ = [
     "PROCESSED_DATA_DIR",
     "PipelineRun",
     "build_pipeline_run",
+    "CandidateArtifacts",
+    "build_candidate_artifacts",
     "build_battle_metadata",
     "build_ft_battles",
     "build_ft_battles_from_metadata",
@@ -57,6 +59,8 @@ __all__ = [
 _LAZY = {
     "PipelineRun": (".pipeline", "PipelineRun"),
     "build_pipeline_run": (".pipeline", "build_pipeline_run"),
+    "CandidateArtifacts": (".release", "CandidateArtifacts"),
+    "build_candidate_artifacts": (".release", "build_candidate_artifacts"),
     "build_battle_metadata": (".battles", "build_battle_metadata"),
     "build_ft_battles": (".publish", "build_ft_battles"),
     "build_ft_battles_from_metadata": (".publish", "build_ft_battles_from_metadata"),
@@ -93,6 +97,7 @@ if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
     )
     from .pipeline import PipelineRun, build_pipeline_run
     from .publish import build_ft_battles, build_ft_battles_from_metadata
+    from .release import CandidateArtifacts, build_candidate_artifacts
     from .structures import (
         build_battle_network,
         build_battle_participants,
