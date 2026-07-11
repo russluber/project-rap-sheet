@@ -44,6 +44,8 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+from fliptop.io import atomic_output_path
+
 # Project root is one level above this script's directory
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -410,7 +412,8 @@ def write_events_to_csv(df: pd.DataFrame, output_path: str) -> None:
         columns=[c for c in cols if c in df.columns]
         + [c for c in df.columns if c not in cols]
     )
-    df.to_csv(output_path, index=False, encoding="utf-8")
+    with atomic_output_path(output_path) as temporary:
+        df.to_csv(temporary, index=False, encoding="utf-8")
     print(f"Wrote {len(df)} rows to {output_path}")
 
 

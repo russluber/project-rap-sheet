@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from .io import atomic_output_path
+
 PathLike = str | Path
 
 # The columns build_ft_battles() emits, in order. This is the final wrangling
@@ -179,16 +181,18 @@ def save_ft_battles(
 
     fmt = fmt.lower()
     if fmt == "csv":
-        ft_battles.to_csv(out_path, index=False)
+        with atomic_output_path(out_path) as temporary:
+            ft_battles.to_csv(temporary, index=False)
     elif fmt == "json":
-        ft_battles.to_json(
-            out_path,
-            orient="records",
-            lines=True,
-            date_format="epoch",
-            date_unit="ms",
-            force_ascii=False,
-        )
+        with atomic_output_path(out_path) as temporary:
+            ft_battles.to_json(
+                temporary,
+                orient="records",
+                lines=True,
+                date_format="epoch",
+                date_unit="ms",
+                force_ascii=False,
+            )
     else:
         raise ValueError(f"Unsupported fmt {fmt!r}; use 'csv' or 'json'.")
 

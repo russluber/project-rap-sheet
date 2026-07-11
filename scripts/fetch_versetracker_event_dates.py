@@ -47,6 +47,8 @@ import requests
 from bs4 import BeautifulSoup
 from dateutil import parser as dateparse
 
+from fliptop.io import atomic_output_path
+
 # Project root is one level above this script's directory
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -255,7 +257,8 @@ def write_event_dates_to_csv(df: pd.DataFrame, output_path: str) -> None:
     """Write the scraped event-date frame to CSV (UTF-8), sorted by event_name."""
     _ensure_parent_dir(output_path)
     out = df.reindex(columns=OUTPUT_COLS).sort_values("event_name")
-    out.to_csv(output_path, index=False, encoding="utf-8")
+    with atomic_output_path(output_path) as temporary:
+        out.to_csv(temporary, index=False, encoding="utf-8")
     print(f"Wrote {len(out)} rows to {output_path}")
 
 

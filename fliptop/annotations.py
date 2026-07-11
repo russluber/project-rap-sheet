@@ -49,6 +49,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import DATA_DIR
+from .io import atomic_output_path
 
 PathLike = str | Path
 
@@ -327,7 +328,8 @@ def save_results(results: pd.DataFrame, path: PathLike = RESULTS_PATH) -> Path:
     _require_results_schema(results, path)
     path.parent.mkdir(parents=True, exist_ok=True)
     out = results.sort_values("id")
-    out.to_csv(path, index=False)
+    with atomic_output_path(path) as temporary:
+        out.to_csv(temporary, index=False)
     return path
 
 

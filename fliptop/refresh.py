@@ -46,6 +46,7 @@ from pathlib import Path
 
 from . import DATA_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
 from .battles import build_battle_metadata
+from .io import atomic_output_path
 from .lineage import write_audit_outputs
 from .publish import (
     build_ft_battles_from_metadata,
@@ -176,7 +177,8 @@ def rebuild_processed(
 
     participants = build_battle_participants(ft_battles)
     participants_path = processed_dir / "battle_participants.csv"
-    participants.to_csv(participants_path, index=False)
+    with atomic_output_path(participants_path) as temporary:
+        participants.to_csv(temporary, index=False)
     print(f"[build] wrote {len(participants)} participant rows -> {participants_path}")
 
     emcees_path = processed_dir / "emcees.csv"

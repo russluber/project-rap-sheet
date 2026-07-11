@@ -26,6 +26,7 @@ from .events import (
     attach_event_metadata,
     drop_excluded_events,
 )
+from .io import atomic_output_path
 from .overrides import load_manual_matchups, load_upload_decisions
 from .publish import build_ft_battles_from_metadata
 from .rules import first_matching_rule
@@ -1055,11 +1056,16 @@ def write_audit_outputs(
     manual_path = debug_dir / "manual_matchup_needed.csv"
     summary_path = debug_dir / "pipeline_summary.csv"
     drops_path = debug_dir / "pipeline_stage_drops.csv"
-    excluded.to_csv(excluded_path, index=False)
-    lineage.to_csv(lineage_path, index=False)
-    manual_needed.to_csv(manual_path, index=False)
-    pipeline_summary.to_csv(summary_path, index=False)
-    pipeline_drops.to_csv(drops_path, index=False)
+    outputs = [
+        (excluded, excluded_path),
+        (lineage, lineage_path),
+        (manual_needed, manual_path),
+        (pipeline_summary, summary_path),
+        (pipeline_drops, drops_path),
+    ]
+    for frame, path in outputs:
+        with atomic_output_path(path) as temporary:
+            frame.to_csv(temporary, index=False)
     return excluded_path, lineage_path, manual_path, summary_path, drops_path
 
 

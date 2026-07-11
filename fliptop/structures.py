@@ -39,6 +39,7 @@ from pathlib import Path
 import networkx as nx
 import pandas as pd
 
+from .io import atomic_output_path
 from .overrides import load_manual_matchups
 from .rename_map import load_rename_map
 
@@ -82,7 +83,10 @@ def write_emcees_table(
     participants: pd.DataFrame | None = None,
 ) -> None:
     """Build the emcee table from ft_battles and write it to CSV."""
-    build_emcees_table(ft_battles, participants=participants).to_csv(out_path, index=False)
+    with atomic_output_path(out_path) as temporary:
+        build_emcees_table(ft_battles, participants=participants).to_csv(
+            temporary, index=False
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -245,11 +249,12 @@ def write_battle_participants_table(
     rename_map: dict[str, str] | None = None,
 ) -> None:
     """Build the participant table from ft_battles and write it to CSV."""
-    build_battle_participants(
-        ft_battles,
-        manual_matchups=manual_matchups,
-        rename_map=rename_map,
-    ).to_csv(out_path, index=False)
+    with atomic_output_path(out_path) as temporary:
+        build_battle_participants(
+            ft_battles,
+            manual_matchups=manual_matchups,
+            rename_map=rename_map,
+        ).to_csv(temporary, index=False)
 
 
 # ---------------------------------------------------------------------------

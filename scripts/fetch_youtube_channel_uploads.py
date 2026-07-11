@@ -24,6 +24,8 @@ from typing import Any
 
 import requests
 
+from fliptop.io import atomic_output_path
+
 # Default paths / constants
 DEFAULT_OUTPUT = os.path.join("data", "raw", "youtube_videos.json")
 DEFAULT_SECRET_PATH = os.path.join("data", "secret", "secret.json")
@@ -229,8 +231,10 @@ def save_metadata(path: str, records: list[dict[str, Any]]) -> None:
     """
     Save the list of metadata records to JSON with UTF-8 and nice indentation.
     """
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    with (
+        atomic_output_path(path) as temporary,
+        temporary.open("w", encoding="utf-8") as f,
+    ):
         json.dump(records, f, ensure_ascii=False, indent=2)
 
 
