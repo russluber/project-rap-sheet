@@ -131,19 +131,26 @@ def build_ft_battles(
     intermediate metadata with description/provenance columns.
     """
     from .battles import build_battle_metadata
+    from .inputs import load_pipeline_inputs
+
+    if inputs is None:
+        inputs = load_pipeline_inputs(
+            raw_dir,
+            youtube_json_name=youtube_json_name,
+            events_csv_name=events_csv_name,
+            versetracker_csv_name=versetracker_csv_name,
+            rename_map=rename_map,
+            manual_matchups=manual_matchups,
+            upload_decisions=upload_decisions,
+            vt_event_dates=vt_event_dates,
+            results=results,
+        )
 
     battle_metadata = build_battle_metadata(
         raw_dir=raw_dir,
-        youtube_json_name=youtube_json_name,
-        events_csv_name=events_csv_name,
-        versetracker_csv_name=versetracker_csv_name,
-        rename_map=rename_map,
-        manual_matchups=manual_matchups,
-        upload_decisions=upload_decisions,
-        vt_event_dates=vt_event_dates,
         inputs=inputs,
     )
-    if results is None and inputs is not None:
+    if results is None:
         results = inputs.results
     return build_ft_battles_from_metadata(
         battle_metadata,
