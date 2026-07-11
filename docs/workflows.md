@@ -243,6 +243,13 @@ Refresh processed FlipTop outputs
 
 ### If Something Looks Off
 
+If the command reports `ContractViolation`, start with the file or pipeline
+stage named on the first line. The bullets underneath are the concrete schema,
+key, blank-value, type, or vocabulary problems found there. Do not edit
+`data/processed/` to work around it: correct the named raw/maintained input or
+the named transform, then rerun. Contract failures happen before publication,
+so the existing three-file processed bundle remains intact.
+
 A few common "pause and inspect" signals:
 
 - A real battle appears in `filtered_out.csv`.

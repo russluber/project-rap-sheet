@@ -88,6 +88,17 @@ def test_missing_metadata_event_date_and_source_are_allowed():
     assert validate_battle_metadata(df, today=date(2020, 1, 1)) == []
 
 
+def test_metadata_requires_event_name_and_location_for_release():
+    df = _valid_metadata()
+    df.loc[0, "event_name"] = pd.NA
+    df.loc[1, "event_location"] = ""
+
+    problems = validate_battle_metadata(df, today=date(2020, 1, 1))
+
+    assert any("blank event_name" in problem for problem in problems)
+    assert any("blank event_location" in problem for problem in problems)
+
+
 # ---------------------------------------------------------------------------
 # failure modes
 # ---------------------------------------------------------------------------

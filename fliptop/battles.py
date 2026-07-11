@@ -41,7 +41,7 @@ import pandas as pd
 from . import events as _events
 from . import publish as _publish
 from . import uploads as _uploads
-from .contracts import RAW_EVENT_METADATA, RAW_YOUTUBE_UPLOADS
+from .contracts import BATTLE_METADATA_COLUMNS, RAW_EVENT_METADATA, RAW_YOUTUBE_UPLOADS
 
 # ---------------------------------------------------------------------------
 # I. Types and simple aliases
@@ -314,22 +314,7 @@ def consolidate_battle_parts(df: pd.DataFrame) -> pd.DataFrame:
 # The rich intermediate columns emitted by build_battle_metadata(), in order.
 # This table keeps provenance/debug columns that are useful inside the pipeline
 # but are not part of the final public analysis table.
-METADATA_COLUMNS = [
-    "id",
-    "title",
-    "description",
-    "upload_date",
-    "duration_seconds",
-    "duration_hms",
-    "emcee1",
-    "emcee2",
-    "matchup",
-    "event_name",
-    "event_date",
-    "event_date_source",
-    "event_location",
-    "url",
-]
+METADATA_COLUMNS = list(BATTLE_METADATA_COLUMNS)
 
 FINAL_COLUMNS = _publish.FINAL_COLUMNS
 FINAL_OUTPUT_FORBIDDEN_COLUMNS = _publish.FINAL_OUTPUT_FORBIDDEN_COLUMNS

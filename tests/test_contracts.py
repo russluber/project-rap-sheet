@@ -3,7 +3,13 @@
 import pandas as pd
 import pytest
 
-from fliptop.contracts import ContractViolation, TableContract
+import fliptop
+from fliptop.contracts import CONTRACT_REGISTRY, ContractViolation, TableContract, contract_versions
+
+
+def test_package_exports_contract_api():
+    assert fliptop.ContractViolation is ContractViolation
+    assert fliptop.TableContract is TableContract
 
 
 def test_contract_reports_multiple_problems_together():
@@ -72,3 +78,11 @@ def test_header_contract_can_validate_without_loading_rows():
 
     with pytest.raises(ContractViolation, match="columns are out of order"):
         contract.require_columns(["second", "first"])
+
+
+def test_contract_registry_has_stable_version_for_every_boundary():
+    versions = contract_versions()
+
+    assert set(versions) == set(CONTRACT_REGISTRY)
+    assert versions["raw.youtube_uploads"] == 1
+    assert versions["pipeline.finalize_battle_metadata"] == 1
