@@ -41,10 +41,6 @@ import pandas as pd
 from . import events as _events
 from . import publish as _publish
 from . import uploads as _uploads
-from .overrides import (
-    load_manual_matchups,
-    load_upload_decisions,
-)
 
 # ---------------------------------------------------------------------------
 # I. Types and simple aliases
@@ -482,33 +478,19 @@ def build_battle_metadata(
         ``event_date_source``; use :func:`build_ft_battles` for the final
         result-enriched analysis table.
     """
-    raw_dir = Path(raw_dir)
+    from .pipeline import build_pipeline_run
 
-    if vt_event_dates is None:
-        vt_event_dates = load_versetracker_event_dates(raw_dir / versetracker_csv_name)
-
-    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
-    df_events = load_event_metadata(raw_dir / events_csv_name)
-    if manual_matchups is None:
-        manual_matchups = load_manual_matchups()
-    if upload_decisions is None:
-        upload_decisions = load_upload_decisions()
-
-    df_1v1 = make_df_1v1_uploads(
-        df_yt,
+    run = build_pipeline_run(
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+        versetracker_csv_name=versetracker_csv_name,
         rename_map=rename_map,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
+        vt_event_dates=vt_event_dates,
     )
-    df_with_meta = attach_event_metadata(df_1v1, df_events)
-    df_with_meta = _keep_upload_decision_includes(
-        df_with_meta,
-        drop_excluded_events(df_with_meta),
-        upload_decisions,
-    )
-    battle_metadata = finalize_battles(df_with_meta, vt_event_dates=vt_event_dates)
-
-    return battle_metadata
+    return run.battle_metadata
 
 
 def build_ft_battles_from_metadata(

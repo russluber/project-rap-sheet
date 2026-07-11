@@ -29,6 +29,7 @@ from .events import (
 from .io import atomic_output_path
 from .overrides import load_manual_matchups, load_upload_decisions
 from .publish import build_ft_battles_from_metadata
+from .rename_map import load_rename_map
 from .rules import first_matching_rule
 from .uploads import (
     TITLE_EXCLUSION_RULES,
@@ -43,6 +44,10 @@ from .uploads import (
     _part_num,
     _pending_manual_matchup_ids,
     _upload_decision_audit_fields,
+    add_matchup_and_split,
+    add_matchup_clean,
+    apply_emcee_rename,
+    apply_manual_matchup_overrides,
     drop_non_battles,
     filter_titles_with_vs,
     keep_1v1_or_manual_matchup,
@@ -91,6 +96,7 @@ def _rule_audit_fields(row) -> dict[str, object]:
 def _upload_stage_trace(
     df_yt: pd.DataFrame,
     df_events: pd.DataFrame,
+    rename_map: RenameMap | None = None,
     manual_matchups: ManualMatchupMap | None = None,
     upload_decisions: UploadDecisionMap | None = None,
 ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame, pd.DataFrame]:
@@ -105,6 +111,8 @@ def _upload_stage_trace(
         manual_matchups = load_manual_matchups()
     if upload_decisions is None:
         upload_decisions = load_upload_decisions()
+    if rename_map is None:
+        rename_map = load_rename_map()
 
     pre = prepare_uploads(df_yt)
     after_decisions, decision_excluded, needs_upload_review = _hold_upload_decision_rows(
@@ -186,7 +194,16 @@ def _upload_stage_trace(
         ),
         upload_decisions,
     )
-    with_event_meta = attach_event_metadata(after_1v1, df_events)
+    parsed_1v1 = (
+        after_1v1.pipe(add_matchup_and_split)
+        .pipe(apply_manual_matchup_overrides, manual_matchups=manual_matchups)
+        .pipe(apply_emcee_rename, rename_map=rename_map)
+        .pipe(add_matchup_clean)
+    )
+    if "upload_date" in parsed_1v1.columns:
+        parsed_1v1 = parsed_1v1.sort_values("upload_date").reset_index(drop=True)
+
+    with_event_meta = attach_event_metadata(parsed_1v1, df_events)
     after_event_filter = _keep_upload_decision_includes(
         with_event_meta,
         drop_excluded_events(with_event_meta),
@@ -285,6 +302,7 @@ def _upload_stage_trace(
         "drop_non_battles": after_nonbattle,
         "manual_matchup_review_split": not_pending,
         "keep_1v1_or_manual_matchup": after_1v1,
+        "parse_and_canonicalize_matchups": parsed_1v1,
         "attach_event_metadata": with_event_meta,
         "drop_excluded_events": after_event_filter,
     }
