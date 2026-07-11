@@ -38,12 +38,12 @@ modules consume it.
 
 ```
  data/raw/youtube_videos.json ─┐
-                               ├─► uploads.py ─► events.py ─► battles.py ─► publish.py ─► ft_battles ──┬─► structures.py
+                               ├─► pipeline.py ─► battles.py ─► publish.py ─► ft_battles ──┬─► structures.py
  data/raw/matchup_events_      ─┘   (+ emcee_aliases.csv)      │
    metadata.csv                                                ??? annotations.py (validated result store)
 
  scripts/ (fetch raw) ──► data/raw/        refresh.py orchestrates: fetch (optional) → build → write
-                                           lineage.py writes audit/debug tables
+                                           lineage.py projects audits from the same run
                                            annotate.py records battle results into data/annotations/
 ```
 
@@ -52,7 +52,10 @@ modules consume it.
 - **Two layers, one public output.** `build_battle_metadata()` keeps the rich
   audit table with provenance fields; `build_ft_battles()` joins validated
   annotations and emits the final analysis table.
-- **Logic is separate from CLI.** `battles.py`/`lineage.py` ↔ `refresh.py`
+- **One execution, many outputs.** `pipeline.py` records stage frames and row
+  exits once; `battles.py` exposes metadata compatibility helpers, while
+  `lineage.py` projects every audit table from that exact run.
+- **Logic is separate from CLI.** `pipeline.py`/`lineage.py` ↔ `refresh.py`
   (build/audit ↔ command) and `annotations.py` ↔ `annotate.py` (store ↔ command)
   are deliberate splits.
 - **Hand-maintained data lives in `data/` files, not in code** — emcee aliases,
@@ -68,7 +71,8 @@ modules consume it.
 ```
 fliptop/
 ├── __init__.py         # package init: shared data-dir paths + lazy public API
-├── battles.py          # metadata/output orchestration: raw sources -> ft_battles
+├── pipeline.py         # one execution: stages, exits, reviews, and battle metadata
+├── battles.py          # battle finalization + compatibility metadata entry point
 ├── uploads.py          # upload-side cleaning, title filters, and matchup parsing
 ├── events.py           # event metadata parsing, date/location fixes, event joins
 ├── publish.py          # final ft_battles schema, annotation join, and file writes
@@ -87,22 +91,23 @@ fliptop/
 
 ## The pipeline: raw → `ft_battles`
 
-`battles.py` orchestrates the metadata build. Upload-side cleaning and filters
-live in `uploads.py`; event metadata parsing and date/location fixes live in
-`events.py`; final `ft_battles` publishing lives in `publish.py`; row-level
-audit tables live in `lineage.py`.
+`pipeline.py` orchestrates the metadata build and returns a `PipelineRun` that
+contains the raw inputs, stage frames, recorded exits/reviews, and final battle
+metadata. Upload-side transforms live in `uploads.py`; event metadata parsing
+and date/location fixes live in `events.py`; final publishing lives in
+`publish.py`; `lineage.py` derives row-level audit tables from the same run.
 `build_battle_metadata(raw_dir=...)` runs three cleaning stages and returns the
 rich metadata table. `build_ft_battles` then joins validated battle results and
 returns the final analysis table.
 
 ```
-build_ft_battles
-  ├─ make_df_1v1_uploads      Stage 1: raw YouTube uploads -> clean 1v1 uploads
-  ├─ attach_event_metadata    Stage 2: merge event name / date / location
-  ├─ drop_excluded_events              remove excluded event categories
-  ├─ finalize_battles         Stage 3: consolidate parts, tidy, override, order
-  └─ publish.build_ft_battles_from_metadata
-                               Stage 4: join annotations and select final columns
+build_pipeline_run
+  ├─ upload stages + recorded exits/reviews
+  ├─ attach/filter event metadata
+  └─ finalize_battles -> PipelineRun.battle_metadata
+
+build_ft_battles_from_metadata
+  └─ join annotations and select final columns
 ```
 
 Each stage is a thin orchestration over small, single-purpose transforms (most
@@ -116,13 +121,13 @@ lazy re-exports; the owning module below is where the behavior lives.
 
 | order | stage | owner | input | output | exits / notes |
 | ----- | ----- | ----- | ----- | ------ | ------------- |
-| 1 | load raw sources | `battles.py` | `data/raw/youtube_videos.json`, `data/raw/matchup_events_metadata.csv`, `data/raw/versetracker_event_dates.csv` | raw upload/event frames plus VerseTracker date map | File loading only; no filtering. |
+| 1 | load raw sources | `pipeline.py` | `data/raw/youtube_videos.json`, `data/raw/matchup_events_metadata.csv`, `data/raw/versetracker_event_dates.csv` | raw upload/event frames plus VerseTracker date map | File loading only; no filtering. |
 | 2 | clean and filter uploads | `uploads.py` | raw YouTube uploads, alias map, `manual_matchups.csv`, `upload_decisions.csv`, `title_exclusions.csv` | parseable 1v1 upload candidates with canonical `emcee1`, `emcee2`, `matchup_clean` | Exact upload decisions can include/exclude/review rows; title/format filters remove non-battles and unsupported multi-emcee titles unless manually resolved. |
 | 3 | attach and filter event metadata | `events.py` | 1v1 uploads plus scraped event metadata and event/location/date overrides | uploads with `event_name`, `event_date`, `event_date_source`, `event_location_clean` | COVID-era website dates are masked, post-COVID descriptions can fill missing metadata, and `event_exclusions.csv` removes out-of-scope event categories. |
 | 4 | finalize battle metadata | `battles.py` | event-enriched upload rows plus VerseTracker dates | rich one-row-per-battle metadata with `METADATA_COLUMNS` | Multi-part uploads are consolidated; event locations/dates are overridden or imputed; provenance/debug fields remain available. |
 | 5 | publish final output | `publish.py` | rich battle metadata plus `battle_results.csv` | standalone `ft_battles` table with `FINAL_COLUMNS` | Annotation results are validated and joined; list-valued multipart ids are scalarized; provenance/debug-only columns are intentionally excluded. |
 | 6 | derive analysis structures | `structures.py` | final `ft_battles` | `battle_participants.csv`, `emcees.csv`, battle network | No-show/helper participation is modeled in the participant table. |
-| audit | explain every raw upload | `lineage.py` | raw sources plus the same rules/overrides used above | `upload_lineage.csv`, `filtered_out.csv`, `manual_matchup_needed.csv`, `pipeline_summary.csv`, `pipeline_stage_drops.csv` | Mirrors the same filter trace so debug artifacts stay reproducible and aligned with the build. |
+| audit | explain every raw upload | `lineage.py` | the completed `PipelineRun` | `upload_lineage.csv`, `filtered_out.csv`, `manual_matchup_needed.csv`, `pipeline_summary.csv`, `pipeline_stage_drops.csv` | Projects the exits and stage frames recorded by the actual build; no second filter execution. |
 
 ### Stage 1 — clean YouTube uploads → 1v1 uploads
 
