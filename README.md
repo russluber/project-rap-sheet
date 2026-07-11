@@ -189,6 +189,11 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
   `data/annotations/battle_results.csv`, and writes the local audit files in
   `data/debug/`. If the candidate has missing results, unresolved uploads, or
   invalid data, the command exits without changing any processed file.
+- Before cleaning starts, shared table contracts check the raw files and every
+  hand-maintained CSV for the expected columns, types, keys, and allowed values.
+  The same checks run again at the major in-memory pipeline boundaries. A
+  contract failure names the source file or exact stage that broke, and no
+  processed file is changed.
 - `--fetch` first runs the two collection scripts in `scripts/` to refresh the
   raw data (this needs a YouTube API key — see `data/README.md`), then rebuilds.
   Override the channel or scrape years with `--channel`, `--start`, `--end`.
@@ -204,6 +209,7 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
   `data/debug/release_changes_summary.txt`, and `data/debug/run_manifest.json`.
   The release files tell you what needs human attention, what would change from
   the current published dataset, and which exact inputs produced the run. The
+  manifest also records the version of every active table contract. The
   lineage file has one row per
   raw YouTube upload and records whether each upload was included, excluded,
   folded into a multi-part battle, or held for manual matchup resolution.

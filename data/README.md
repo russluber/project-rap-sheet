@@ -62,6 +62,30 @@ rules/ ───────────┤
 
 ---
 
+## Data contracts
+
+[`fliptop/contracts.py`](../fliptop/contracts.py) is the machine-readable
+rulebook for the project's important tables. It defines required columns and
+their order, key uniqueness, non-blank fields, parseable numeric/date fields,
+and small allowed-value lists. Contracts are checked:
+
+- when the three raw source files are loaded;
+- when aliases, overrides, rules, and battle results are loaded;
+- after the major cleaning stages; and
+- again when the release candidate is validated.
+
+Hand-maintained CSV headers are intentionally exact and ordered. This makes a
+mistyped, missing, reordered, or newly invented column a visible schema change
+instead of something the pipeline silently ignores. If a schema really needs
+to change, update its versioned contract and consumers in the same code change.
+Each refresh records the active versions in `data/debug/run_manifest.json`.
+
+A `ContractViolation` names the failing file or pipeline stage and lists all
+structural problems found together. Correct that source problem and rerun the
+refresh; the existing processed bundle is not changed by a contract failure.
+
+---
+
 ## `emcee_aliases.csv`
 
 Hand-maintained mapping from name **variants** to a single **canonical** emcee

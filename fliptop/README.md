@@ -58,6 +58,9 @@ passing candidate replaces the three processed tables that other modules use.
 - **Review before release.** `release.py` builds the final tables and human
   review queues together. It records the run and proposed changes before the
   official processed files are replaced as a rollback-safe bundle.
+- **Contracts at every boundary.** `contracts.py` declares the schema, key,
+  type, blank-value, and vocabulary rules for source tables and major pipeline
+  stages. Failures identify the file or transform that introduced the problem.
 - **Logic is separate from CLI.** `pipeline.py`/`lineage.py` ↔ `refresh.py`
   (build/audit ↔ command) and `annotations.py` ↔ `annotate.py` (store ↔ command)
   are deliberate splits.
@@ -100,6 +103,8 @@ metadata. Upload-side transforms live in `uploads.py`; event metadata parsing
 and date/location fixes live in `events.py`; final publishing lives in
 `publish.py`; `lineage.py` derives row-level audit tables from the same run;
 `release.py` combines those products into a candidate and controls publication.
+`contracts.py` supplies the shared rulebook enforced by loaders and by the
+major stage transitions in `pipeline.py`.
 `build_battle_metadata(raw_dir=...)` runs three cleaning stages and returns the
 rich metadata table. `build_ft_battles` then joins validated battle results and
 returns the final analysis table.
@@ -116,6 +121,8 @@ build_ft_battles_from_metadata
 
 Each stage is a thin orchestration over small, single-purpose transforms (most
 take a DataFrame and return a new one), which keeps them easy to read and test.
+The contracts after preparation, matchup parsing, event enrichment/filtering,
+and metadata finalization make each module's output assumptions explicit.
 
 ## Pipeline Map
 
@@ -505,6 +512,20 @@ fliptop-annotate --redo "A vs B" # re-annotate an existing battle (fix a mistake
 ```
 
 ---
+
+## Table contracts and output validation
+
+`contracts.py` guards structure at the point data enters or crosses a major
+boundary. `TableContract` checks columns and order, key uniqueness, blanks,
+basic types/date parsing, and closed vocabularies. `ContractViolation` reports
+all structural problems it finds and includes either the source path or the
+named pipeline stage. Contract definitions carry versions; `run_manifest.json`
+records all active versions with the input hashes and Git commit.
+
+These structural contracts complement the domain-quality gate rather than
+replace it. For example, a contract can prove that `event_date` is a date, while
+`validate.py` decides whether that date is historically plausible; the result
+store also retains its cross-field judging rules.
 
 ## Output validation gate
 
