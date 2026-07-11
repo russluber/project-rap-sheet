@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +25,10 @@ class PipelineRun:
     """All reusable products from one execution of the metadata pipeline."""
 
     raw_dir: Path
+    rename_map: Mapping[str, str]
+    manual_matchups: ManualMatchupMap
+    upload_decisions: UploadDecisionMap
+    vt_event_dates: Mapping[str, pd.Timestamp]
     raw_uploads: pd.DataFrame
     raw_events: pd.DataFrame
     stages: dict[str, pd.DataFrame]
@@ -74,6 +79,10 @@ def build_pipeline_run(
 
     return PipelineRun(
         raw_dir=raw_dir,
+        rename_map=rename_map,
+        manual_matchups=manual_matchups,
+        upload_decisions=upload_decisions,
+        vt_event_dates=vt_event_dates,
         raw_uploads=raw_uploads,
         raw_events=raw_events,
         stages=stages,

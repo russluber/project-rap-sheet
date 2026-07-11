@@ -12,14 +12,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from .battles import (
-    build_battle_metadata,
-    load_event_metadata,
-    load_youtube_uploads,
-)
 from .events import (
     EVENT_EXCLUSION_RE,
     EVENT_EXCLUSION_RULES,
@@ -53,6 +49,39 @@ from .uploads import (
     keep_1v1_or_manual_matchup,
     prepare_uploads,
 )
+
+if TYPE_CHECKING:
+    from .pipeline import PipelineRun
+
+
+def _resolve_pipeline_run(
+    pipeline_run: PipelineRun | None,
+    *,
+    raw_dir: PathLike,
+    youtube_json_name: str = "youtube_videos.json",
+    events_csv_name: str = "matchup_events_metadata.csv",
+    versetracker_csv_name: str = "versetracker_event_dates.csv",
+    rename_map: RenameMap | None = None,
+    manual_matchups: ManualMatchupMap | None = None,
+    upload_decisions: UploadDecisionMap | None = None,
+    vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
+) -> PipelineRun:
+    """Return the supplied run or execute the pipeline once for this request."""
+    if pipeline_run is not None:
+        return pipeline_run
+
+    from .pipeline import build_pipeline_run
+
+    return build_pipeline_run(
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+        versetracker_csv_name=versetracker_csv_name,
+        rename_map=rename_map,
+        manual_matchups=manual_matchups,
+        upload_decisions=upload_decisions,
+        vt_event_dates=vt_event_dates,
+    )
 
 
 def _event_name_lookup(df_events: pd.DataFrame) -> pd.DataFrame:
@@ -341,14 +370,16 @@ def build_excluded_uploads(
     events_csv_name: str = "matchup_events_metadata.csv",
     manual_matchups: ManualMatchupMap | None = None,
     upload_decisions: UploadDecisionMap | None = None,
+    *,
+    pipeline_run: PipelineRun | None = None,
 ) -> pd.DataFrame:
     """
     Return the raw uploads that the pipeline drops, tagged with the reason.
 
     Audit helper: lets you eyeball everything the pipeline excludes so real
-    battles are not silently filtered out. It reruns the title/format filters
-    in the same order, then attaches event metadata and applies the event-name
-    exclusions, recording the first stage that removed each video:
+    battles are not silently filtered out. It projects the recorded exits from
+    the supplied pipeline run (or builds one), preserving the first stage that
+    removed each video:
 
         - "no 'vs' token"      (filter_titles_with_vs)
         - "non-battle keyword" (drop_non_battles; rule metadata is recorded)
@@ -362,15 +393,15 @@ def build_excluded_uploads(
         One row per excluded upload, with id, both titles, upload_date, url,
         `excluded_reason`, `exit_category`, and rule metadata where applicable.
     """
-    raw_dir = Path(raw_dir)
-    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
-    df_events = load_event_metadata(raw_dir / events_csv_name)
-    _, _, excluded, _ = _filter_upload_stages(
-        df_yt,
-        df_events,
+    run = _resolve_pipeline_run(
+        pipeline_run,
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
     )
+    excluded = run.excluded_uploads.copy()
 
     cols = [
         "id",
@@ -475,6 +506,8 @@ def build_upload_lineage(
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
     battle_metadata: pd.DataFrame | None = None,
     results: pd.DataFrame | None = None,
+    *,
+    pipeline_run: PipelineRun | None = None,
 ) -> pd.DataFrame:
     """
     Build a one-row-per-YouTube-upload audit table for the wrangling pipeline.
@@ -495,19 +528,24 @@ def build_upload_lineage(
     """
     from .annotations import battle_key, load_results
 
-    raw_dir = Path(raw_dir)
-    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
-    df_events = load_event_metadata(raw_dir / events_csv_name)
-    if manual_matchups is None:
-        manual_matchups = load_manual_matchups()
-    if upload_decisions is None:
-        upload_decisions = load_upload_decisions()
-    prepared, _kept, excluded, needs_manual = _filter_upload_stages(
-        df_yt,
-        df_events,
+    run = _resolve_pipeline_run(
+        pipeline_run,
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+        versetracker_csv_name=versetracker_csv_name,
+        rename_map=rename_map,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
+        vt_event_dates=vt_event_dates,
     )
+    manual_matchups = run.manual_matchups
+    upload_decisions = run.upload_decisions
+    rename_map = run.rename_map
+    prepared = run.stages["prepare_uploads"]
+    excluded = run.excluded_uploads
+    needs_manual = run.review_uploads
+    df_events = run.raw_events
 
     base_cols = ["id", "yt_raw_title", "title", "upload_date", "url"]
     lineage = prepared[[c for c in base_cols if c in prepared.columns]].copy()
@@ -591,16 +629,7 @@ def build_upload_lineage(
             )
 
     if battle_metadata is None:
-        battle_metadata = build_battle_metadata(
-            raw_dir=raw_dir,
-            youtube_json_name=youtube_json_name,
-            events_csv_name=events_csv_name,
-            versetracker_csv_name=versetracker_csv_name,
-            rename_map=rename_map,
-            manual_matchups=manual_matchups,
-            upload_decisions=upload_decisions,
-            vt_event_dates=vt_event_dates,
-        )
+        battle_metadata = run.battle_metadata
 
     final_rows: list[dict[str, object]] = []
     for _, battle in battle_metadata.iterrows():
@@ -698,6 +727,8 @@ def build_manual_matchup_review_uploads(
     events_csv_name: str = "matchup_events_metadata.csv",
     manual_matchups: ManualMatchupMap | None = None,
     upload_decisions: UploadDecisionMap | None = None,
+    *,
+    pipeline_run: PipelineRun | None = None,
 ) -> pd.DataFrame:
     """
     Return known battle uploads awaiting a hand-entered 1v1 matchup.
@@ -707,15 +738,15 @@ def build_manual_matchup_review_uploads(
     generic ``filtered_out.csv`` audit, but are not included in final battle
     metadata until the two emcee columns are resolved.
     """
-    raw_dir = Path(raw_dir)
-    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
-    df_events = load_event_metadata(raw_dir / events_csv_name)
-    _, _, _, needs_manual = _filter_upload_stages(
-        df_yt,
-        df_events,
+    run = _resolve_pipeline_run(
+        pipeline_run,
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
     )
+    needs_manual = run.review_uploads.copy()
     if not needs_manual.empty and "stage" in needs_manual.columns:
         needs_manual = needs_manual[needs_manual["stage"] == "manual_matchup_override"].copy()
 
@@ -775,6 +806,8 @@ def build_pipeline_stage_summary(
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
     battle_metadata: pd.DataFrame | None = None,
     ft_battles: pd.DataFrame | None = None,
+    *,
+    pipeline_run: PipelineRun | None = None,
 ) -> pd.DataFrame:
     """
     Summarize raw-to-output row counts at each major wrangling stage.
@@ -783,20 +816,20 @@ def build_pipeline_stage_summary(
     row-count changes step by step, while ``build_pipeline_stage_drops`` lists
     the exact upload ids that exited at filter/manual-review stages.
     """
-    raw_dir = Path(raw_dir)
-    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
-    df_events = load_event_metadata(raw_dir / events_csv_name)
-    if manual_matchups is None:
-        manual_matchups = load_manual_matchups()
-    if upload_decisions is None:
-        upload_decisions = load_upload_decisions()
-
-    trace, excluded, needs_manual = _upload_stage_trace(
-        df_yt,
-        df_events,
+    run = _resolve_pipeline_run(
+        pipeline_run,
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+        versetracker_csv_name=versetracker_csv_name,
+        rename_map=rename_map,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
+        vt_event_dates=vt_event_dates,
     )
+    trace = run.stages
+    excluded = run.excluded_uploads
+    needs_manual = run.review_uploads
 
     needs_manual_matchup = (
         needs_manual[needs_manual["stage"] == "manual_matchup_override"]
@@ -820,16 +853,7 @@ def build_pipeline_stage_summary(
     ]
 
     if battle_metadata is None:
-        battle_metadata = build_battle_metadata(
-            raw_dir=raw_dir,
-            youtube_json_name=youtube_json_name,
-            events_csv_name=events_csv_name,
-            versetracker_csv_name=versetracker_csv_name,
-            rename_map=rename_map,
-            manual_matchups=manual_matchups,
-            upload_decisions=upload_decisions,
-            vt_event_dates=vt_event_dates,
-        )
+        battle_metadata = run.battle_metadata
     if ft_battles is None:
         ft_battles = build_ft_battles_from_metadata(
             battle_metadata,
@@ -962,6 +986,8 @@ def build_pipeline_stage_drops(
     events_csv_name: str = "matchup_events_metadata.csv",
     manual_matchups: ManualMatchupMap | None = None,
     upload_decisions: UploadDecisionMap | None = None,
+    *,
+    pipeline_run: PipelineRun | None = None,
 ) -> pd.DataFrame:
     """
     Return the exact raw upload rows that exit at filter/manual-review stages.
@@ -970,20 +996,16 @@ def build_pipeline_stage_drops(
     rows. This table keeps the stage/status columns, so manual-review holds are
     visible alongside true exclusions.
     """
-    raw_dir = Path(raw_dir)
-    df_yt = load_youtube_uploads(raw_dir / youtube_json_name)
-    df_events = load_event_metadata(raw_dir / events_csv_name)
-    if manual_matchups is None:
-        manual_matchups = load_manual_matchups()
-    if upload_decisions is None:
-        upload_decisions = load_upload_decisions()
-
-    _, excluded, needs_manual = _upload_stage_trace(
-        df_yt,
-        df_events,
+    run = _resolve_pipeline_run(
+        pipeline_run,
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
     )
+    excluded = run.excluded_uploads
+    needs_manual = run.review_uploads
 
     exits = pd.concat([excluded, needs_manual], ignore_index=True)
     if exits.empty:
@@ -1019,6 +1041,8 @@ def write_audit_outputs(
     events_csv_name: str = "matchup_events_metadata.csv",
     manual_matchups: ManualMatchupMap | None = None,
     upload_decisions: UploadDecisionMap | None = None,
+    *,
+    pipeline_run: PipelineRun | None = None,
 ) -> tuple[Path, Path, Path, Path, Path]:
     """
     Write the reproducible debug audit files and return their paths.
@@ -1032,6 +1056,14 @@ def write_audit_outputs(
     """
     debug_dir = Path(debug_dir)
     debug_dir.mkdir(parents=True, exist_ok=True)
+    run = _resolve_pipeline_run(
+        pipeline_run,
+        raw_dir=raw_dir,
+        youtube_json_name=youtube_json_name,
+        events_csv_name=events_csv_name,
+        manual_matchups=manual_matchups,
+        upload_decisions=upload_decisions,
+    )
 
     excluded = build_excluded_uploads(
         raw_dir=raw_dir,
@@ -1039,6 +1071,7 @@ def write_audit_outputs(
         events_csv_name=events_csv_name,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
+        pipeline_run=run,
     )
     lineage = build_upload_lineage(
         raw_dir=raw_dir,
@@ -1046,6 +1079,7 @@ def write_audit_outputs(
         events_csv_name=events_csv_name,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
+        pipeline_run=run,
     )
     manual_needed = build_manual_matchup_review_uploads(
         raw_dir=raw_dir,
@@ -1053,6 +1087,7 @@ def write_audit_outputs(
         events_csv_name=events_csv_name,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
+        pipeline_run=run,
     )
     pipeline_summary = build_pipeline_stage_summary(
         raw_dir=raw_dir,
@@ -1060,6 +1095,7 @@ def write_audit_outputs(
         events_csv_name=events_csv_name,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
+        pipeline_run=run,
     )
     pipeline_drops = build_pipeline_stage_drops(
         raw_dir=raw_dir,
@@ -1067,6 +1103,7 @@ def write_audit_outputs(
         events_csv_name=events_csv_name,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
+        pipeline_run=run,
     )
 
     excluded_path = debug_dir / "filtered_out.csv"
