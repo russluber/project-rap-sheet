@@ -57,6 +57,10 @@ DEFAULT_HEADERS = {
 _VS = re.compile(r"\s+vs\s+", re.I)
 
 
+class IncompleteScrapeError(RuntimeError):
+    """Raised when a scrape cannot prove it collected a complete snapshot."""
+
+
 # ---------------------------------------------------------------------
 # Utility helpers
 # ---------------------------------------------------------------------
@@ -236,41 +240,53 @@ def parse_event_live(
         "div.row.my-4"
     )
 
+    if top_row is None:
+        raise IncompleteScrapeError(f"{event_url}: main battle block was not found")
+
+    # All YouTube player divs and matchup headings for this event block. A
+    # mismatch indicates source-HTML drift; truncating with zip would silently
+    # drop battles from a full overwrite.
+    video_divs = top_row.select("div.col-md-5.my-3 div.youtube-player")
+    matchup_els = top_row.select("div.col-md-7.my-3 h4")
+    if not video_divs or not matchup_els:
+        raise IncompleteScrapeError(f"{event_url}: no battle rows were found")
+    if len(video_divs) != len(matchup_els):
+        raise IncompleteScrapeError(
+            f"{event_url}: found {len(video_divs)} video players but "
+            f"{len(matchup_els)} matchup headings"
+        )
+
     rows: list[dict] = []
+    for vid_div, h4 in zip(video_divs, matchup_els):
+        raw_id = vid_div.get("data-id") or None
+        txt = h4.get_text(" ", strip=True)
 
-    if top_row:
-        # All YouTube player divs for this event block
-        video_divs = top_row.select("div.col-md-5.my-3 div.youtube-player")
-        # All matchup h4s for this event block
-        matchup_els = top_row.select("div.col-md-7.my-3 h4")
-
-        # Protect against length mismatches by zipping
-        for vid_div, h4 in zip(video_divs, matchup_els):
-            raw_id = vid_div.get("data-id") or None
-            txt = h4.get_text(" ", strip=True)
-
-            if not txt or not _VS.search(txt) or not (3 <= len(txt) <= 100):
-                continue
-
-            left_right = _VS.split(txt, maxsplit=1)
-            if len(left_right) != 2:
-                continue
-
-            em1 = _canon(left_right[0], rename_map)
-            em2 = _canon(left_right[1], rename_map)
-
-            # trim common postfixes from the right emcee
-            em2 = re.split(r"\s*[@|(*]", em2)[0].strip()
-            em2 = re.sub(r"\s+\d+$", "", em2).strip()
-
-            rows.append(
-                {
-                    "matchup": f"{em1} vs {em2}",
-                    "event_name": event_name,
-                    "event_description": event_description,
-                    "video_id": raw_id,
-                }
+        if not txt or not _VS.search(txt) or not (3 <= len(txt) <= 100):
+            raise IncompleteScrapeError(
+                f"{event_url}: invalid matchup heading {txt!r}"
             )
+
+        left_right = _VS.split(txt, maxsplit=1)
+        if len(left_right) != 2:
+            raise IncompleteScrapeError(
+                f"{event_url}: could not split matchup heading {txt!r}"
+            )
+
+        em1 = _canon(left_right[0], rename_map)
+        em2 = _canon(left_right[1], rename_map)
+
+        # trim common postfixes from the right emcee
+        em2 = re.split(r"\s*[@|(*]", em2)[0].strip()
+        em2 = re.sub(r"\s+\d+$", "", em2).strip()
+
+        rows.append(
+            {
+                "matchup": f"{em1} vs {em2}",
+                "event_name": event_name,
+                "event_description": event_description,
+                "video_id": raw_id,
+            }
+        )
 
     return rows
 
@@ -291,6 +307,7 @@ def scrape_year(
     request_sleep: float = 0.7,
     timeout: int = 30,
     verbose: bool = True,
+    strict: bool = False,
 ) -> pd.DataFrame:
     """
     Scrape a single year of FlipTop battle events.
@@ -316,12 +333,15 @@ def scrape_year(
     )
 
     found = len(links)
+    if strict and found == 0:
+        raise IncompleteScrapeError(f"{year}: no event pages were discovered")
     links = _filter_known_links(links, skip_event_names)
     if verbose:
         skipped = found - len(links)
         suffix = f" ({skipped} already known, skipped)" if skipped else ""
         print(f"{year}: found {found} event pages, scraping {len(links)}{suffix}")
 
+    failures: list[str] = []
     for _event_name, event_url in links:
         try:
             out_rows.extend(
@@ -337,7 +357,15 @@ def scrape_year(
             )
         except Exception as e:
             print(f"[warn] {year} {event_url} -> {e}")
+            failures.append(f"{event_url}: {e}")
         time.sleep(sleep)
+
+    if strict and failures:
+        shown = "\n".join(f"  - {failure}" for failure in failures)
+        raise IncompleteScrapeError(
+            f"{year}: {len(failures)} event page(s) failed; refusing partial scrape:\n"
+            + shown
+        )
 
     return pd.DataFrame(
         out_rows,
@@ -358,6 +386,7 @@ def scrape_years(
     request_sleep: float = 0.7,
     timeout: int = 30,
     verbose: bool = True,
+    strict: bool = False,
 ) -> pd.DataFrame:
     """
     Scrape a range of years and return one concatenated DataFrame.
@@ -389,6 +418,7 @@ def scrape_years(
                 request_sleep=request_sleep,
                 timeout=timeout,
                 verbose=verbose,
+                strict=strict,
             )
         )
 
@@ -422,6 +452,47 @@ def write_events_to_csv(df: pd.DataFrame, output_path: str) -> None:
 # ---------------------------------------------------------------------
 
 EVENT_COLS = ["matchup", "event_name", "event_description", "video_id"]
+
+
+def validate_full_snapshot(
+    df: pd.DataFrame,
+    output_path: str,
+    *,
+    minimum_existing_fraction: float = 0.9,
+) -> None:
+    """Reject an empty, malformed, duplicate, or suspiciously small overwrite."""
+    missing = [column for column in EVENT_COLS if column not in df.columns]
+    if missing:
+        raise IncompleteScrapeError(
+            "scraped event data is missing required columns: " + ", ".join(missing)
+        )
+    if df.empty:
+        raise IncompleteScrapeError("scraped event data is empty; refusing full overwrite")
+
+    ids = df.loc[_has_video_id(df["video_id"]), "video_id"].astype(str).str.strip()
+    duplicates = ids[ids.duplicated()].unique().tolist()
+    if duplicates:
+        shown = ", ".join(duplicates[:5])
+        raise IncompleteScrapeError(
+            f"scraped event data has {len(duplicates)} duplicate video id(s): {shown}"
+        )
+
+    if not os.path.exists(output_path):
+        return
+    try:
+        existing = pd.read_csv(output_path)
+    except Exception as exc:
+        raise IncompleteScrapeError(
+            f"{output_path}: existing event data is unreadable; refusing overwrite"
+        ) from exc
+
+    minimum_rows = int(len(existing) * minimum_existing_fraction)
+    if len(existing) and len(df) < minimum_rows:
+        raise IncompleteScrapeError(
+            f"scrape returned {len(df)} rows versus {len(existing)} existing rows; "
+            "refusing a suspiciously smaller full overwrite (use --allow-shrink "
+            "only when this reduction is intentional)"
+        )
 
 
 def _existing_event_names(path: str) -> set:
@@ -602,6 +673,13 @@ def main() -> None:
              "--merge.",
     )
 
+    parser.add_argument(
+        "--allow-shrink",
+        action="store_true",
+        help="Allow a full overwrite with substantially fewer rows than the existing "
+             "CSV. Use only when the source dataset intentionally became smaller.",
+    )
+
     args = parser.parse_args()
 
     if args.start > args.end:
@@ -635,11 +713,17 @@ def main() -> None:
         request_sleep=args.request_sleep,
         timeout=args.timeout,
         verbose=not args.quiet,
+        strict=True,
     )
 
     if args.merge:
         merge_events_into_csv(df, args.output)
     else:
+        validate_full_snapshot(
+            df,
+            args.output,
+            minimum_existing_fraction=0.0 if args.allow_shrink else 0.9,
+        )
         write_events_to_csv(df, args.output)
 
 

@@ -93,3 +93,11 @@ def test_write_event_dates_to_csv_sorts_and_keeps_schema(tmp_path):
     out = pd.read_csv(p)
     assert list(out.columns) == ["event_name", "event_date", "source_url"]
     assert out["event_name"].tolist() == ["Ahon 12", "Zoning 10"]  # sorted by name
+
+
+def test_strict_scrape_refuses_partial_reference_overwrite(monkeypatch):
+    monkeypatch.setattr(vt, "fetch_event_date", lambda *args, **kwargs: None)
+    monkeypatch.setattr(vt.time, "sleep", lambda *_: None)
+
+    with pytest.raises(vt.IncompleteScrapeError, match="refusing partial"):
+        vt.scrape_event_dates(["Missing Event"], strict=True, verbose=False)

@@ -60,6 +60,10 @@ DEFAULT_HEADERS = {
 OUTPUT_COLS = ["event_name", "event_date", "source_url"]
 
 
+class IncompleteScrapeError(RuntimeError):
+    """Raised when requested reference dates could not all be collected."""
+
+
 # ---------------------------------------------------------------------
 # Utility helpers
 # ---------------------------------------------------------------------
@@ -217,6 +221,7 @@ def scrape_event_dates(
     request_sleep: float = 0.7,
     timeout: int = 30,
     verbose: bool = True,
+    strict: bool = False,
 ) -> pd.DataFrame:
     """
     Scrape VerseTracker event dates for a list of event names.
@@ -226,8 +231,10 @@ def scrape_event_dates(
     """
     session = requests.Session()
     rows: list[dict] = []
+    failures: list[str] = []
 
     for name in names:
+        failure_detail: str | None = None
         try:
             row = fetch_event_date(
                 name,
@@ -240,15 +247,24 @@ def scrape_event_dates(
             )
         except Exception as e:  # network error after retries
             print(f"[warn] {name!r} ({event_url(name, base=base)}) -> {e}")
+            failure_detail = str(e)
             row = None
 
         if row is None:
             print(f"[warn] no date for {name!r} -> {event_url(name, base=base)} (skipped)")
+            failures.append(f"{name}: {failure_detail or 'no page or parseable date'}")
         else:
             if verbose:
                 print(f"{name:24s} {row['event_date']}")
             rows.append(row)
         time.sleep(sleep)
+
+    if strict and failures:
+        shown = "\n".join(f"  - {failure}" for failure in failures)
+        raise IncompleteScrapeError(
+            f"{len(failures)} requested event date(s) failed; refusing partial "
+            f"reference overwrite:\n{shown}"
+        )
 
     return pd.DataFrame(rows, columns=OUTPUT_COLS)
 
@@ -347,6 +363,7 @@ def main() -> None:
         request_sleep=args.request_sleep,
         timeout=args.timeout,
         verbose=not args.quiet,
+        strict=True,
     )
 
     write_event_dates_to_csv(df, args.output)

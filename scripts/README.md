@@ -146,6 +146,7 @@ No API key needed — it's plain HTML scraping with `requests` + `BeautifulSoup`
 | `--quiet` | | off | reduce logging |
 | `--merge` | | off | **upsert** scraped rows into the existing CSV (by `video_id`) instead of overwriting it |
 | `--skip-known` | | off | skip event pages whose name is already in the CSV (past years only; current year always re-scraped). Requires `--merge` |
+| `--allow-shrink` | | off | allow an intentional full overwrite that is substantially smaller than the existing CSV |
 
 ```bash
 # full overwrite (clean, reproducible — the default)
@@ -156,13 +157,15 @@ python scripts/fetch_events_metadata_from_fliptop_web.py \
     --start 2025 --end 2026 --merge --skip-known
 ```
 
-**Overwrite vs. merge.** The default overwrites the CSV with exactly what the
-scrape found — a clean, reproducible full rebuild, but slow over all years, and
-if the site is down mid-run it can drop events you'd already captured. `--merge`
-upserts instead (keyed by `video_id`), so events outside the scraped range
-survive untouched and a narrowed `--start` is safe. The trade-off: merged data
-is path-dependent and stale rows (a matchup removed from a page) linger — so run
-a plain full overwrite periodically to reconcile. `uv run fliptop-refresh
+**Overwrite vs. merge.** The default full scrape is strict: every discovered
+event page must parse successfully, video-player and matchup counts must agree,
+video ids must be unique, and a replacement cannot be dramatically smaller than
+the existing CSV. A failure leaves the old file untouched. `--allow-shrink`
+overrides only the row-count comparison when a real source reduction is
+intentional. `--merge` upserts instead (keyed by `video_id`), so events outside
+the scraped range survive untouched and a narrowed `--start` is safe. The
+trade-off is that merged data is path-dependent and stale rows can linger, so
+run a plain full overwrite periodically to reconcile. `uv run fliptop-refresh
 --events-since YEAR` bundles `--start YEAR --merge --skip-known` for you.
 
 **Output** → [`data/raw/matchup_events_metadata.csv`](../data/raw/):
@@ -240,7 +243,8 @@ python scripts/fetch_versetracker_event_dates.py --events "Ahon 12" "Zoning 10"
 > `ft_battles`' `event_date_source` column; override a specific battle by adding
 > a row to `data/overrides/event_dates.csv` if you find a better source. This
 > scraper also depends on VerseTracker's current HTML (`div.event-date`); if the
-> site is redesigned, update `parse_event_date`.
+> site is redesigned, update `parse_event_date`. The CLI requires every requested
+> event to return a date before replacing the existing reference CSV.
 
 ---
 
@@ -253,6 +257,7 @@ keep it that way if you tweak them:
   VerseTracker scraper only hits the handful of events still missing a date.
 - **Paced** — short `time.sleep` pauses between API pages and event-page
   requests.
-- **Resilient** — the web and VerseTracker scrapers retry with backoff and skip a
-  bad/missing page (logging a `[warn]`) rather than aborting the whole run.
+- **Resilient** — the web and VerseTracker scrapers retry with backoff. Their
+  command-line workflows fail safely after retries instead of publishing a
+  partial replacement; the previous raw file remains untouched.
 - **Identifiable** — the scrapers send a descriptive `User-Agent`.
