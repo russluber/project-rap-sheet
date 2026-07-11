@@ -41,6 +41,7 @@ import pandas as pd
 from . import events as _events
 from . import publish as _publish
 from . import uploads as _uploads
+from .contracts import RAW_EVENT_METADATA, RAW_YOUTUBE_UPLOADS
 
 # ---------------------------------------------------------------------------
 # I. Types and simple aliases
@@ -73,7 +74,7 @@ def load_youtube_uploads(path: PathLike) -> pd.DataFrame:
     path = Path(path)
     # This mirrors what you did in the notebook: pd.read_json on the exported file.
     df = pd.read_json(path)
-    return df
+    return RAW_YOUTUBE_UPLOADS.require(df, source=path)
 
 
 def load_event_metadata(path: PathLike) -> pd.DataFrame:
@@ -94,7 +95,7 @@ def load_event_metadata(path: PathLike) -> pd.DataFrame:
     path = Path(path)
     # This mirrors your notebook: pd.read_csv on the scraped CSV.
     df = pd.read_csv(path)
-    return df
+    return RAW_EVENT_METADATA.require(df, source=path)
 
 
 # ---------------------------------------------------------------------------

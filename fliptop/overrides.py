@@ -30,6 +30,27 @@ import csv
 from pathlib import Path
 
 from . import DATA_DIR
+from .contracts import (
+    EVENT_DATES_CSV as EVENT_DATES_CONTRACT,
+)
+from .contracts import (
+    EVENT_LOCATION_PATTERNS_CSV as EVENT_LOCATION_PATTERNS_CONTRACT,
+)
+from .contracts import (
+    EVENT_LOCATIONS_CSV as EVENT_LOCATIONS_CONTRACT,
+)
+from .contracts import (
+    LOCATION_ALIASES_CSV as LOCATION_ALIASES_CONTRACT,
+)
+from .contracts import (
+    MANUAL_MATCHUPS_CSV as MANUAL_MATCHUPS_CONTRACT,
+)
+from .contracts import (
+    UPLOAD_DECISIONS_CSV as UPLOAD_DECISIONS_CONTRACT,
+)
+from .contracts import (
+    TableContract,
+)
 
 PathLike = str | Path
 
@@ -43,7 +64,12 @@ MANUAL_MATCHUPS_CSV = OVERRIDES_DIR / "manual_matchups.csv"
 UPLOAD_DECISIONS_CSV = OVERRIDES_DIR / "upload_decisions.csv"
 
 
-def _load_mapping(path: PathLike, key_col: str, value_col: str) -> dict[str, str]:
+def _load_mapping(
+    path: PathLike,
+    key_col: str,
+    value_col: str,
+    contract: TableContract,
+) -> dict[str, str]:
     """
     Load a two-column ``key -> value`` CSV as an insertion-ordered dict.
 
@@ -58,11 +84,7 @@ def _load_mapping(path: PathLike, key_col: str, value_col: str) -> dict[str, str
 
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        required = {key_col, value_col}
-        if reader.fieldnames is None or not required <= set(reader.fieldnames):
-            raise ValueError(
-                f"{path}: expected columns {sorted(required)}, got {reader.fieldnames}"
-            )
+        contract.require_columns(reader.fieldnames, source=path)
 
         mapping: dict[str, str] = {}
         for lineno, row in enumerate(reader, start=2):  # row 1 is the header
@@ -87,7 +109,7 @@ def _load_mapping(path: PathLike, key_col: str, value_col: str) -> dict[str, str
 
 def load_event_location_overrides(path: PathLike = EVENT_LOCATIONS_CSV) -> dict[str, str]:
     """Load ``event_name -> corrected event_location`` (applied by exact match)."""
-    return _load_mapping(path, "event_name", "event_location")
+    return _load_mapping(path, "event_name", "event_location", EVENT_LOCATIONS_CONTRACT)
 
 
 def load_event_location_patterns(
@@ -99,17 +121,24 @@ def load_event_location_patterns(
     An event_location that *contains* the substring is replaced wholesale. Kept
     as an ordered list because these are applied sequentially.
     """
-    return list(_load_mapping(path, "contains", "event_location").items())
+    return list(
+        _load_mapping(
+            path,
+            "contains",
+            "event_location",
+            EVENT_LOCATION_PATTERNS_CONTRACT,
+        ).items()
+    )
 
 
 def load_location_aliases(path: PathLike = LOCATION_ALIASES_CSV) -> dict[str, str]:
     """Load ``raw location value -> canonical value`` (applied by exact match)."""
-    return _load_mapping(path, "location", "canonical")
+    return _load_mapping(path, "location", "canonical", LOCATION_ALIASES_CONTRACT)
 
 
 def load_event_date_overrides(path: PathLike = EVENT_DATES_CSV) -> dict[str, str]:
     """Load ``YouTube video id -> corrected event_date`` (ISO date string)."""
-    return _load_mapping(path, "id", "event_date")
+    return _load_mapping(path, "id", "event_date", EVENT_DATES_CONTRACT)
 
 
 UPLOAD_DECISIONS = {"include", "exclude", "review"}
@@ -150,11 +179,7 @@ def load_upload_decisions(
 
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        required = {"id", "decision", "reason", "note", "active"}
-        if reader.fieldnames is None or not required <= set(reader.fieldnames):
-            raise ValueError(
-                f"{path}: expected columns {sorted(required)}, got {reader.fieldnames}"
-            )
+        UPLOAD_DECISIONS_CONTRACT.require_columns(reader.fieldnames, source=path)
 
         decisions: dict[str, dict[str, str]] = {}
         for lineno, row in enumerate(reader, start=2):
@@ -229,19 +254,7 @@ def load_manual_matchups(
 
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        required = {
-            "id",
-            "emcee1",
-            "emcee2",
-            "helper_emcee",
-            "emcee1_status",
-            "emcee2_status",
-            "helper_status",
-        }
-        if reader.fieldnames is None or not required <= set(reader.fieldnames):
-            raise ValueError(
-                f"{path}: expected columns {sorted(required)}, got {reader.fieldnames}"
-            )
+        MANUAL_MATCHUPS_CONTRACT.require_columns(reader.fieldnames, source=path)
 
         overrides: dict[str, dict[str, str | None]] = {}
         for lineno, row in enumerate(reader, start=2):

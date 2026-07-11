@@ -8,6 +8,7 @@ Tests for event-metadata transforms:
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from fliptop.events import (
     _parse_event_date_range,
@@ -349,13 +350,17 @@ def test_load_versetracker_event_dates_missing_file_is_empty(tmp_path):
     assert load_versetracker_event_dates(tmp_path / "nope.csv") == {}
 
 
-def test_load_versetracker_event_dates_drops_unparseable_dates(tmp_path):
+def test_load_versetracker_event_dates_rejects_unparseable_dates(tmp_path):
     p = tmp_path / "vt.csv"
     pd.DataFrame(
-        {"event_name": ["Good", "Bad"], "event_date": ["2021-12-08", "not a date"]}
+        {
+            "event_name": ["Good", "Bad"],
+            "event_date": ["2021-12-08", "not a date"],
+            "source_url": ["u1", "u2"],
+        }
     ).to_csv(p, index=False)
-    out = load_versetracker_event_dates(p)
-    assert out == {"Good": pd.Timestamp("2021-12-08")}
+    with pytest.raises(ValueError, match="event_date has 1 value.*not datetime"):
+        load_versetracker_event_dates(p)
 
 
 # ---------------------------------------------------------------------------

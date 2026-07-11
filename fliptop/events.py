@@ -17,6 +17,7 @@ from pathlib import Path
 import pandas as pd
 from dateutil import parser as dateparse
 
+from .contracts import VERSETRACKER_EVENT_DATES
 from .overrides import (
     load_event_date_overrides,
     load_event_location_overrides,
@@ -384,14 +385,13 @@ def load_versetracker_event_dates(path: PathLike) -> dict[str, pd.Timestamp]:
         return {}
 
     df = pd.read_csv(path)
-    if "event_name" not in df.columns or "event_date" not in df.columns:
-        return {}
+    VERSETRACKER_EVENT_DATES.require(df, source=path)
 
-    dates = pd.to_datetime(df["event_date"], errors="coerce")
+    dates = pd.to_datetime(df["event_date"])
     return {
         str(name).strip(): date
         for name, date in zip(df["event_name"], dates)
-        if pd.notna(date) and isinstance(name, str)
+        if isinstance(name, str)
     }
 
 

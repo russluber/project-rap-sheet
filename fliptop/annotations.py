@@ -49,6 +49,8 @@ from pathlib import Path
 import pandas as pd
 
 from . import DATA_DIR
+from .contracts import RESULTS_COLUMNS as CONTRACT_RESULTS_COLUMNS
+from .contracts import RESULTS_CSV
 from .io import atomic_output_path
 
 PathLike = str | Path
@@ -56,17 +58,7 @@ PathLike = str | Path
 ANNOTATIONS_DIR = DATA_DIR / "annotations"
 RESULTS_PATH = ANNOTATIONS_DIR / "battle_results.csv"
 
-RESULTS_COLUMNS = [
-    "id",
-    "battle_type",
-    "winner",
-    "votes_winner",
-    "votes_loser",
-    "votes_nv",
-    "votes_ot",
-    "overtime",
-    "notes",
-]
+RESULTS_COLUMNS = list(CONTRACT_RESULTS_COLUMNS)
 
 VOTE_COLUMNS = ["votes_winner", "votes_loser", "votes_nv", "votes_ot"]
 
@@ -291,24 +283,7 @@ def validate_results_store(
 
 def _require_results_schema(results: pd.DataFrame, source: PathLike) -> None:
     """Raise clearly rather than silently dropping or inventing result columns."""
-    actual = list(results.columns)
-    if actual == RESULTS_COLUMNS:
-        return
-
-    missing = [col for col in RESULTS_COLUMNS if col not in actual]
-    unexpected = [col for col in actual if col not in RESULTS_COLUMNS]
-    details = []
-    if missing:
-        details.append(f"missing: {', '.join(missing)}")
-    if unexpected:
-        details.append(f"unexpected: {', '.join(unexpected)}")
-    if not missing and not unexpected:
-        details.append("columns are out of order")
-    detail = "; ".join(details)
-    raise ValueError(
-        f"{source}: results schema does not match the current format ({detail}). "
-        f"Expected columns, in order: {', '.join(RESULTS_COLUMNS)}"
-    )
+    RESULTS_CSV.require_columns(results.columns, source=source)
 
 
 def load_results(path: PathLike = RESULTS_PATH) -> pd.DataFrame:
