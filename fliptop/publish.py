@@ -119,6 +119,8 @@ def build_ft_battles(
     vt_event_dates=None,
     results: pd.DataFrame | None = None,
     require_results: bool = True,
+    *,
+    inputs=None,
 ) -> pd.DataFrame:
     """
     Build the final result-enriched ``ft_battles`` table from raw files.
@@ -139,7 +141,10 @@ def build_ft_battles(
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
         vt_event_dates=vt_event_dates,
+        inputs=inputs,
     )
+    if results is None and inputs is not None:
+        results = inputs.results
     return build_ft_battles_from_metadata(
         battle_metadata,
         results=results,
@@ -156,6 +161,8 @@ def write_ft_battles(
     manual_matchups=None,
     upload_decisions=None,
     fmt: str = "json",
+    *,
+    inputs=None,
 ) -> Path:
     """Build the final ``ft_battles`` table and save it to disk."""
     ft_battles = build_ft_battles(
@@ -165,6 +172,7 @@ def write_ft_battles(
         rename_map=rename_map,
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
+        inputs=inputs,
     )
 
     return save_ft_battles(ft_battles, out_path, fmt=fmt)

@@ -103,9 +103,6 @@ def load_event_metadata(path: PathLike) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 # Re-export upload helpers so older imports from ``fliptop.battles`` keep working.
-EXCLUDE_KEYWORDS = _uploads.EXCLUDE_KEYWORDS
-EXCLUDE_RE = _uploads.EXCLUDE_RE
-TITLE_EXCLUSION_RULES = _uploads.TITLE_EXCLUSION_RULES
 _PT_SUFFIX = _uploads._PT_SUFFIX
 _base_raw_title = _uploads._base_raw_title
 _keep_upload_decision_includes = _uploads._keep_upload_decision_includes
@@ -133,10 +130,6 @@ strip_pt_suffix_from_title = _uploads.strip_pt_suffix_from_title
 # ---------------------------------------------------------------------------
 
 # Re-export event helpers so older imports from ``fliptop.battles`` keep working.
-EVENT_EXCLUSION_RULES = _events.EVENT_EXCLUSION_RULES
-EXCLUDE_EVENT_KEYWORDS = _events.EXCLUDE_EVENT_KEYWORDS
-EVENT_EXCLUSION_RE = _events.EVENT_EXCLUSION_RE
-EXCLUDE_EVENT_RE = _events.EXCLUDE_EVENT_RE
 _parse_event_date_range = _events._parse_event_date_range
 _split_event_day = _events._split_event_day
 apply_manual_event_date_overrides = _events.apply_manual_event_date_overrides
@@ -323,6 +316,10 @@ FINAL_OUTPUT_FORBIDDEN_COLUMNS = _publish.FINAL_OUTPUT_FORBIDDEN_COLUMNS
 def finalize_battles(
     df_with_meta: pd.DataFrame,
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
+    *,
+    event_location_overrides: Mapping[str, str] | None = None,
+    event_location_patterns=None,
+    event_date_overrides: Mapping[str, str] | None = None,
 ) -> pd.DataFrame:
     """
     Final tidy up step to produce ft_battles.
@@ -391,7 +388,11 @@ def finalize_battles(
     # 7) Apply manual event_location fixes you had in the notebook
     #    (must precede normalize_event_day, which strips the '(Day N)' suffix
     #    these overrides key on).
-    battles = apply_manual_event_location_overrides(battles)
+    battles = apply_manual_event_location_overrides(
+        battles,
+        overrides=event_location_overrides,
+        patterns=event_location_patterns,
+    )
 
     # 7b) Impute COVID-masked event_dates from VerseTracker. Runs before
     #     normalize_event_day so the '(Day N)' suffix is still available to
@@ -404,7 +405,10 @@ def finalize_battles(
 
     # 9) Pin event_date for battles whose YouTube description mis-dates them
     #    (website-authoritative hand fixes).
-    battles = apply_manual_event_date_overrides(battles)
+    battles = apply_manual_event_date_overrides(
+        battles,
+        overrides=event_date_overrides,
+    )
 
     # 10) Select and order metadata columns (keep only those that exist)
     existing_cols = [c for c in METADATA_COLUMNS if c in battles.columns]
@@ -427,6 +431,8 @@ def build_battle_metadata(
     manual_matchups: ManualMatchupMap | None = None,
     upload_decisions: UploadDecisionMap | None = None,
     vt_event_dates: Mapping[str, pd.Timestamp] | None = None,
+    *,
+    inputs=None,
 ) -> pd.DataFrame:
     """
     Build the rich one-row-per-battle metadata table from raw files.
@@ -475,6 +481,7 @@ def build_battle_metadata(
         manual_matchups=manual_matchups,
         upload_decisions=upload_decisions,
         vt_event_dates=vt_event_dates,
+        inputs=inputs,
     )
     return run.battle_metadata
 

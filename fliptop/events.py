@@ -31,20 +31,18 @@ PathLike = str | Path
 # Event names are unavailable during upload title filtering. These domain-level
 # exclusions run after event metadata is attached so they also catch uploads
 # whose YouTube titles do not identify them as tryouts / POI.
-EVENT_EXCLUSION_RULES = load_event_exclusion_rules()
-EXCLUDE_EVENT_KEYWORDS = [rule.pattern for rule in EVENT_EXCLUSION_RULES]
-EVENT_EXCLUSION_RE = compile_exclusion_pattern(EVENT_EXCLUSION_RULES)
-EXCLUDE_EVENT_RE = EVENT_EXCLUSION_RE
-
-
 def drop_excluded_events(
     df: pd.DataFrame,
     event_col: str = "event_name",
+    exclusion_rules=None,
 ) -> pd.DataFrame:
     """Drop rows whose event name matches active event exclusion rules."""
     if event_col not in df:
         return df
-    return df[~df[event_col].astype("string").str.contains(EVENT_EXCLUSION_RE, na=False)]
+    if exclusion_rules is None:
+        exclusion_rules = load_event_exclusion_rules()
+    pattern = compile_exclusion_pattern(list(exclusion_rules))
+    return df[~df[event_col].astype("string").str.contains(pattern, na=False)]
 
 
 # Month token: full or abbr, optional trailing period (incl. Sept.)
@@ -225,7 +223,11 @@ def extract_event_name_from_description(
     return df.assign(**{new_col: df[desc_col].map(_extract)})
 
 
-def fill_metadata_from_yt_description(df: pd.DataFrame) -> pd.DataFrame:
+def fill_metadata_from_yt_description(
+    df: pd.DataFrame,
+    *,
+    location_aliases: Mapping[str, str] | None = None,
+) -> pd.DataFrame:
     """Fill missing event name/date/location fields from YouTube descriptions."""
     df = df.copy()
 
@@ -245,7 +247,7 @@ def fill_metadata_from_yt_description(df: pd.DataFrame) -> pd.DataFrame:
     tmp2 = df.assign(event_description=df["description"])
     tmp2 = split_event_description(tmp2)
     tmp2["event_date"] = pd.to_datetime(tmp2["event_date"], errors="coerce")
-    tmp2 = clean_event_location(tmp2)
+    tmp2 = clean_event_location(tmp2, aliases=location_aliases)
 
     if "event_date" in df.columns:
         missing_date_mask = df["event_date"].isna()
@@ -433,6 +435,8 @@ def impute_event_dates_from_versetracker(
 def attach_event_metadata(
     df_1v1: pd.DataFrame,
     df_events_raw: pd.DataFrame,
+    *,
+    location_aliases: Mapping[str, str] | None = None,
 ) -> pd.DataFrame:
     """Attach event name, date, and location metadata to 1v1 upload rows."""
     if df_events_raw is None or df_events_raw.empty:
@@ -447,7 +451,7 @@ def attach_event_metadata(
         df_events_raw
         .pipe(split_event_description)
         .pipe(parse_event_date)
-        .pipe(clean_event_location)
+        .pipe(clean_event_location, aliases=location_aliases)
     )
 
     if "id" in df_1v1.columns:
@@ -492,7 +496,10 @@ def attach_event_metadata(
 
         post_covid_mask = out["event_date"].isna() & (out["upload_date"] > "2022-05-01")
         if post_covid_mask.any():
-            subset = fill_metadata_from_yt_description(out.loc[post_covid_mask])
+            subset = fill_metadata_from_yt_description(
+                out.loc[post_covid_mask],
+                location_aliases=location_aliases,
+            )
             cols_to_update = ["event_name", "event_date", "event_location_clean"]
             cols_to_update = [c for c in cols_to_update if c in subset.columns]
             out.loc[post_covid_mask, cols_to_update] = subset[cols_to_update].values

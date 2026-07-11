@@ -3,6 +3,8 @@
 import fliptop
 from fliptop import DATA_DIR, RAW_DATA_DIR
 from fliptop.inputs import PipelineInputs, load_pipeline_inputs
+from fliptop.pipeline import build_pipeline_run
+from fliptop.release import build_candidate_artifacts
 
 
 def test_package_exports_pipeline_inputs_api():
@@ -42,3 +44,24 @@ def test_explicit_empty_overrides_are_not_reloaded():
     assert inputs.manual_matchups == {}
     assert inputs.upload_decisions == {}
     assert inputs.vt_event_dates == {}
+
+
+def test_loaded_snapshot_needs_no_hidden_file_reads(monkeypatch):
+    inputs = load_pipeline_inputs(RAW_DATA_DIR)
+
+    def unexpected_read(*args, **kwargs):
+        raise AssertionError("pipeline attempted a hidden file read")
+
+    monkeypatch.setattr("fliptop.events.load_location_aliases", unexpected_read)
+    monkeypatch.setattr("fliptop.events.load_event_location_overrides", unexpected_read)
+    monkeypatch.setattr("fliptop.events.load_event_location_patterns", unexpected_read)
+    monkeypatch.setattr("fliptop.events.load_event_date_overrides", unexpected_read)
+    monkeypatch.setattr("fliptop.uploads.load_title_exclusion_rules", unexpected_read)
+    monkeypatch.setattr("fliptop.structures.load_manual_matchups", unexpected_read)
+    monkeypatch.setattr("fliptop.structures.load_rename_map", unexpected_read)
+    monkeypatch.setattr("fliptop.annotations.load_results", unexpected_read)
+
+    run = build_pipeline_run(inputs=inputs)
+    candidate = build_candidate_artifacts(run)
+
+    assert candidate.releasable

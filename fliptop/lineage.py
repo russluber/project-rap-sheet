@@ -223,7 +223,7 @@ def build_upload_lineage(
     event/date provenance, and annotation status. This is an audit surface only;
     it does not change the published ``ft_battles`` build.
     """
-    from .annotations import battle_key, load_results
+    from .annotations import battle_key
 
     run = _resolve_pipeline_run(
         pipeline_run,
@@ -392,7 +392,7 @@ def build_upload_lineage(
             )
 
     if results is None:
-        results = load_results()
+        results = run.inputs.results
 
     if not results.empty and "battle_key" in lineage.columns:
         result_lookup = results.copy()
@@ -554,6 +554,7 @@ def build_pipeline_stage_summary(
     if ft_battles is None:
         ft_battles = build_ft_battles_from_metadata(
             battle_metadata,
+            results=run.inputs.results,
             require_results=False,
         )
 
