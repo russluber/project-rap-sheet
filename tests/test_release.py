@@ -1,5 +1,6 @@
 """Tests for candidate construction and release blockers."""
 
+import json
 from dataclasses import replace
 
 import pandas as pd
@@ -13,8 +14,12 @@ from fliptop.release import (
     CandidateArtifacts,
     ReleaseBlockedError,
     build_candidate_artifacts,
+    build_release_changes,
+    build_run_manifest,
     require_releasable,
     write_candidate_review_outputs,
+    write_release_change_report,
+    write_run_manifest,
 )
 
 
@@ -80,3 +85,47 @@ def test_candidate_review_outputs_are_written_before_release(tmp_path):
 
     assert len(pd.read_csv(missing_path)) == len(run.battle_metadata)
     assert "missing results" in blockers_path.read_text(encoding="utf-8")
+
+
+def test_run_manifest_records_inputs_counts_and_status(tmp_path):
+    run = build_pipeline_run(RAW_DATA_DIR)
+    candidate = build_candidate_artifacts(run)
+
+    manifest = build_run_manifest(candidate, release_status="ready")
+    path = write_run_manifest(candidate, tmp_path, release_status="ready")
+    written = json.loads(path.read_text(encoding="utf-8"))
+
+    assert manifest["counts"]["candidate_battles"] == len(candidate.ft_battles)
+    assert manifest["input_sha256"]
+    assert written["release_status"] == "ready"
+    assert written["git_commit"]
+
+
+def test_release_change_report_detects_added_removed_and_changed(tmp_path):
+    run = build_pipeline_run(RAW_DATA_DIR)
+    candidate = build_candidate_artifacts(run)
+    current = candidate.ft_battles.iloc[:2].copy()
+    removed = current.iloc[[0]].copy()
+    removed.loc[:, "id"] = "removed-id"
+    current = pd.concat([current, removed], ignore_index=True)
+    current.loc[0, "event_location"] = "Old Location"
+    current.to_json(
+        tmp_path / "ft_battles.json",
+        orient="records",
+        lines=True,
+        date_format="epoch",
+        date_unit="ms",
+    )
+
+    changes = build_release_changes(candidate, tmp_path)
+    csv_path, summary_path = write_release_change_report(
+        candidate,
+        tmp_path,
+        tmp_path / "debug",
+    )
+
+    assert {"battle_added", "battle_removed", "field_changed"} <= set(
+        changes["change_type"]
+    )
+    assert csv_path.exists()
+    assert "total_changes=" in summary_path.read_text(encoding="utf-8")

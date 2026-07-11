@@ -31,6 +31,11 @@ By default it also writes reproducible debug files under ``data/debug``:
     - manual_matchup_needed.csv
     - pipeline_summary.csv
     - pipeline_stage_drops.csv
+    - missing_results.csv
+    - release_blockers.txt
+    - release_changes.csv
+    - release_changes_summary.txt
+    - run_manifest.json
 
 Use ``--no-audit`` to skip the debug files. ``--audit`` is still accepted for
 backwards compatibility, but audit output is now the default maintainer path.
@@ -55,6 +60,8 @@ from .release import (
     build_candidate_artifacts,
     require_releasable,
     write_candidate_review_outputs,
+    write_release_change_report,
+    write_run_manifest,
 )
 from .validate import (
     summarize_battle_metadata,
@@ -311,8 +318,22 @@ def main(argv: list[str] | None = None) -> None:
         print(f"[review] wrote missing results queue -> {missing_path}")
         print(f"[review] wrote release blockers -> {blockers_path}")
 
+        manifest_path = write_run_manifest(
+            candidate,
+            args.debug_dir,
+            release_status="blocked" if candidate.release_problems else "ready",
+        )
+        changes_path, changes_summary_path = write_release_change_report(
+            candidate,
+            args.processed_dir,
+            args.debug_dir,
+        )
+        print(f"[review] wrote run manifest -> {manifest_path}")
+        print(f"[review] wrote release changes -> {changes_path}")
+        print(f"[review] wrote release change summary -> {changes_summary_path}")
+
     try:
-        rebuild_processed(
+        battles_path, emcees_path = rebuild_processed(
             raw_dir=args.raw_dir,
             processed_dir=args.processed_dir,
             pipeline_run=pipeline_run,
@@ -321,6 +342,18 @@ def main(argv: list[str] | None = None) -> None:
     except ReleaseBlockedError as exc:
         print(f"[release] blocked:\n{exc}", file=sys.stderr)
         raise SystemExit(2) from exc
+
+    if args.audit:
+        write_run_manifest(
+            candidate,
+            args.debug_dir,
+            release_status="published",
+            published_files=[
+                battles_path,
+                args.processed_dir / "battle_participants.csv",
+                emcees_path,
+            ],
+        )
 
     print("[release] processed outputs updated.")
     print("[done] refresh complete.")

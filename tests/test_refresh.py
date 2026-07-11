@@ -149,6 +149,18 @@ def test_main_writes_audit_outputs_by_default(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(
         refresh_mod,
+        "write_run_manifest",
+        lambda *args, **kwargs: calls.append((f"manifest-{kwargs['release_status']}", args))
+        or tmp_path / "run_manifest.json",
+    )
+    monkeypatch.setattr(
+        refresh_mod,
+        "write_release_change_report",
+        lambda *args: calls.append(("changes", args))
+        or (tmp_path / "changes.csv", tmp_path / "changes.txt"),
+    )
+    monkeypatch.setattr(
+        refresh_mod,
         "build_pipeline_run",
         lambda **kwargs: calls.append(("pipeline", kwargs)) or pipeline_run,
     )
@@ -160,11 +172,14 @@ def test_main_writes_audit_outputs_by_default(tmp_path, monkeypatch):
         "candidate",
         "audit",
         "review",
+        "manifest-ready",
+        "changes",
         "rebuild",
+        "manifest-published",
     ]
     assert calls[2][1]["pipeline_run"] is pipeline_run
     assert calls[2][1]["debug_dir"] == tmp_path / "debug"
-    assert calls[4][1]["candidate"] is candidate
+    assert calls[6][1]["candidate"] is candidate
 
 
 def test_main_no_audit_skips_audit_outputs(tmp_path, monkeypatch):
@@ -193,6 +208,16 @@ def test_main_no_audit_skips_audit_outputs(tmp_path, monkeypatch):
         refresh_mod,
         "write_candidate_review_outputs",
         lambda *args: calls.append(("review", args)),
+    )
+    monkeypatch.setattr(
+        refresh_mod,
+        "write_run_manifest",
+        lambda *args, **kwargs: calls.append(("manifest", args)),
+    )
+    monkeypatch.setattr(
+        refresh_mod,
+        "write_release_change_report",
+        lambda *args: calls.append(("changes", args)),
     )
 
     refresh_mod.main(["--processed-dir", str(tmp_path), "--no-audit"])
@@ -237,13 +262,32 @@ def test_main_audit_flag_remains_accepted(tmp_path, monkeypatch):
         lambda *args: calls.append(("review", args))
         or (tmp_path / "missing_results.csv", tmp_path / "release_blockers.txt"),
     )
+    monkeypatch.setattr(
+        refresh_mod,
+        "write_run_manifest",
+        lambda *args, **kwargs: calls.append((f"manifest-{kwargs['release_status']}", args))
+        or tmp_path / "run_manifest.json",
+    )
+    monkeypatch.setattr(
+        refresh_mod,
+        "write_release_change_report",
+        lambda *args: calls.append(("changes", args))
+        or (tmp_path / "changes.csv", tmp_path / "changes.txt"),
+    )
 
     refresh_mod.main(["--processed-dir", str(tmp_path), "--audit"])
 
-    assert [name for name, _ in calls] == ["audit", "review", "rebuild"]
+    assert [name for name, _ in calls] == [
+        "audit",
+        "review",
+        "manifest-ready",
+        "changes",
+        "rebuild",
+        "manifest-published",
+    ]
     assert calls[0][1]["pipeline_run"] is pipeline_run
-    assert calls[2][1]["pipeline_run"] is pipeline_run
-    assert calls[2][1]["candidate"] is candidate
+    assert calls[4][1]["pipeline_run"] is pipeline_run
+    assert calls[4][1]["candidate"] is candidate
 
 
 def test_main_writes_reviews_before_blocked_release(tmp_path, monkeypatch):
@@ -269,6 +313,18 @@ def test_main_writes_reviews_before_blocked_release(tmp_path, monkeypatch):
         lambda *args: calls.append("review")
         or (tmp_path / "missing.csv", tmp_path / "blockers.txt"),
     )
+    monkeypatch.setattr(
+        refresh_mod,
+        "write_run_manifest",
+        lambda *args, **kwargs: calls.append(f"manifest-{kwargs['release_status']}")
+        or tmp_path / "run_manifest.json",
+    )
+    monkeypatch.setattr(
+        refresh_mod,
+        "write_release_change_report",
+        lambda *args: calls.append("changes")
+        or (tmp_path / "changes.csv", tmp_path / "changes.txt"),
+    )
 
     def block_release(**kwargs):
         calls.append("release")
@@ -282,4 +338,4 @@ def test_main_writes_reviews_before_blocked_release(tmp_path, monkeypatch):
         )
 
     assert exc.value.code == 2
-    assert calls == ["audit", "review", "release"]
+    assert calls == ["audit", "review", "manifest-blocked", "changes", "release"]
