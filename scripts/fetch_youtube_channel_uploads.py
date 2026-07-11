@@ -18,6 +18,7 @@ Usage (from repo root):
 import argparse
 import json
 import os
+import sys
 import time
 from typing import Any
 
@@ -207,7 +208,9 @@ def load_existing_metadata(path: str) -> list[dict[str, Any]]:
     """
     Load existing video metadata from JSON file, if it exists.
 
-    Returns an empty list if the file does not exist or is invalid.
+    Returns an empty list if the file does not exist. An existing but invalid
+    file is an error: treating corruption as an empty dataset could replace a
+    known-good raw snapshot with incomplete data.
     """
     if not os.path.exists(path):
         return []
@@ -215,11 +218,11 @@ def load_existing_metadata(path: str) -> list[dict[str, Any]]:
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        if isinstance(data, list):
-            return data
-        return []
-    except (json.JSONDecodeError, OSError):
-        return []
+        if not isinstance(data, list):
+            raise ValueError(f"{path}: expected a JSON list of video records")
+        return data
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path}: invalid JSON; refusing to overwrite it") from exc
 
 
 def save_metadata(path: str, records: list[dict[str, Any]]) -> None:
@@ -307,7 +310,8 @@ def main() -> None:
             secret_path=args.secret,
         )
     except Exception as e:
-        print(f"[error] {e}")
+        print(f"[error] {e}", file=sys.stderr)
+        raise SystemExit(1) from e
 
 
 if __name__ == "__main__":
