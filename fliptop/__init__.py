@@ -32,6 +32,8 @@ __all__ = [
     "DATA_DIR",
     "RAW_DATA_DIR",
     "PROCESSED_DATA_DIR",
+    "PipelineRun",
+    "build_pipeline_run",
     "build_battle_metadata",
     "build_ft_battles",
     "build_ft_battles_from_metadata",
@@ -53,6 +55,8 @@ __all__ = [
 # Lazy public API: name -> (submodule, attribute). Imported on first access so
 # `import fliptop` does not eagerly load pandas/networkx.
 _LAZY = {
+    "PipelineRun": (".pipeline", "PipelineRun"),
+    "build_pipeline_run": (".pipeline", "build_pipeline_run"),
     "build_battle_metadata": (".battles", "build_battle_metadata"),
     "build_ft_battles": (".publish", "build_ft_battles"),
     "build_ft_battles_from_metadata": (".publish", "build_ft_battles_from_metadata"),
@@ -87,6 +91,7 @@ if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
         build_pipeline_stage_summary,
         build_upload_lineage,
     )
+    from .pipeline import PipelineRun, build_pipeline_run
     from .publish import build_ft_battles, build_ft_battles_from_metadata
     from .structures import (
         build_battle_network,

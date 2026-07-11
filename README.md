@@ -89,6 +89,7 @@ project-rap-sheet/
 ├── fliptop/
 |   ├── README.md
 │   ├── __init__.py
+│   ├── pipeline.py
 │   ├── battles.py
 │   ├── uploads.py
 │   ├── events.py
@@ -202,7 +203,8 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
   `pipeline_summary.csv` gives the row counts stage by stage, while
   `pipeline_stage_drops.csv` lists the exact ids exiting at filter/manual-review
   stages. Use `--no-audit` only when you intentionally want to skip these local
-  debug outputs.
+  debug outputs. The build and every audit file share one `PipelineRun`, so the
+  filters execute once and the audit describes the exact rows that were built.
 
 Under the hood the command runs three stages — fetch YouTube uploads, scrape
 FlipTop event metadata, then build the cleaned tables. You can also drive these

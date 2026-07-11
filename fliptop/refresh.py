@@ -48,6 +48,7 @@ from . import DATA_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
 from .battles import build_battle_metadata
 from .io import atomic_output_path
 from .lineage import write_audit_outputs
+from .pipeline import PipelineRun, build_pipeline_run
 from .publish import (
     build_ft_battles_from_metadata,
     save_ft_battles,
@@ -131,6 +132,7 @@ def rebuild_processed(
     raw_dir: Path = RAW_DATA_DIR,
     processed_dir: Path = PROCESSED_DATA_DIR,
     validate: bool = True,
+    pipeline_run: PipelineRun | None = None,
 ) -> tuple[Path, Path]:
     """
     Build battle metadata once, publish ft_battles from it, and write outputs.
@@ -145,7 +147,11 @@ def rebuild_processed(
     """
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    battle_metadata = build_battle_metadata(raw_dir=raw_dir)
+    battle_metadata = (
+        pipeline_run.battle_metadata
+        if pipeline_run is not None
+        else build_battle_metadata(raw_dir=raw_dir)
+    )
     print(f"[validate] metadata: {summarize_battle_metadata(battle_metadata)}")
 
     if validate:
@@ -283,7 +289,12 @@ def main(argv: list[str] | None = None) -> None:
             skip_known_events=incremental,
         )
 
-    rebuild_processed(raw_dir=args.raw_dir, processed_dir=args.processed_dir)
+    pipeline_run = build_pipeline_run(raw_dir=args.raw_dir)
+    rebuild_processed(
+        raw_dir=args.raw_dir,
+        processed_dir=args.processed_dir,
+        pipeline_run=pipeline_run,
+    )
 
     if args.audit:
         (
@@ -295,6 +306,7 @@ def main(argv: list[str] | None = None) -> None:
         ) = write_audit_outputs(
             raw_dir=args.raw_dir,
             debug_dir=args.debug_dir,
+            pipeline_run=pipeline_run,
         )
         print(f"[audit] wrote filtered uploads -> {excluded_path}")
         print(f"[audit] wrote upload lineage -> {lineage_path}")

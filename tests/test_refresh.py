@@ -98,6 +98,7 @@ def test_rebuild_validate_false_bypasses_gate(tmp_path, monkeypatch):
 
 def test_main_writes_audit_outputs_by_default(tmp_path, monkeypatch):
     calls = []
+    pipeline_run = object()
 
     def fake_rebuild_processed(**kwargs):
         calls.append(("rebuild", kwargs))
@@ -115,15 +116,23 @@ def test_main_writes_audit_outputs_by_default(tmp_path, monkeypatch):
 
     monkeypatch.setattr(refresh_mod, "rebuild_processed", fake_rebuild_processed)
     monkeypatch.setattr(refresh_mod, "write_audit_outputs", fake_write_audit_outputs)
+    monkeypatch.setattr(
+        refresh_mod,
+        "build_pipeline_run",
+        lambda **kwargs: calls.append(("pipeline", kwargs)) or pipeline_run,
+    )
 
     refresh_mod.main(["--processed-dir", str(tmp_path), "--debug-dir", str(tmp_path / "debug")])
 
-    assert [name for name, _ in calls] == ["rebuild", "audit"]
-    assert calls[1][1]["debug_dir"] == tmp_path / "debug"
+    assert [name for name, _ in calls] == ["pipeline", "rebuild", "audit"]
+    assert calls[1][1]["pipeline_run"] is pipeline_run
+    assert calls[2][1]["pipeline_run"] is pipeline_run
+    assert calls[2][1]["debug_dir"] == tmp_path / "debug"
 
 
 def test_main_no_audit_skips_audit_outputs(tmp_path, monkeypatch):
     calls = []
+    pipeline_run = object()
 
     monkeypatch.setattr(
         refresh_mod,
@@ -136,14 +145,17 @@ def test_main_no_audit_skips_audit_outputs(tmp_path, monkeypatch):
         "write_audit_outputs",
         lambda **kwargs: calls.append(("audit", kwargs)),
     )
+    monkeypatch.setattr(refresh_mod, "build_pipeline_run", lambda **kwargs: pipeline_run)
 
     refresh_mod.main(["--processed-dir", str(tmp_path), "--no-audit"])
 
     assert [name for name, _ in calls] == ["rebuild"]
+    assert calls[0][1]["pipeline_run"] is pipeline_run
 
 
 def test_main_audit_flag_remains_accepted(tmp_path, monkeypatch):
     calls = []
+    pipeline_run = object()
 
     monkeypatch.setattr(
         refresh_mod,
@@ -163,7 +175,10 @@ def test_main_audit_flag_remains_accepted(tmp_path, monkeypatch):
             tmp_path / "pipeline_stage_drops.csv",
         ),
     )
+    monkeypatch.setattr(refresh_mod, "build_pipeline_run", lambda **kwargs: pipeline_run)
 
     refresh_mod.main(["--processed-dir", str(tmp_path), "--audit"])
 
     assert [name for name, _ in calls] == ["rebuild", "audit"]
+    assert calls[0][1]["pipeline_run"] is pipeline_run
+    assert calls[1][1]["pipeline_run"] is pipeline_run

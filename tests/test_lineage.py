@@ -8,6 +8,7 @@ import json
 
 import pandas as pd
 
+import fliptop.lineage as lineage_mod
 from fliptop import RAW_DATA_DIR
 from fliptop.battles import (
     build_battle_metadata,
@@ -474,3 +475,18 @@ def test_write_audit_outputs_writes_filtered_and_lineage_files(tmp_path):
         lineage["pipeline_status"].isin(["excluded", "needs_manual_matchup"])
     ]
     assert set(drops["id"]) == set(non_final["id"])
+
+
+def test_write_audit_outputs_executes_pipeline_once(tmp_path, monkeypatch):
+    real_build = lineage_mod.build_pipeline_run
+    calls = []
+
+    def counted_build(*args, **kwargs):
+        calls.append((args, kwargs))
+        return real_build(*args, **kwargs)
+
+    monkeypatch.setattr(lineage_mod, "build_pipeline_run", counted_build)
+
+    write_audit_outputs(RAW_DATA_DIR, tmp_path)
+
+    assert len(calls) == 1
