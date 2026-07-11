@@ -33,7 +33,18 @@ POI_NO_SHOW_ID = "IO6AaGSupuY"
 
 
 def _write_raw(tmp_path, videos, events=None):
-    (tmp_path / "youtube_videos.json").write_text(json.dumps(videos), encoding="utf-8")
+    defaults = {
+        "description": "",
+        "view_count": "0",
+        "likeCount": "0",
+        "commentCount": "0",
+        "tags": [],
+    }
+    complete_videos = [{**defaults, **video} for video in videos]
+    (tmp_path / "youtube_videos.json").write_text(
+        json.dumps(complete_videos),
+        encoding="utf-8",
+    )
     pd.DataFrame(
         events or [],
         columns=["matchup", "event_name", "event_description", "video_id"],

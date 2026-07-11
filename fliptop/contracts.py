@@ -9,7 +9,7 @@ from typing import Literal
 import pandas as pd
 
 PathLike = str | Path
-ColumnKind = Literal["string", "numeric", "datetime", "list"]
+ColumnKind = Literal["string", "numeric", "datetime", "list", "string_or_list"]
 
 
 class ContractViolation(ValueError):
@@ -36,6 +36,7 @@ class TableContract:
 
     name: str
     columns: tuple[str, ...]
+    version: int = 1
     allow_extra_columns: bool = True
     ordered_columns: bool = False
     allow_empty: bool = True
@@ -92,6 +93,8 @@ class TableContract:
         for column, kind in self.kinds:
             values = frame[column]
             present = values[values.notna()]
+            if present.empty:
+                continue
             if kind == "string":
                 invalid = ~present.map(lambda value: isinstance(value, str))
             elif kind == "numeric":
@@ -105,6 +108,8 @@ class TableContract:
                 ).isna()
             elif kind == "list":
                 invalid = ~present.map(lambda value: isinstance(value, list))
+            elif kind == "string_or_list":
+                invalid = ~present.map(lambda value: isinstance(value, (str, list)))
             else:  # pragma: no cover - the type annotation prevents this
                 raise ValueError(f"unsupported contract kind: {kind}")
             count = int(invalid.sum())
@@ -187,7 +192,6 @@ RAW_EVENT_METADATA = TableContract(
     name="raw FlipTop event metadata",
     columns=RAW_EVENT_COLUMNS,
     allow_extra_columns=False,
-    allow_empty=False,
     unique_by=("video_id",),
     non_blank=RAW_EVENT_COLUMNS,
     kinds=tuple((column, "string") for column in RAW_EVENT_COLUMNS),
@@ -319,7 +323,7 @@ EVENT_ENRICHED_UPLOADS = TableContract(
     columns=PARSED_MATCHUPS.columns
     + ("event_name", "event_date", "event_location_clean", "event_date_source"),
     unique_by=("id",),
-    non_blank=PARSED_MATCHUPS.non_blank + ("event_name", "event_location_clean"),
+    non_blank=PARSED_MATCHUPS.non_blank,
     kinds=PARSED_MATCHUPS.kinds
     + (
         ("event_name", "string"),
@@ -329,3 +333,92 @@ EVENT_ENRICHED_UPLOADS = TableContract(
     ),
     allowed_values=(("event_date_source", frozenset({"website", "description"})),),
 )
+
+BATTLE_METADATA_COLUMNS = (
+    "id",
+    "title",
+    "description",
+    "upload_date",
+    "duration_seconds",
+    "duration_hms",
+    "emcee1",
+    "emcee2",
+    "matchup",
+    "event_name",
+    "event_date",
+    "event_date_source",
+    "event_location",
+    "url",
+)
+BATTLE_METADATA = TableContract(
+    name="battle metadata",
+    columns=BATTLE_METADATA_COLUMNS,
+    allow_extra_columns=False,
+    ordered_columns=True,
+    non_blank=tuple(
+        column
+        for column in BATTLE_METADATA_COLUMNS
+        if column
+        not in {
+            "description",
+            "event_name",
+            "event_date",
+            "event_date_source",
+            "event_location",
+        }
+    ),
+    kinds=(
+        ("id", "string_or_list"),
+        ("title", "string"),
+        ("description", "string"),
+        ("upload_date", "datetime"),
+        ("duration_seconds", "numeric"),
+        ("duration_hms", "string"),
+        ("emcee1", "string"),
+        ("emcee2", "string"),
+        ("matchup", "string"),
+        ("event_name", "string"),
+        ("event_date", "datetime"),
+        ("event_date_source", "string"),
+        ("event_location", "string"),
+        ("url", "string_or_list"),
+    ),
+    allowed_values=(
+        (
+            "event_date_source",
+            frozenset({"website", "description", "versetracker", "manual"}),
+        ),
+    ),
+)
+
+PIPELINE_STAGE_CONTRACTS = {
+    "prepare_uploads": PREPARED_UPLOADS,
+    "parse_and_canonicalize_matchups": PARSED_MATCHUPS,
+    "attach_event_metadata": EVENT_ENRICHED_UPLOADS,
+    "drop_excluded_events": EVENT_ENRICHED_UPLOADS,
+    "finalize_battle_metadata": BATTLE_METADATA,
+}
+
+CONTRACT_REGISTRY = {
+    "raw.youtube_uploads": RAW_YOUTUBE_UPLOADS,
+    "raw.event_metadata": RAW_EVENT_METADATA,
+    "raw.versetracker_event_dates": VERSETRACKER_EVENT_DATES,
+    "maintained.emcee_aliases": EMCEE_ALIASES_CSV,
+    "maintained.event_locations": EVENT_LOCATIONS_CSV,
+    "maintained.event_location_patterns": EVENT_LOCATION_PATTERNS_CSV,
+    "maintained.location_aliases": LOCATION_ALIASES_CSV,
+    "maintained.event_dates": EVENT_DATES_CSV,
+    "maintained.manual_matchups": MANUAL_MATCHUPS_CSV,
+    "maintained.upload_decisions": UPLOAD_DECISIONS_CSV,
+    "maintained.exclusion_rules": EXCLUSION_RULES_CSV,
+    "maintained.battle_results": RESULTS_CSV,
+    **{
+        f"pipeline.{stage}": contract
+        for stage, contract in PIPELINE_STAGE_CONTRACTS.items()
+    },
+}
+
+
+def contract_versions() -> dict[str, int]:
+    """Return stable contract identifiers and versions for run provenance."""
+    return {name: contract.version for name, contract in CONTRACT_REGISTRY.items()}

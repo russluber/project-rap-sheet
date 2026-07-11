@@ -1,10 +1,13 @@
 """Tests for the shared single-execution pipeline result."""
 
 import pandas as pd
+import pytest
 
 import fliptop
 from fliptop import RAW_DATA_DIR
+from fliptop import pipeline as pipeline_mod
 from fliptop.battles import build_battle_metadata
+from fliptop.contracts import ContractViolation
 from fliptop.pipeline import PipelineRun, build_pipeline_run
 
 
@@ -32,3 +35,18 @@ def test_build_battle_metadata_is_pipeline_run_compatibility_view():
     metadata = build_battle_metadata(RAW_DATA_DIR)
 
     pd.testing.assert_frame_equal(metadata, run.battle_metadata)
+
+
+def test_pipeline_names_the_stage_that_broke(monkeypatch):
+    original = pipeline_mod.prepare_uploads
+
+    def drop_required_id(frame):
+        return original(frame).drop(columns="id")
+
+    monkeypatch.setattr(pipeline_mod, "prepare_uploads", drop_required_id)
+
+    with pytest.raises(
+        ContractViolation,
+        match="pipeline stage prepare_uploads.*prepared uploads contract failed",
+    ):
+        build_pipeline_run(RAW_DATA_DIR)

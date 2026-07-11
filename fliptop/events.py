@@ -436,7 +436,12 @@ def attach_event_metadata(
 ) -> pd.DataFrame:
     """Attach event name, date, and location metadata to 1v1 upload rows."""
     if df_events_raw is None or df_events_raw.empty:
-        return df_1v1.copy()
+        out = df_1v1.copy()
+        out["event_name"] = pd.Series(pd.NA, index=out.index, dtype="object")
+        out["event_date"] = pd.Series(pd.NaT, index=out.index, dtype="datetime64[ns]")
+        out["event_location_clean"] = pd.Series(pd.NA, index=out.index, dtype="object")
+        out["event_date_source"] = pd.Series(pd.NA, index=out.index, dtype="object")
+        return out
 
     df_events = (
         df_events_raw

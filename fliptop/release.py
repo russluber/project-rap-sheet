@@ -15,6 +15,7 @@ import pandas as pd
 
 from . import DATA_DIR, PROJECT_ROOT
 from .annotations import load_results, pending_battles, validate_results_store
+from .contracts import contract_versions
 from .io import atomic_output_path
 from .pipeline import PipelineRun
 from .publish import build_ft_battles_from_metadata, save_ft_battles
@@ -221,6 +222,7 @@ def build_run_manifest(
         "schema_version": 1,
         "created_at": datetime.now(UTC).isoformat(),
         "git_commit": _git_commit(),
+        "contract_versions": contract_versions(),
         "release_status": release_status,
         "input_sha256": {_display_path(path): _sha256(path) for path in inputs},
         "counts": {

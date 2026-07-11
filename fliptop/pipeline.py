@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from .battles import finalize_battles, load_event_metadata, load_youtube_uploads
+from .contracts import PIPELINE_STAGE_CONTRACTS
 from .events import (
     EVENT_EXCLUSION_RE,
     EVENT_EXCLUSION_RULES,
@@ -55,6 +56,12 @@ class PipelineRun:
     excluded_uploads: pd.DataFrame
     review_uploads: pd.DataFrame
     battle_metadata: pd.DataFrame
+
+
+def _require_stage_contract(stage: str, frame: pd.DataFrame) -> pd.DataFrame:
+    """Validate a named major stage and return the same frame for composition."""
+    contract = PIPELINE_STAGE_CONTRACTS[stage]
+    return contract.require(frame, source=f"pipeline stage {stage}")
 
 
 def _event_name_lookup(df_events: pd.DataFrame) -> pd.DataFrame:
@@ -104,7 +111,7 @@ def _upload_stage_trace(
     upload_decisions: UploadDecisionMap,
 ) -> tuple[dict[str, pd.DataFrame], pd.DataFrame, pd.DataFrame]:
     """Execute upload stages once and record every filter/review exit."""
-    pre = prepare_uploads(df_yt)
+    pre = _require_stage_contract("prepare_uploads", prepare_uploads(df_yt))
     after_decisions, decision_excluded, needs_upload_review = _hold_upload_decision_rows(
         pre,
         upload_decisions,
@@ -187,14 +194,25 @@ def _upload_stage_trace(
         .pipe(apply_emcee_rename, rename_map=rename_map)
         .pipe(add_matchup_clean)
     )
+    parsed_1v1 = _require_stage_contract(
+        "parse_and_canonicalize_matchups",
+        parsed_1v1,
+    )
     if "upload_date" in parsed_1v1.columns:
         parsed_1v1 = parsed_1v1.sort_values("upload_date").reset_index(drop=True)
 
-    with_event_meta = attach_event_metadata(parsed_1v1, df_events)
+    with_event_meta = _require_stage_contract(
+        "attach_event_metadata",
+        attach_event_metadata(parsed_1v1, df_events),
+    )
     after_event_filter = _keep_upload_decision_includes(
         with_event_meta,
         drop_excluded_events(with_event_meta),
         upload_decisions,
+    )
+    after_event_filter = _require_stage_contract(
+        "drop_excluded_events",
+        after_event_filter,
     )
 
     excluded = pd.concat(
@@ -329,7 +347,10 @@ def build_pipeline_run(
     )
 
     filtered = stages["drop_excluded_events"]
-    battle_metadata = finalize_battles(filtered, vt_event_dates=vt_event_dates)
+    battle_metadata = _require_stage_contract(
+        "finalize_battle_metadata",
+        finalize_battles(filtered, vt_event_dates=vt_event_dates),
+    )
     stages = dict(stages)
     stages["finalize_battle_metadata"] = battle_metadata
 

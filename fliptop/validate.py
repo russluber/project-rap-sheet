@@ -91,6 +91,18 @@ def _check_emcees(df: pd.DataFrame) -> list[str]:
     return problems
 
 
+def _check_required_text(df: pd.DataFrame, columns: tuple[str, ...]) -> list[str]:
+    problems: list[str] = []
+    for column in columns:
+        if column not in df.columns:
+            continue
+        blank = df[column].isna() | df[column].astype("string").str.strip().eq("")
+        count = int(blank.sum())
+        if count:
+            problems.append(f"{count} battle(s) have a blank {column}")
+    return problems
+
+
 def _check_event_dates(df: pd.DataFrame, *, today: date | None = None) -> list[str]:
     problems: list[str] = []
     if "event_date" not in df.columns:
@@ -128,6 +140,7 @@ def validate_battle_metadata(
     problems.extend(_check_expected_columns(df, METADATA_COLUMNS, "battle metadata"))
     problems.extend(_check_battle_identity(df, label="metadata", allow_list_ids=True))
     problems.extend(_check_emcees(df))
+    problems.extend(_check_required_text(df, ("event_name", "event_location")))
 
     # event_date_source is a closed vocabulary (missing = undated battle, allowed).
     if "event_date_source" in df.columns:
