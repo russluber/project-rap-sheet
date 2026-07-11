@@ -98,11 +98,6 @@ def convert_video_metrics_to_numeric(
     )
 
 
-TITLE_EXCLUSION_RULES = load_title_exclusion_rules()
-EXCLUDE_KEYWORDS = [rule.pattern for rule in TITLE_EXCLUSION_RULES]
-EXCLUDE_RE = compile_exclusion_pattern(TITLE_EXCLUSION_RULES)
-
-
 def filter_titles_with_vs(df: pd.DataFrame) -> pd.DataFrame:
     """Keep only rows whose ``title`` contains the token ``vs``."""
     if "title" not in df:
@@ -110,11 +105,17 @@ def filter_titles_with_vs(df: pd.DataFrame) -> pd.DataFrame:
     return df[df["title"].str.contains(r"\bvs\b", case=False, regex=True, na=False)]
 
 
-def drop_non_battles(df: pd.DataFrame) -> pd.DataFrame:
+def drop_non_battles(
+    df: pd.DataFrame,
+    exclusion_rules=None,
+) -> pd.DataFrame:
     """Drop rows whose ``title`` matches active title exclusion rules."""
     if "title" not in df:
         return df
-    return df[~df["title"].str.contains(EXCLUDE_RE, na=False)]
+    if exclusion_rules is None:
+        exclusion_rules = load_title_exclusion_rules()
+    pattern = compile_exclusion_pattern(list(exclusion_rules))
+    return df[~df["title"].str.contains(pattern, na=False)]
 
 
 def keep_1v1(df: pd.DataFrame) -> pd.DataFrame:
@@ -511,6 +512,7 @@ def make_df_1v1_uploads(
     rename_map: RenameMap | None = None,
     manual_matchups: ManualMatchupMap | None = None,
     upload_decisions: UploadDecisionMap | None = None,
+    title_exclusion_rules=None,
 ) -> pd.DataFrame:
     """Build a clean table of 1v1 battle uploads from raw YouTube uploads."""
     if rename_map is None:
@@ -527,7 +529,11 @@ def make_df_1v1_uploads(
         filter_titles_with_vs(df),
         upload_decisions,
     )
-    df = _keep_upload_decision_includes(df, drop_non_battles(df), upload_decisions)
+    df = _keep_upload_decision_includes(
+        df,
+        drop_non_battles(df, exclusion_rules=title_exclusion_rules),
+        upload_decisions,
+    )
     df = _keep_upload_decision_includes(
         df,
         keep_1v1_or_manual_matchup(df, manual_matchups=manual_matchups),

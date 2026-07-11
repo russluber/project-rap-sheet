@@ -116,8 +116,9 @@ Read them in this order:
 2. `missing_results.csv` - is the exact annotation to-do list.
 3. `release_changes_summary.txt` and `release_changes.csv` - show the additions,
    removals, and changed fields versus the currently published battles.
-4. `run_manifest.json` - records the Git commit, input hashes, row counts, and
-   final release status so the run can be traced later.
+4. `run_manifest.json` - records the Git commit, hashes of the exact files
+   loaded into the run's `PipelineInputs` snapshot, row counts, and final
+   release status so the run can be traced later.
 5. `pipeline_summary.csv` - confirms where row counts changed.
 6. `manual_matchup_needed.csv` - tells you whether any title needs a human
    matchup decision before it can enter the dataset.

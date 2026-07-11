@@ -32,6 +32,7 @@ import pandas as pd
 from . import RAW_DATA_DIR
 from . import annotations as ann
 from .battles import build_battle_metadata
+from .inputs import load_pipeline_inputs
 
 # sentinels returned by the winner prompt
 _QUIT = object()
@@ -206,8 +207,9 @@ def resolve_targets(ft_battles: pd.DataFrame, term: str) -> pd.DataFrame:
 
 def redo(term: str) -> None:
     """Re-annotate an existing battle, overwriting its row in the store."""
-    df = build_battle_metadata(raw_dir=RAW_DATA_DIR)
-    results = ann.load_results()
+    inputs = load_pipeline_inputs(RAW_DATA_DIR)
+    df = build_battle_metadata(raw_dir=RAW_DATA_DIR, inputs=inputs)
+    results = inputs.results
 
     targets = resolve_targets(df, term)
     if targets.empty:
@@ -255,8 +257,9 @@ def redo(term: str) -> None:
 
 
 def run(*, limit: int | None = None, event: str | None = None, open_urls: bool = False) -> None:
-    df = build_battle_metadata(raw_dir=RAW_DATA_DIR)
-    results = ann.load_results()
+    inputs = load_pipeline_inputs(RAW_DATA_DIR)
+    df = build_battle_metadata(raw_dir=RAW_DATA_DIR, inputs=inputs)
+    results = inputs.results
 
     pending = ann.pending_battles(df, results)
     if event:
@@ -305,7 +308,7 @@ def run(*, limit: int | None = None, event: str | None = None, open_urls: bool =
         done_this_run += 1
         print(f"  [saved] {_summarize(result_row)}\n")
 
-    remaining = len(ann.pending_battles(df))
+    remaining = len(ann.pending_battles(df, results))
     print(f"\nDone. Recorded {done_this_run} this run; {remaining} still pending.")
 
 

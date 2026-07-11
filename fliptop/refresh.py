@@ -50,6 +50,7 @@ from datetime import date
 from pathlib import Path
 
 from . import DATA_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
+from .inputs import load_pipeline_inputs
 from .lineage import write_audit_outputs
 from .pipeline import PipelineRun, build_pipeline_run
 from .release import (
@@ -277,7 +278,8 @@ def main(argv: list[str] | None = None) -> None:
             skip_known_events=incremental,
         )
 
-    pipeline_run = build_pipeline_run(raw_dir=args.raw_dir)
+    inputs = load_pipeline_inputs(args.raw_dir)
+    pipeline_run = build_pipeline_run(inputs=inputs)
     candidate = build_candidate_artifacts(pipeline_run)
     print(
         f"[candidate] built {len(candidate.ft_battles)} battles; "

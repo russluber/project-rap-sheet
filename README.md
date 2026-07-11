@@ -182,7 +182,9 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
 ```
 
 - The default (no flags) is fast, deterministic, and needs no network or API
-  key: it first builds a candidate in memory, writes the review files, and only
+  key: it loads every raw table, rule, override, alias, reference date, and
+  annotation exactly once into a `PipelineInputs` snapshot. It then builds a
+  candidate in memory, writes the review files, and only
   then replaces `data/processed/ft_battles.json`,
   `data/processed/battle_participants.csv`, and `data/processed/emcees.csv`
   from the raw files already in `data/raw/` plus
@@ -218,6 +220,8 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
   stages. Use `--no-audit` only when you intentionally want to skip these local
   debug outputs. The build and every audit file share one `PipelineRun`, so the
   filters execute once and the audit describes the exact rows that were built.
+  That run retains its `PipelineInputs`, so later candidate, audit, and manifest
+  steps cannot silently reread a changed file midway through the refresh.
 - A successful candidate is written to a temporary bundle and reloaded before
   publication. If any of the three processed files fails while being replaced,
   all three old files are restored together.

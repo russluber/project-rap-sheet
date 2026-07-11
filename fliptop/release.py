@@ -13,8 +13,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import DATA_DIR, PROJECT_ROOT
-from .annotations import load_results, pending_battles, validate_results_store
+from . import PROJECT_ROOT
+from .annotations import pending_battles, validate_results_store
 from .contracts import contract_versions
 from .io import atomic_output_path
 from .pipeline import PipelineRun
@@ -103,7 +103,7 @@ def build_candidate_artifacts(
 ) -> CandidateArtifacts:
     """Build candidate tables and collect, rather than raise on, release blockers."""
     if results is None:
-        results = load_results()
+        results = pipeline_run.inputs.results
 
     battle_metadata = pipeline_run.battle_metadata
     ft_battles = build_ft_battles_from_metadata(
@@ -111,7 +111,11 @@ def build_candidate_artifacts(
         results=results,
         require_results=False,
     )
-    participants = build_battle_participants(ft_battles)
+    participants = build_battle_participants(
+        ft_battles,
+        manual_matchups=pipeline_run.inputs.manual_matchups,
+        rename_map=dict(pipeline_run.inputs.rename_map),
+    )
     emcees = build_emcees_table(ft_battles, participants=participants)
 
     missing_results = pending_battles(battle_metadata, results)
@@ -176,17 +180,7 @@ def _sha256(path: Path) -> str:
 
 
 def _manifest_input_files(candidate: CandidateArtifacts) -> list[Path]:
-    roots = [
-        candidate.pipeline_run.raw_dir,
-        DATA_DIR / "rules",
-        DATA_DIR / "overrides",
-        DATA_DIR / "annotations",
-    ]
-    files = [DATA_DIR / "emcee_aliases.csv"]
-    for root in roots:
-        if root.exists():
-            files.extend(path for path in root.rglob("*") if path.is_file())
-    return sorted(set(files))
+    return sorted(set(candidate.pipeline_run.inputs.source_files))
 
 
 def _display_path(path: Path) -> str:

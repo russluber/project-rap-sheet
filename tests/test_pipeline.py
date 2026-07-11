@@ -19,6 +19,8 @@ def test_package_exports_pipeline_run_api():
 def test_pipeline_run_carries_stages_decisions_and_metadata():
     run = build_pipeline_run(RAW_DATA_DIR)
 
+    assert run.inputs.raw_uploads is run.raw_uploads
+    assert run.inputs.raw_events is run.raw_events
     assert not run.raw_uploads.empty
     assert not run.battle_metadata.empty
     assert set(run.excluded_uploads["id"]).isdisjoint(run.battle_metadata["id"].astype(str))
@@ -50,3 +52,19 @@ def test_pipeline_names_the_stage_that_broke(monkeypatch):
         match="pipeline stage prepare_uploads.*prepared uploads contract failed",
     ):
         build_pipeline_run(RAW_DATA_DIR)
+
+
+def test_pipeline_can_execute_an_already_loaded_snapshot_without_raw_dir():
+    inputs = fliptop.load_pipeline_inputs(RAW_DATA_DIR)
+
+    run = build_pipeline_run(inputs=inputs)
+
+    assert run.inputs is inputs
+    assert not run.battle_metadata.empty
+
+
+def test_pipeline_rejects_ambiguous_snapshot_and_individual_overrides():
+    inputs = fliptop.load_pipeline_inputs(RAW_DATA_DIR)
+
+    with pytest.raises(TypeError, match="either inputs or individual input overrides"):
+        build_pipeline_run(inputs=inputs, rename_map={})
