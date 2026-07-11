@@ -50,14 +50,13 @@ from datetime import date
 from pathlib import Path
 
 from . import DATA_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
-from .io import atomic_output_path
 from .lineage import write_audit_outputs
 from .pipeline import PipelineRun, build_pipeline_run
-from .publish import save_ft_battles
 from .release import (
     CandidateArtifacts,
     ReleaseBlockedError,
     build_candidate_artifacts,
+    publish_candidate_bundle,
     require_releasable,
     write_candidate_review_outputs,
     write_release_change_report,
@@ -169,22 +168,15 @@ def rebuild_processed(
     if validate:
         require_releasable(candidate)
 
-    ft_battles = candidate.ft_battles
-
-    battles_path = save_ft_battles(
-        ft_battles, processed_dir / "ft_battles.json", fmt="json"
+    battles_path, participants_path, emcees_path = publish_candidate_bundle(
+        candidate,
+        processed_dir,
     )
-    print(f"[build] wrote {len(ft_battles)} battles -> {battles_path}")
-
-    participants = candidate.participants
-    participants_path = processed_dir / "battle_participants.csv"
-    with atomic_output_path(participants_path) as temporary:
-        participants.to_csv(temporary, index=False)
-    print(f"[build] wrote {len(participants)} participant rows -> {participants_path}")
-
-    emcees_path = processed_dir / "emcees.csv"
-    with atomic_output_path(emcees_path) as temporary:
-        candidate.emcees.to_csv(temporary, index=False)
+    print(f"[build] wrote {len(candidate.ft_battles)} battles -> {battles_path}")
+    print(
+        f"[build] wrote {len(candidate.participants)} participant rows "
+        f"-> {participants_path}"
+    )
     print(f"[build] wrote emcees table -> {emcees_path}")
 
     return battles_path, emcees_path

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,7 +17,7 @@ from . import DATA_DIR, PROJECT_ROOT
 from .annotations import load_results, pending_battles, validate_results_store
 from .io import atomic_output_path
 from .pipeline import PipelineRun
-from .publish import build_ft_battles_from_metadata
+from .publish import build_ft_battles_from_metadata, save_ft_battles
 from .structures import build_battle_participants, build_emcees_table
 from .validate import validate_battle_metadata, validate_ft_battles
 
@@ -358,3 +360,101 @@ def write_release_change_report(
         temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     return csv_path, summary_path
+
+
+def _write_candidate_bundle(
+    candidate: CandidateArtifacts,
+    directory: Path,
+) -> tuple[Path, Path, Path]:
+    directory.mkdir(parents=True, exist_ok=True)
+    battles_path = save_ft_battles(
+        candidate.ft_battles,
+        directory / "ft_battles.json",
+        fmt="json",
+    )
+    participants_path = directory / "battle_participants.csv"
+    with atomic_output_path(participants_path) as temporary:
+        candidate.participants.to_csv(temporary, index=False)
+    emcees_path = directory / "emcees.csv"
+    with atomic_output_path(emcees_path) as temporary:
+        candidate.emcees.to_csv(temporary, index=False)
+    return battles_path, participants_path, emcees_path
+
+
+def _validate_staged_bundle(
+    candidate: CandidateArtifacts,
+    paths: tuple[Path, Path, Path],
+) -> None:
+    """Make sure all staged files can be loaded with their expected shape."""
+    battles_path, participants_path, emcees_path = paths
+    checks = [
+        (
+            "ft_battles.json",
+            pd.read_json(battles_path, lines=True),
+            candidate.ft_battles,
+        ),
+        ("battle_participants.csv", pd.read_csv(participants_path), candidate.participants),
+        ("emcees.csv", pd.read_csv(emcees_path), candidate.emcees),
+    ]
+    for filename, staged, expected in checks:
+        if len(staged) != len(expected) or list(staged.columns) != list(expected.columns):
+            raise ValueError(
+                f"staged {filename} did not preserve the candidate table shape"
+            )
+
+
+def _replace_for_publish(source: Path, destination: Path) -> None:
+    """Replace one publication path; kept separate for failure-injection tests."""
+    os.replace(source, destination)
+
+
+def _promote_staged_bundle(
+    staged_paths: tuple[Path, Path, Path],
+    processed_dir: Path,
+) -> tuple[Path, Path, Path]:
+    destinations = tuple(processed_dir / path.name for path in staged_paths)
+    processed_dir.parent.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(
+        dir=processed_dir.parent,
+        prefix=".processed-backup-",
+    ) as backup_name:
+        backup_dir = Path(backup_name)
+        backups: dict[Path, Path] = {}
+        published: list[Path] = []
+        try:
+            for destination in destinations:
+                if destination.exists():
+                    backup = backup_dir / destination.name
+                    _replace_for_publish(destination, backup)
+                    backups[destination] = backup
+
+            for staged, destination in zip(staged_paths, destinations, strict=True):
+                _replace_for_publish(staged, destination)
+                published.append(destination)
+        except BaseException:
+            for destination in reversed(published):
+                destination.unlink(missing_ok=True)
+            for destination, backup in backups.items():
+                if backup.exists():
+                    _replace_for_publish(backup, destination)
+            raise
+
+    return destinations
+
+
+def publish_candidate_bundle(
+    candidate: CandidateArtifacts,
+    processed_dir: PathLike,
+) -> tuple[Path, Path, Path]:
+    """Stage, verify, and rollback-safely publish all processed tables together."""
+    processed_dir = Path(processed_dir)
+    processed_dir.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(
+        dir=processed_dir.parent,
+        prefix=".candidate-release-",
+    ) as staging_name:
+        staged_paths = _write_candidate_bundle(candidate, Path(staging_name))
+        _validate_staged_bundle(candidate, staged_paths)
+        return _promote_staged_bundle(staged_paths, processed_dir)

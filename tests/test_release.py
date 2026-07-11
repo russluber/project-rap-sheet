@@ -8,6 +8,7 @@ import pytest
 
 import fliptop
 from fliptop import RAW_DATA_DIR
+from fliptop import release as release_mod
 from fliptop.annotations import RESULTS_COLUMNS, load_results
 from fliptop.pipeline import build_pipeline_run
 from fliptop.release import (
@@ -16,6 +17,7 @@ from fliptop.release import (
     build_candidate_artifacts,
     build_release_changes,
     build_run_manifest,
+    publish_candidate_bundle,
     require_releasable,
     write_candidate_review_outputs,
     write_release_change_report,
@@ -129,3 +131,39 @@ def test_release_change_report_detects_added_removed_and_changed(tmp_path):
     )
     assert csv_path.exists()
     assert "total_changes=" in summary_path.read_text(encoding="utf-8")
+
+
+def test_candidate_bundle_restores_every_old_file_if_promotion_fails(
+    tmp_path,
+    monkeypatch,
+):
+    candidate = build_candidate_artifacts(build_pipeline_run(RAW_DATA_DIR))
+    processed_dir = tmp_path / "processed"
+    processed_dir.mkdir()
+    old_contents = {
+        "ft_battles.json": b"old battles\n",
+        "battle_participants.csv": b"old participants\n",
+        "emcees.csv": b"old emcees\n",
+    }
+    for filename, contents in old_contents.items():
+        (processed_dir / filename).write_bytes(contents)
+
+    real_replace = release_mod._replace_for_publish
+    call_count = 0
+
+    def fail_during_promotion(source, destination):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 5:
+            raise OSError("forced promotion failure")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(release_mod, "_replace_for_publish", fail_during_promotion)
+
+    with pytest.raises(OSError, match="forced promotion failure"):
+        publish_candidate_bundle(candidate, processed_dir)
+
+    for filename, contents in old_contents.items():
+        assert (processed_dir / filename).read_bytes() == contents
+    assert not list(tmp_path.glob(".candidate-release-*"))
+    assert not list(tmp_path.glob(".processed-backup-*"))
