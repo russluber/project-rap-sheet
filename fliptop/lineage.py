@@ -12,23 +12,25 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from .events import (
     EVENT_EXCLUSION_RE,
-    EVENT_EXCLUSION_RULES,
     attach_event_metadata,
     drop_excluded_events,
 )
 from .io import atomic_output_path
 from .overrides import load_manual_matchups, load_upload_decisions
+from .pipeline import (
+    PipelineRun,
+    _event_name_lookup,
+    _rule_audit_fields,
+    build_pipeline_run,
+)
 from .publish import build_ft_battles_from_metadata
 from .rename_map import load_rename_map
-from .rules import first_matching_rule
 from .uploads import (
-    TITLE_EXCLUSION_RULES,
     ManualMatchupMap,
     PathLike,
     RenameMap,
@@ -50,9 +52,6 @@ from .uploads import (
     prepare_uploads,
 )
 
-if TYPE_CHECKING:
-    from .pipeline import PipelineRun
-
 
 def _resolve_pipeline_run(
     pipeline_run: PipelineRun | None,
@@ -70,8 +69,6 @@ def _resolve_pipeline_run(
     if pipeline_run is not None:
         return pipeline_run
 
-    from .pipeline import build_pipeline_run
-
     return build_pipeline_run(
         raw_dir=raw_dir,
         youtube_json_name=youtube_json_name,
@@ -82,44 +79,6 @@ def _resolve_pipeline_run(
         upload_decisions=upload_decisions,
         vt_event_dates=vt_event_dates,
     )
-
-
-def _event_name_lookup(df_events: pd.DataFrame) -> pd.DataFrame:
-    """Return a small ``id -> event_name`` lookup from raw event metadata."""
-    event_key = "video_id" if "video_id" in df_events.columns else "id"
-    if event_key not in df_events.columns or "event_name" not in df_events.columns:
-        return pd.DataFrame(columns=["id", "_event_name_lookup"])
-    return (
-        df_events[[event_key, "event_name"]]
-        .drop_duplicates(subset=[event_key])
-        .rename(columns={event_key: "id", "event_name": "_event_name_lookup"})
-    )
-
-
-def _rule_audit_fields(row) -> dict[str, object]:
-    """Structured rule metadata responsible for a row exit, if any."""
-    if row["excluded_reason"] == "non-battle keyword":
-        match = first_matching_rule(row.get("title"), TITLE_EXCLUSION_RULES)
-    elif row["excluded_reason"] == "excluded event":
-        match = first_matching_rule(row.get("event_name"), EVENT_EXCLUSION_RULES)
-    else:
-        match = None
-
-    if match is None:
-        return {
-            "matched_keyword": pd.NA,
-            "rule_id": pd.NA,
-            "rule_note": pd.NA,
-            "exit_category": row.get("exit_category", pd.NA),
-        }
-
-    rule, matched_keyword = match
-    return {
-        "matched_keyword": matched_keyword,
-        "rule_id": rule.rule_id,
-        "rule_note": rule.note,
-        "exit_category": rule.exit_category,
-    }
 
 
 def _upload_stage_trace(
