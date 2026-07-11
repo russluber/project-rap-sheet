@@ -178,7 +178,7 @@ def test_load_rejects_stale_participant_relative_schema(tmp_path):
     )
     legacy.to_csv(path, index=False)
 
-    with pytest.raises(ValueError, match="results schema does not match"):
+    with pytest.raises(ValueError, match="battle results contract failed"):
         ann.load_results(path)
 
 

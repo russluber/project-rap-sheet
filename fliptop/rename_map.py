@@ -23,12 +23,13 @@ import csv
 from pathlib import Path
 
 from . import DATA_DIR
+from .contracts import EMCEE_ALIASES_CSV
 
 PathLike = str | Path
 
 ALIASES_CSV = DATA_DIR / "emcee_aliases.csv"
 
-EXPECTED_COLUMNS = {"alias", "canonical"}
+EXPECTED_COLUMNS = set(EMCEE_ALIASES_CSV.columns)
 
 
 def load_rename_map(path: PathLike = ALIASES_CSV) -> dict[str, str]:
@@ -53,11 +54,7 @@ def load_rename_map(path: PathLike = ALIASES_CSV) -> dict[str, str]:
 
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        if reader.fieldnames is None or not set(reader.fieldnames) >= EXPECTED_COLUMNS:
-            raise ValueError(
-                f"{path}: expected columns {sorted(EXPECTED_COLUMNS)}, "
-                f"got {reader.fieldnames}"
-            )
+        EMCEE_ALIASES_CSV.require_columns(reader.fieldnames, source=path)
 
         direct: dict[str, str] = {}
         for lineno, row in enumerate(reader, start=2):  # row 1 is the header

@@ -153,6 +153,12 @@ def test_missing_column_raises(tmp_path):
         ov.load_event_date_overrides(csv)
 
 
+def test_maintained_table_rejects_reordered_columns(tmp_path):
+    csv = _write(tmp_path / "d.csv", "event_date,id,note", ["2020-01-01,abc,reason"])
+    with pytest.raises(ValueError, match="columns are out of order"):
+        ov.load_event_date_overrides(csv)
+
+
 def test_half_empty_row_raises(tmp_path):
     p = tmp_path / "d.csv"
     p.write_text("id,event_date,note\nabc,,r\n", encoding="utf-8")

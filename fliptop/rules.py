@@ -18,6 +18,7 @@ from pathlib import Path
 from re import Pattern
 
 from . import DATA_DIR
+from .contracts import EXCLUSION_RULES_CSV
 
 PathLike = str | Path
 
@@ -74,19 +75,8 @@ def load_exclusion_rules(path: PathLike) -> list[ExclusionRule]:
 
     with open(path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        required = {
-            "rule_id",
-            "pattern",
-            "match_type",
-            "excluded_reason",
-            "exit_category",
-            "note",
-            "active",
-        }
-        if reader.fieldnames is None or not required <= set(reader.fieldnames):
-            raise ValueError(
-                f"{path}: expected columns {sorted(required)}, got {reader.fieldnames}"
-            )
+        EXCLUSION_RULES_CSV.require_columns(reader.fieldnames, source=path)
+        required = set(EXCLUSION_RULES_CSV.columns)
 
         rules: list[ExclusionRule] = []
         seen_ids: set[str] = set()
