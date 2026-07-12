@@ -62,6 +62,9 @@ passing candidate replaces the three processed tables that other modules use.
 - **Review before release.** `release.py` builds the final tables and human
   review queues together. It records the run and proposed changes before the
   official processed files are replaced as a rollback-safe bundle.
+- **Raw collection is transactional.** `raw_snapshot.py` gives both collectors
+  a staged copy of the current raw data, validates their combined result, and
+  promotes the raw files together with rollback on publication failure.
 - **Contracts at every boundary.** `contracts.py` declares the schema, key,
   type, blank-value, and vocabulary rules for source tables and major pipeline
   stages. Failures identify the file or transform that introduced the problem.
@@ -580,8 +583,10 @@ uv run fliptop-refresh --no-audit             # rebuild without writing data/deb
 - `rebuild_processed()` receives one candidate, runs the
   [validation gate](#output-validation-gate), and (if it passes) stages,
   reloads, and publishes all three processed tables as one rollback-safe bundle.
-- `fetch_raw()` (only with `--fetch`) runs the two `scripts/` collectors as
-  subprocesses first; this needs a YouTube API key (see `data/README.md`). The
+- `fetch_raw()` (only with `--fetch`) runs the two `scripts/` collectors against
+  a temporary copy of `data/raw/`; this needs a YouTube API key (see
+  `data/README.md`). The combined candidate is contract-validated and promoted
+  with rollback protection. The
   YouTube fetch is always incremental; the website events scrape is a **full
   overwrite** (2010 → now) by default.
 - `--events-since YEAR` makes the events scrape incremental — only YEAR → now is

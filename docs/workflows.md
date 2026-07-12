@@ -62,6 +62,12 @@ uv run fliptop-refresh --fetch
 
 That is slower, but useful periodically.
 
+Fetching is transactional. YouTube and event collection operate on a temporary
+copy of the current raw files, so incremental behavior still works. The command
+validates the complete candidate snapshot and replaces `data/raw/` only after
+both collectors succeed. If either collector, validation, or publication fails,
+the previous raw snapshot remains unchanged and it is safe to rerun.
+
 All of those refresh commands build the candidate and write `data/debug/`
 review files before trying to publish. A blocked run is useful: the official
 processed files remain unchanged and the review files tell you what to fix.
