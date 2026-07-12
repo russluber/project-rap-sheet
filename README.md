@@ -179,6 +179,7 @@ uv run fliptop-refresh                        # rebuild processed outputs from e
 uv run fliptop-refresh --fetch                # fetch fresh raw data (YouTube + web) first, then rebuild
 uv run fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (faster), then rebuild
 uv run fliptop-refresh --no-audit             # rebuild processed outputs without local audit files
+uv run fliptop-verify-release                 # verify committed inputs and processed outputs
 ```
 
 - The default (no flags) is fast, deterministic, and needs no network or API
@@ -187,6 +188,7 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
   candidate in memory, writes the review files, and only
   then replaces `data/processed/ft_battles.json`,
   `data/processed/battle_participants.csv`, and `data/processed/emcees.csv`
+  together with `data/processed/release_manifest.json`
   from the raw files already in `data/raw/` plus
   `data/annotations/battle_results.csv`, and writes the local audit files in
   `data/debug/`. If the candidate has missing results, unresolved uploads, or
@@ -226,8 +228,11 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
   That run retains its `PipelineInputs`, so later candidate, audit, and manifest
   steps cannot silently reread a changed file midway through the refresh.
 - A successful candidate is written to a temporary bundle and reloaded before
-  publication. If any of the three processed files fails while being replaced,
-  all three old files are restored together.
+  publication. If any processed file fails while being replaced,
+  the three old tables and their release manifest are restored together. The
+  manifest records cross-platform input/output hashes, canonical byte sizes, row
+  counts, contract versions, and the pipeline commit;
+  `fliptop-verify-release` checks it offline.
 
 Under the hood the command runs three stages — fetch YouTube uploads, scrape
 FlipTop event metadata, then build the cleaned tables. You can also drive these

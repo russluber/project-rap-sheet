@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -16,6 +15,7 @@ import pandas as pd
 from . import PROJECT_ROOT
 from .annotations import pending_battles, validate_results_store
 from .contracts import contract_versions
+from .integrity import file_fingerprint
 from .io import atomic_output_path
 from .pipeline import PipelineRun
 from .publish import build_ft_battles_from_metadata, save_ft_battles
@@ -172,11 +172,7 @@ def write_candidate_review_outputs(
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return str(file_fingerprint(path)["sha256"])
 
 
 def _manifest_input_files(candidate: CandidateArtifacts) -> list[Path]:
@@ -211,7 +207,6 @@ def build_run_manifest(
 ) -> dict[str, object]:
     """Build a JSON-serializable record of inputs, counts, blockers, and status."""
     inputs = _manifest_input_files(candidate)
-    run = candidate.pipeline_run
     return {
         "schema_version": 1,
         "created_at": datetime.now(UTC).isoformat(),
@@ -219,18 +214,23 @@ def build_run_manifest(
         "contract_versions": contract_versions(),
         "release_status": release_status,
         "input_sha256": {_display_path(path): _sha256(path) for path in inputs},
-        "counts": {
-            "raw_uploads": len(run.raw_uploads),
-            "raw_events": len(run.raw_events),
-            "candidate_battles": len(candidate.ft_battles),
-            "excluded_uploads": len(run.excluded_uploads),
-            "review_uploads": len(run.review_uploads),
-            "missing_results": len(candidate.missing_results),
-            "participants": len(candidate.participants),
-            "emcees": len(candidate.emcees),
-        },
+        "counts": _candidate_counts(candidate),
         "release_problems": candidate.release_problems,
         "published_files": [str(path) for path in (published_files or [])],
+    }
+
+
+def _candidate_counts(candidate: CandidateArtifacts) -> dict[str, int]:
+    run = candidate.pipeline_run
+    return {
+        "raw_uploads": len(run.raw_uploads),
+        "raw_events": len(run.raw_events),
+        "candidate_battles": len(candidate.ft_battles),
+        "excluded_uploads": len(run.excluded_uploads),
+        "review_uploads": len(run.review_uploads),
+        "missing_results": len(candidate.missing_results),
+        "participants": len(candidate.participants),
+        "emcees": len(candidate.emcees),
     }
 
 
@@ -377,6 +377,56 @@ def _write_candidate_bundle(
     return battles_path, participants_path, emcees_path
 
 
+def build_release_manifest(
+    candidate: CandidateArtifacts,
+    staged_paths: tuple[Path, Path, Path],
+    processed_dir: Path,
+) -> dict[str, object]:
+    """Build the durable provenance record for one published data bundle."""
+    output_rows = {
+        "ft_battles.json": len(candidate.ft_battles),
+        "battle_participants.csv": len(candidate.participants),
+        "emcees.csv": len(candidate.emcees),
+    }
+    inputs = _manifest_input_files(candidate)
+    outputs = {
+        _display_path(processed_dir / path.name): {
+            **file_fingerprint(path),
+            "rows": output_rows[path.name],
+        }
+        for path in staged_paths
+    }
+    return {
+        "schema_version": 2,
+        "created_at": datetime.now(UTC).isoformat(),
+        "pipeline_commit": _git_commit(),
+        "contract_versions": contract_versions(),
+        "inputs": {
+            _display_path(path): file_fingerprint(path)
+            for path in inputs
+        },
+        "outputs": outputs,
+        "counts": _candidate_counts(candidate),
+        "release_problems": candidate.release_problems,
+    }
+
+
+def _write_release_manifest(
+    candidate: CandidateArtifacts,
+    staged_paths: tuple[Path, Path, Path],
+    staging_dir: Path,
+    processed_dir: Path,
+) -> Path:
+    manifest_path = staging_dir / "release_manifest.json"
+    manifest = build_release_manifest(candidate, staged_paths, processed_dir)
+    with atomic_output_path(manifest_path) as temporary:
+        temporary.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    return manifest_path
+
+
 def _validate_staged_bundle(
     candidate: CandidateArtifacts,
     paths: tuple[Path, Path, Path],
@@ -405,9 +455,9 @@ def _replace_for_publish(source: Path, destination: Path) -> None:
 
 
 def _promote_staged_bundle(
-    staged_paths: tuple[Path, Path, Path],
+    staged_paths: tuple[Path, ...],
     processed_dir: Path,
-) -> tuple[Path, Path, Path]:
+) -> tuple[Path, ...]:
     destinations = tuple(processed_dir / path.name for path in staged_paths)
     processed_dir.parent.mkdir(parents=True, exist_ok=True)
 
@@ -451,6 +501,14 @@ def publish_candidate_bundle(
         dir=processed_dir.parent,
         prefix=".candidate-release-",
     ) as staging_name:
-        staged_paths = _write_candidate_bundle(candidate, Path(staging_name))
+        staging_dir = Path(staging_name)
+        staged_paths = _write_candidate_bundle(candidate, staging_dir)
         _validate_staged_bundle(candidate, staged_paths)
-        return _promote_staged_bundle(staged_paths, processed_dir)
+        manifest_path = _write_release_manifest(
+            candidate,
+            staged_paths,
+            staging_dir,
+            processed_dir,
+        )
+        promoted = _promote_staged_bundle((*staged_paths, manifest_path), processed_dir)
+        return promoted[0], promoted[1], promoted[2]

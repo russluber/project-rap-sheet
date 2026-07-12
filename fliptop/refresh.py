@@ -24,6 +24,7 @@ Outputs written (under data/processed by default):
     - ft_battles.json   (final result-enriched table, one battle per line)
     - battle_participants.csv
     - emcees.csv
+    - release_manifest.json
 
 By default it also writes reproducible debug files under ``data/debug``:
     - filtered_out.csv
@@ -199,6 +200,7 @@ def rebuild_processed(
         f"-> {participants_path}"
     )
     print(f"[build] wrote emcees table -> {emcees_path}")
+    print(f"[build] wrote release manifest -> {processed_dir / 'release_manifest.json'}")
 
     return battles_path, emcees_path
 
@@ -366,6 +368,7 @@ def main(argv: list[str] | None = None) -> None:
                 battles_path,
                 args.processed_dir / "battle_participants.csv",
                 emcees_path,
+                args.processed_dir / "release_manifest.json",
             ],
         )
 

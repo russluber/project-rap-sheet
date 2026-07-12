@@ -249,6 +249,21 @@ Clean, analysis-ready tables built by the `fliptop` package via
 `uv run fliptop-refresh`. **Regenerated, not hand-edited** — anything you change here is
 overwritten on the next refresh.
 
+`release_manifest.json` is the official provenance and integrity record for the
+three processed tables. It stores cross-platform hashes and canonical byte sizes
+for every loaded input and published output, output row counts, table-contract
+versions, the pipeline Git commit, and release counts. Line endings are
+normalized for these fingerprints, so Windows and Unix checkouts verify the same
+release. It is published in the same rollback-safe bundle as the tables. Verify
+a checkout without network access using:
+
+```bash
+uv run fliptop-verify-release
+```
+
+Any missing, edited, truncated, or contract-version-drifted file makes that
+command fail and is also rejected by CI.
+
 ### `ft_battles.json`
 
 The project's core table: **one row per battle**, as newline-delimited JSON

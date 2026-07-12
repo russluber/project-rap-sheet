@@ -145,6 +145,7 @@ def test_candidate_bundle_restores_every_old_file_if_promotion_fails(
         "ft_battles.json": b"old battles\n",
         "battle_participants.csv": b"old participants\n",
         "emcees.csv": b"old emcees\n",
+        "release_manifest.json": b'{"old": true}\n',
     }
     for filename, contents in old_contents.items():
         (processed_dir / filename).write_bytes(contents)
@@ -155,7 +156,7 @@ def test_candidate_bundle_restores_every_old_file_if_promotion_fails(
     def fail_during_promotion(source, destination):
         nonlocal call_count
         call_count += 1
-        if call_count == 5:
+        if call_count == 6:
             raise OSError("forced promotion failure")
         real_replace(source, destination)
 
