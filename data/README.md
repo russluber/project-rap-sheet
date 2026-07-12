@@ -110,6 +110,11 @@ behind the canonical choices is documented in the
 
 Original data straight from the sources, before any cleaning. Produced by the
 collection scripts in [`scripts/`](../scripts/) (or `uv run fliptop-refresh --fetch`).
+
+During `fliptop-refresh --fetch`, collectors update a temporary sibling snapshot
+rather than the official files directly. The candidate is contract-validated
+and the raw files are replaced together only after both collectors succeed;
+rollback restores the previous snapshot if publication fails midway.
 Treat these as **read-only inputs** — the pipeline never writes here.
 
 ### `youtube_videos.json`

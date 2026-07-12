@@ -96,8 +96,9 @@ def fetch_raw(
     """
     Refresh the raw data files by running the two collection scripts.
 
-    Invoked as subprocesses (with the current interpreter) because the scripts
-    live outside the importable package and are designed as standalone CLIs.
+    Invoked as subprocesses (with the current interpreter) against a temporary
+    copy of the current raw snapshot. The candidate is contract-validated and
+    promoted as a rollback-safe bundle only after both collectors succeed.
 
     The YouTube fetch is always incremental (it skips ids already saved). The web
     events scrape overwrites the CSV by default (a clean full rebuild); with

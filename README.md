@@ -198,6 +198,9 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
   processed file is changed.
 - `--fetch` first runs the two collection scripts in `scripts/` to refresh the
   raw data (this needs a YouTube API key — see `data/README.md`), then rebuilds.
+  Both collectors write into a temporary snapshot first. The snapshot is
+  contract-validated and all raw files are promoted together; a collection,
+  validation, or publication failure leaves the previous raw snapshot intact.
   Override the channel or scrape years with `--channel`, `--start`, `--end`.
 - `--fetch` re-scrapes the whole FlipTop site (2010 → now) by default;
   `--events-since YEAR` instead scrapes only recent events and **merges** them

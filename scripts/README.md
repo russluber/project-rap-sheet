@@ -37,6 +37,13 @@ uv run fliptop-refresh --fetch    # fetch both raw sources, then rebuild ft_batt
 uv run fliptop-refresh            # rebuild only, from the raw data already on disk (no network)
 ```
 
+The refresh command gives both scripts a temporary copy of the current raw
+snapshot instead of letting either overwrite `data/raw/` directly. It validates
+their combined result and publishes all raw files together. A collector,
+validation, or publication failure leaves the old snapshot intact. Running a
+collector directly retains per-file atomic-write safety, but not this cross-file
+transaction.
+
 By default `--fetch` does a **full** website re-scrape (2010 → now), which is
 slow. For routine updates use the **incremental** form, which only scrapes
 recent years and *merges* them into the existing events CSV:
