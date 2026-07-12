@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-07-12T05:49:30.916858+00:00",
+  "pipeline_commit": "a1a7e40105772052de8242be2d7521f63a826a04",
+  "contract_versions": {
+    "raw.youtube_uploads": 1,
+    "raw.event_metadata": 1,
+    "raw.versetracker_event_dates": 1,
+    "maintained.emcee_aliases": 1,
+    "maintained.event_locations": 1,
+    "maintained.event_location_patterns": 1,
+    "maintained.location_aliases": 1,
+    "maintained.event_dates": 1,
+    "maintained.manual_matchups": 1,
+    "maintained.upload_decisions": 1,
+    "maintained.exclusion_rules": 1,
+    "maintained.battle_results": 1,
+    "pipeline.prepare_uploads": 1,
+    "pipeline.parse_and_canonicalize_matchups": 1,
+    "pipeline.attach_event_metadata": 1,
+    "pipeline.drop_excluded_events": 1,
+    "pipeline.finalize_battle_metadata": 1
+  },
+  "inputs": {
+    "data/annotations/battle_results.csv": {
+      "sha256": "f0204a103ecb57354398c84b9339410c119e5e9e3798aac5b869d2898589914d",
+      "bytes": 57920
+    },
+    "data/emcee_aliases.csv": {
+      "sha256": "ce48fb796f07f41dcad4ce0c8f9f6826b629ea5700add7b5c068e15719879114",
+      "bytes": 1273
+    },
+    "data/overrides/event_dates.csv": {
+      "sha256": "307b4fb052e1549ddb82c4018412646863310f62a701d00ebb6d22de7c0677db",
+      "bytes": 145
+    },
+    "data/overrides/event_location_patterns.csv": {
+      "sha256": "1f06dc40962e0822fb49bc36869ee721411a55633ef8463e61854ccdec076976",
+      "bytes": 150
+    },
+    "data/overrides/event_locations.csv": {
+      "sha256": "ad7abbb076fe45d000247eee94e5ef742059e76f64144ca496ae99a4de0443c4",
+      "bytes": 890
+    },
+    "data/overrides/location_aliases.csv": {
+      "sha256": "de62bf6113d1606ece7f73e13764e2dd84ebf96a07934dde7abf6b6f831b3a6d",
+      "bytes": 208
+    },
+    "data/overrides/manual_matchups.csv": {
+      "sha256": "ebe2ed7ab650afc6a2d9f5b3a4b3ca84aae3e8f71c3f668a08315d1e797e2088",
+      "bytes": 625
+    },
+    "data/overrides/upload_decisions.csv": {
+      "sha256": "32c436db2fefc3ad56977e057859e17842e337d2239e84c21dda283f89967dd6",
+      "bytes": 31
+    },
+    "data/raw/matchup_events_metadata.csv": {
+      "sha256": "48e1220d572d32c5136b196da8a3627fd16b97c8b84c4e5bbb0f7d5af744a5d5",
+      "bytes": 303858
+    },
+    "data/raw/versetracker_event_dates.csv": {
+      "sha256": "b6ad0f32ea2fe14ac192903f88650c573321f9e745bfdad7e1e75cb8e6434eab",
+      "bytes": 1136
+    },
+    "data/raw/youtube_videos.json": {
+      "sha256": "a71b953e0db79050ddda4f3f8a556ec301f23e9e0bfa86300c27d89c010e97c6",
+      "bytes": 4587380
+    },
+    "data/rules/event_exclusions.csv": {
+      "sha256": "6c0abda67a2d04d3ddab42bd21c30e8e4f123ef13e1b826c371e1705754d1ee4",
+      "bytes": 356
+    },
+    "data/rules/title_exclusions.csv": {
+      "sha256": "276a91941500c3a07dd727e37c8e47f697dade23ee2f8190fee1003141fbcf4c",
+      "bytes": 2361
+    }
+  },
+  "outputs": {
+    "data/processed/ft_battles.json": {
+      "sha256": "90d7ba60227abf88c3363d2a3f33a4062f19764a2374d32435173978fba0fa68",
+      "bytes": 583728,
+      "rows": 1275
+    },
+    "data/processed/battle_participants.csv": {
+      "sha256": "6f9bec7f1825265f3f13b39930ddedf4100c88b87c0c854dceed9f2561009deb",
+      "bytes": 305788,
+      "rows": 2554
+    },
+    "data/processed/emcees.csv": {
+      "sha256": "fb7b482998cd045f9b4fb9c1878b77d3eae4b9b2511185f1299fcdd94ed2eb73",
+      "bytes": 5160,
+      "rows": 410
+    }
+  },
+  "counts": {
+    "raw_uploads": 1888,
+    "raw_events": 1416,
+    "candidate_battles": 1275,
+    "excluded_uploads": 602,
+    "review_uploads": 0,
+    "missing_results": 0,
+    "participants": 2554,
+    "emcees": 410
+  },
+  "release_problems": []
+}
