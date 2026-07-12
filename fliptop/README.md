@@ -323,6 +323,7 @@ The project has four output layers with different jobs:
 | `battle_metadata` | `build_battle_metadata()` | rich internal build table with provenance/debug fields such as `description`, `duration_hms`, and `event_date_source` |
 | `ft_battles.json` | `build_ft_battles()` / `fliptop-refresh` | clean standalone battle-level analysis output with only `FINAL_COLUMNS` |
 | `battle_participants.csv` | `build_battle_participants()` / `fliptop-refresh` | long participant table for event-history/survival-style analysis |
+| `release_manifest.json` | `fliptop-refresh` | committed input/output hashes, byte sizes, row counts, contract versions, and pipeline commit for offline verification |
 | `data/debug/*` | `fliptop-refresh` | regenerated lineage, human review queues, release blockers, proposed changes, and a hashed run manifest |
 
 `ft_battles.json` intentionally excludes provenance and audit-only fields. Do
@@ -578,11 +579,13 @@ uv run fliptop-refresh                        # rebuild ft_battles.json + emcees
 uv run fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first, then rebuild
 uv run fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
 uv run fliptop-refresh --no-audit             # rebuild without writing data/debug audit files
+uv run fliptop-verify-release                 # verify the committed processed release offline
 ```
 
 - `rebuild_processed()` receives one candidate, runs the
   [validation gate](#output-validation-gate), and (if it passes) stages,
-  reloads, and publishes all three processed tables as one rollback-safe bundle.
+  reloads, and publishes all three processed tables plus their official manifest
+  as one rollback-safe bundle.
 - `fetch_raw()` (only with `--fetch`) runs the two `scripts/` collectors against
   a temporary copy of `data/raw/`; this needs a YouTube API key (see
   `data/README.md`). The combined candidate is contract-validated and promoted

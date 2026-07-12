@@ -202,6 +202,7 @@ Run the checks from the locked uv environment:
 uv run pytest -q --basetemp .pytest-tmp
 uv run ruff check fliptop tests
 uv lock --check
+uv run fliptop-verify-release
 ```
 
 Then look at the Git diff:
