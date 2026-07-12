@@ -323,7 +323,7 @@ The project has four output layers with different jobs:
 | `battle_metadata` | `build_battle_metadata()` | rich internal build table with provenance/debug fields such as `description`, `duration_hms`, and `event_date_source` |
 | `ft_battles.json` | `build_ft_battles()` / `fliptop-refresh` | clean standalone battle-level analysis output with only `FINAL_COLUMNS` |
 | `battle_participants.csv` | `build_battle_participants()` / `fliptop-refresh` | long participant table for event-history/survival-style analysis |
-| `release_manifest.json` | `fliptop-refresh` | committed input/output hashes, byte sizes, row counts, contract versions, and pipeline commit for offline verification |
+| `release_manifest.json` | `fliptop-refresh` | cross-platform input/output hashes, canonical byte sizes, row counts, contract versions, and pipeline commit for offline verification |
 | `data/debug/*` | `fliptop-refresh` | regenerated lineage, human review queues, release blockers, proposed changes, and a hashed run manifest |
 
 `ft_battles.json` intentionally excludes provenance and audit-only fields. Do

@@ -4,27 +4,19 @@ from __future__ import annotations
 
 import argparse
 import csv
-import hashlib
 import json
 import subprocess
 from pathlib import Path
 
 from . import PROCESSED_DATA_DIR, PROJECT_ROOT
 from .contracts import contract_versions
+from .integrity import file_fingerprint
 
 EXPECTED_OUTPUT_FILENAMES = {
     "ft_battles.json",
     "battle_participants.csv",
     "emcees.csv",
 }
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _resolve_recorded_path(label: str, project_root: Path) -> Path:
@@ -58,12 +50,11 @@ def _verify_recorded_files(
         if not path.exists():
             problems.append(f"{label}: file is missing")
             continue
-        expected_hash = record.get("sha256")
-        actual_hash = _sha256(path)
-        if expected_hash != actual_hash:
+        actual = file_fingerprint(path)
+        if record.get("sha256") != actual["sha256"]:
             problems.append(f"{label}: sha256 mismatch")
-        if record.get("bytes") != path.stat().st_size:
-            problems.append(f"{label}: byte-size mismatch")
+        if record.get("canonical_bytes") != actual["canonical_bytes"]:
+            problems.append(f"{label}: canonical byte-size mismatch")
         if include_rows:
             try:
                 rows = _row_count(path)
@@ -91,7 +82,7 @@ def verify_release_manifest(
         return [f"release manifest is unreadable: {exc}"]
 
     problems: list[str] = []
-    if manifest.get("schema_version") != 1:
+    if manifest.get("schema_version") != 2:
         problems.append("unsupported release manifest schema_version")
     if manifest.get("contract_versions") != contract_versions():
         problems.append("contract versions do not match the current code")

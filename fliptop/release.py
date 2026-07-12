@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -16,6 +15,7 @@ import pandas as pd
 from . import PROJECT_ROOT
 from .annotations import pending_battles, validate_results_store
 from .contracts import contract_versions
+from .integrity import file_fingerprint
 from .io import atomic_output_path
 from .pipeline import PipelineRun
 from .publish import build_ft_battles_from_metadata, save_ft_battles
@@ -172,11 +172,7 @@ def write_candidate_review_outputs(
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return str(file_fingerprint(path)["sha256"])
 
 
 def _manifest_input_files(candidate: CandidateArtifacts) -> list[Path]:
@@ -395,22 +391,18 @@ def build_release_manifest(
     inputs = _manifest_input_files(candidate)
     outputs = {
         _display_path(processed_dir / path.name): {
-            "sha256": _sha256(path),
-            "bytes": path.stat().st_size,
+            **file_fingerprint(path),
             "rows": output_rows[path.name],
         }
         for path in staged_paths
     }
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "created_at": datetime.now(UTC).isoformat(),
         "pipeline_commit": _git_commit(),
         "contract_versions": contract_versions(),
         "inputs": {
-            _display_path(path): {
-                "sha256": _sha256(path),
-                "bytes": path.stat().st_size,
-            }
+            _display_path(path): file_fingerprint(path)
             for path in inputs
         },
         "outputs": outputs,

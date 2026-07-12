@@ -250,10 +250,12 @@ Clean, analysis-ready tables built by the `fliptop` package via
 overwritten on the next refresh.
 
 `release_manifest.json` is the official provenance and integrity record for the
-three processed tables. It stores hashes and byte sizes for every loaded input
-and published output, output row counts, table-contract versions, the pipeline
-Git commit, and release counts. It is published in the same rollback-safe bundle
-as the tables. Verify a checkout without network access using:
+three processed tables. It stores cross-platform hashes and canonical byte sizes
+for every loaded input and published output, output row counts, table-contract
+versions, the pipeline Git commit, and release counts. Line endings are
+normalized for these fingerprints, so Windows and Unix checkouts verify the same
+release. It is published in the same rollback-safe bundle as the tables. Verify
+a checkout without network access using:
 
 ```bash
 uv run fliptop-verify-release

@@ -230,8 +230,9 @@ uv run fliptop-verify-release                 # verify committed inputs and proc
 - A successful candidate is written to a temporary bundle and reloaded before
   publication. If any processed file fails while being replaced,
   the three old tables and their release manifest are restored together. The
-  manifest records input/output hashes, byte sizes, row counts, contract
-  versions, and the pipeline commit; `fliptop-verify-release` checks it offline.
+  manifest records cross-platform input/output hashes, canonical byte sizes, row
+  counts, contract versions, and the pipeline commit;
+  `fliptop-verify-release` checks it offline.
 
 Under the hood the command runs three stages — fetch YouTube uploads, scrape
 FlipTop event metadata, then build the cleaned tables. You can also drive these
