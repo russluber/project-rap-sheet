@@ -53,6 +53,11 @@ from . import DATA_DIR, PROCESSED_DATA_DIR, PROJECT_ROOT, RAW_DATA_DIR
 from .inputs import load_pipeline_inputs
 from .lineage import write_audit_outputs
 from .pipeline import PipelineRun, build_pipeline_run
+from .raw_snapshot import (
+    publish_raw_snapshot,
+    staged_raw_snapshot,
+    validate_raw_snapshot,
+)
 from .release import (
     CandidateArtifacts,
     ReleaseBlockedError,
@@ -102,27 +107,41 @@ def fetch_raw(
     """
     end_year = end_year or date.today().year
 
-    youtube_out = raw_dir / "youtube_videos.json"
-    events_out = raw_dir / "matchup_events_metadata.csv"
+    raw_dir = Path(raw_dir)
+    with staged_raw_snapshot(raw_dir) as staging_dir:
+        youtube_staged = staging_dir / "youtube_videos.json"
+        events_staged = staging_dir / "matchup_events_metadata.csv"
 
-    print(f"[fetch] YouTube uploads (channel={channel}) -> {youtube_out}")
-    _run_script(
-        SCRIPTS_DIR / "fetch_youtube_channel_uploads.py",
-        ["--channel", channel, "--output", str(youtube_out)],
-    )
+        print(f"[fetch] YouTube uploads (channel={channel}) -> staged snapshot")
+        _run_script(
+            SCRIPTS_DIR / "fetch_youtube_channel_uploads.py",
+            ["--channel", channel, "--output", str(youtube_staged)],
+        )
 
-    events_args = ["--start", str(start_year), "--end", str(end_year), "--output", str(events_out)]
-    if merge_events:
-        events_args.append("--merge")
-    if skip_known_events:
-        events_args.append("--skip-known")
+        events_args = [
+            "--start",
+            str(start_year),
+            "--end",
+            str(end_year),
+            "--output",
+            str(events_staged),
+        ]
+        if merge_events:
+            events_args.append("--merge")
+        if skip_known_events:
+            events_args.append("--skip-known")
 
-    mode = "incremental" if merge_events else "full overwrite"
-    print(f"[fetch] FlipTop web events ({start_year}-{end_year}, {mode}) -> {events_out}")
-    _run_script(
-        SCRIPTS_DIR / "fetch_events_metadata_from_fliptop_web.py",
-        events_args,
-    )
+        mode = "incremental" if merge_events else "full overwrite"
+        print(f"[fetch] FlipTop web events ({start_year}-{end_year}, {mode}) -> staged snapshot")
+        _run_script(
+            SCRIPTS_DIR / "fetch_events_metadata_from_fliptop_web.py",
+            events_args,
+        )
+
+        validate_raw_snapshot(staging_dir)
+        published = publish_raw_snapshot(staging_dir, raw_dir)
+
+    print(f"[fetch] published raw snapshot -> {raw_dir} ({len(published)} files)")
 
 
 def _run_script(script_path: Path, args: list[str]) -> None:
