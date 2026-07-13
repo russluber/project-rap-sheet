@@ -29,7 +29,7 @@ store in `data/annotations/battle_results.csv`, and includes:
 | `event_name` | string | Name of the FlipTop event the battle took place in (standardized — a `(Day N)` suffix is stripped) |
 | `event_date` | datetime | The day the battle actually took place (for multi-day events, the specific day). COVID-era dates are imputed from VerseTracker — see note below. |
 | `event_location` | string | Location of where the battle took place |
-| `url`| string | Link to the battle. A list of URLs for multi-part uploads. |
+| `url`| string or list[string] | Link to the battle. A list of URLs for multi-part uploads. |
 | `battle_type` | string | `judged` or `promo` |
 | `winner` | string | Winning emcee, or `NA` for promos and judged draws |
 | `votes_winner` | string | Judges voting for the winner, or `NA` |
@@ -81,19 +81,28 @@ project-rap-sheet/
 │   ├── processed/
 │   │   ├── ft_battles.json
 │   │   ├── battle_participants.csv
-│   │   └── emcees.csv
+│   │   ├── emcees.csv
+│   │   └── release_manifest.json
 │   ├── annotations/
 │   │   └── battle_results.csv
+│   ├── debug/                  # regenerated, git-ignored audit/review files
 │   └── secret/
 │       └── secret.json
 ├── fliptop/
-|   ├── README.md
+│   ├── README.md
 │   ├── __init__.py
+│   ├── inputs.py
 │   ├── pipeline.py
 │   ├── battles.py
 │   ├── uploads.py
 │   ├── events.py
 │   ├── publish.py
+│   ├── release.py
+│   ├── raw_snapshot.py
+│   ├── contracts.py
+│   ├── integrity.py
+│   ├── verify_release.py
+│   ├── io.py
 │   ├── lineage.py
 │   ├── rename_map.py
 │   ├── overrides.py
@@ -104,16 +113,18 @@ project-rap-sheet/
 │   ├── annotate.py
 │   └── refresh.py
 ├── notebooks/
-|   ├── README.md
-│   └── wrangling.ipynb
+│   ├── README.md
+│   ├── wrangling.ipynb
+│   └── imputation.ipynb
 ├── scripts/
-|   ├── README.md
-|   ├── fetch_youtube_channel_uploads.py
-|   ├── fetch_events_metadata_from_fliptop_web.py
-|   └── fetch_versetracker_event_dates.py
+│   ├── README.md
+│   ├── fetch_youtube_channel_uploads.py
+│   ├── fetch_events_metadata_from_fliptop_web.py
+│   └── fetch_versetracker_event_dates.py
 ├── tests/
 ├── docs/
-|   └── workflows.md
+│   └── workflows.md
+├── .github/workflows/ci.yml
 ├── README.md
 ├── LICENSE
 ├── pyproject.toml
@@ -129,7 +140,7 @@ Python 3.12 in `.python-version` and locks the resolved dependencies in
 `uv.lock`.
 
 ```bash
-uv sync
+uv sync --locked
 ```
 
 That creates a project-local `.venv/`, installs the `fliptop` package in
@@ -145,7 +156,7 @@ uv run fliptop-refresh
 For notebooks and analysis packages:
 
 ```bash
-uv sync --extra analysis
+uv sync --locked --extra analysis
 uv run python -m ipykernel install --user --name project-rap-sheet --display-name "Project Rap Sheet"
 ```
 
@@ -155,13 +166,15 @@ Run the checks that CI runs:
 
 ```bash
 uv run pytest -q --basetemp .pytest-tmp
-uv run ruff check fliptop tests
-uv run ruff check --fix fliptop tests
+uv run ruff check .
+uv run fliptop-verify-release
 uv lock --check
 ```
 
-Every push and pull request to `main` runs the same lint and test suite on
-Python 3.12 via GitHub Actions (see `.github/workflows/ci.yml`).
+Use `uv run ruff check --fix .` when you intentionally want Ruff to apply safe
+automatic fixes. Every code or data push and pull request to `main` runs the
+lint, test, release-integrity, and lockfile gates on Python 3.12 via GitHub
+Actions (see `.github/workflows/ci.yml`). Documentation-only changes skip CI.
 
 Optionally, install the git hooks so lint runs before each commit:
 
@@ -182,8 +195,10 @@ uv run fliptop-refresh --no-audit             # rebuild processed outputs withou
 uv run fliptop-verify-release                 # verify committed inputs and processed outputs
 ```
 
-- The default (no flags) is fast, deterministic, and needs no network or API
-  key: it loads every raw table, rule, override, alias, reference date, and
+- The default (no flags) is fast and needs no network or API key. The three data
+  tables are deterministic for a fixed input snapshot; the release manifest
+  deliberately adds the build time and pipeline commit. The command loads every
+  raw table, rule, override, alias, reference date, and
   annotation exactly once into a `PipelineInputs` snapshot. It then builds a
   candidate in memory, writes the review files, and only
   then replaces `data/processed/ft_battles.json`,
@@ -234,11 +249,13 @@ uv run fliptop-verify-release                 # verify committed inputs and proc
   counts, contract versions, and the pipeline commit;
   `fliptop-verify-release` checks it offline.
 
-Under the hood the command runs three stages — fetch YouTube uploads, scrape
-FlipTop event metadata, then build the cleaned tables. You can also drive these
-stages directly; see `scripts/README.md` (collection) and `fliptop/README.md`
-(building in Python). The `notebooks/wrangling.ipynb` notebook walks through the
-build interactively.
+Under the hood, optional fetching transactionally refreshes the YouTube and
+FlipTop website sources. The build then loads one input snapshot, executes the
+cleaning stages once, validates a complete candidate, and transactionally
+publishes the three tables plus their release manifest. You can also drive the
+collection and in-memory APIs directly; see `scripts/README.md` and
+`fliptop/README.md`. The notebooks are exploratory consumers of the package,
+not a second implementation of the pipeline.
 
 For the conversational maintainer routine to catch up after a few weeks of new
 uploads, see [`docs/workflows.md`](docs/workflows.md).

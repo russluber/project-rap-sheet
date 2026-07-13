@@ -24,9 +24,11 @@ data/
 ├── processed/             # clean tables built by the fliptop package
 │   ├── ft_battles.json
 │   ├── battle_participants.csv
-│   └── emcees.csv
+│   ├── emcees.csv
+│   └── release_manifest.json
 ├── annotations/           # hand-collected results, kept separate from processed
 │   └── battle_results.csv
+├── debug/                 # regenerated, git-ignored audits and review queues
 └── secret/                # API keys etc. — git-ignored
     └── secret.json
 ```
@@ -38,12 +40,15 @@ package runs entirely from that snapshot and writes `processed/` only after the
 candidate passes. `annotations/` is filled in by hand via `fliptop-annotate`.
 
 ```
-scripts/ ─► raw/ ─┐
-emcee_aliases.csv ┤
-overrides/ ───────┼─► fliptop (build) ─► processed/
-rules/ ───────────┤
-                  │                          │
-                  ????????????? annotations/ ?(validated join)??
+scripts/ -> raw/ ------------------+
+emcee_aliases.csv -----------------|
+overrides/ + rules/ ---------------+-> PipelineInputs -> PipelineRun
+annotations/battle_results.csv ----+                      |
+                                                          v
+                                            validated candidate bundle
+                                                          |
+                                                          v
+                                      processed tables + release manifest
 ```
 
 ---
@@ -56,6 +61,7 @@ rules/ ───────────┤
 - [`rules/`](#rules)
 - [`processed/`](#processed)
 - [`annotations/`](#annotations)
+- [`debug/`](#debug-and-review-files)
 - [`secret/`](#secret)
 - [Regenerating everything](#regenerating-everything)
 - [Conventions](#conventions)
@@ -79,7 +85,9 @@ mistyped, missing, reordered, or newly invented column a visible schema change
 instead of something the pipeline silently ignores. If a schema really needs
 to change, update its versioned contract and consumers in the same code change.
 Each refresh records the active versions and hashes only the files actually
-loaded into its `PipelineInputs` snapshot in `data/debug/run_manifest.json`.
+loaded into its `PipelineInputs` snapshot. The local
+`data/debug/run_manifest.json` describes the run; the committed
+`data/processed/release_manifest.json` is the durable release receipt.
 
 A `ContractViolation` names the failing file or pipeline stage and lists all
 structural problems found together. Correct that source problem and rerun the
@@ -255,14 +263,15 @@ for every loaded input and published output, output row counts, table-contract
 versions, the pipeline Git commit, and release counts. Line endings are
 normalized for these fingerprints, so Windows and Unix checkouts verify the same
 release. It is published in the same rollback-safe bundle as the tables. Verify
-a checkout without network access using:
+a normal full Git checkout without contacting any data source using:
 
 ```bash
 uv run fliptop-verify-release
 ```
 
 Any missing, edited, truncated, or contract-version-drifted file makes that
-command fail and is also rejected by CI.
+command fail and is also rejected by CI. A deliberately shallow clone must fetch
+the recorded pipeline commit before provenance verification can succeed.
 
 ### `ft_battles.json`
 
@@ -364,29 +373,37 @@ uv run fliptop-refresh                        # rebuild processed/ + data/debug/
 uv run fliptop-refresh --fetch                # re-scrape raw/ first (needs network + API key), then rebuild
 uv run fliptop-refresh --fetch --events-since 2025   # incremental events scrape (recent years only), then rebuild
 uv run fliptop-refresh --no-audit             # rebuild processed/ without local data/debug audit files
+uv run fliptop-verify-release                 # verify the committed inputs and processed release
 ```
 
-`processed/` is fully reproducible from `raw/` + `emcee_aliases.csv` +
-`rules/` + `overrides/` + `annotations/`. `raw/` is
-reproducible from the network via [`scripts/`](../scripts/) — a full
-`--fetch` overwrites the events CSV with a clean scrape, while `--events-since`
-**merges** only recent events in (faster, but accumulates scrape history; see
-[`scripts/README.md`](../scripts/README.md)). `annotations/` is **not**
-reproducible — it's hand-entered, so it's the one thing here worth guarding.
+The three processed tables are reproducible from the exact committed `raw/` +
+`emcee_aliases.csv` + `rules/` + `overrides/` + `annotations/` snapshot. The
+manifest adds the release time and pipeline commit, so it is a receipt rather
+than a byte-for-byte deterministic table. `raw/` is refreshable from the network
+via [`scripts/`](../scripts/), but upstream sources can change; keeping each raw
+snapshot in Git is therefore part of the provenance story. A full `--fetch`
+reconciles the events CSV, while `--events-since` merges only recent events in
+(faster, but accumulates scrape history). `annotations/` is hand-entered and
+cannot be recovered from upstream, so guard it especially carefully.
 
 For the conversational routine refresh playbook, see
 [`docs/workflows.md`](../docs/workflows.md).
 
 ---
 
+## Debug and review files
+
 `data/debug/` is git-ignored and regenerated by default with
-`uv run fliptop-refresh`. It includes `filtered_out.csv`,
-`manual_matchup_needed.csv`, `pipeline_summary.csv`,
-`pipeline_stage_drops.csv`, plus `upload_lineage.csv`, a one-row-per-raw-upload
-audit of what the pipeline did with each source row. Use
-`pipeline_summary.csv` for stage-by-stage row counts and
-`pipeline_stage_drops.csv` for the exact ids that exited at filter/manual-review
-stages.
+`uv run fliptop-refresh`. It includes the lineage files (`filtered_out.csv`,
+`upload_lineage.csv`, `manual_matchup_needed.csv`, `pipeline_summary.csv`, and
+`pipeline_stage_drops.csv`) and the release-review files
+(`missing_results.csv`, `release_blockers.txt`, `release_changes.csv`,
+`release_changes_summary.txt`, and `run_manifest.json`). Use
+`pipeline_summary.csv` for stage-by-stage counts, `pipeline_stage_drops.csv` for
+the exact ids that exited, and the release-review files to decide whether the
+candidate is ready to publish.
+
+---
 
 ## Conventions
 

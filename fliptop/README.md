@@ -16,11 +16,13 @@ reimplement it.
 
 - [Architecture at a glance](#architecture-at-a-glance)
 - [Package layout](#package-layout)
-- [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`uploads.py`, `events.py`, `battles.py`, `publish.py`)
+- [The pipeline: raw → `ft_battles`](#the-pipeline-raw--ft_battles) (`inputs.py`, `pipeline.py`, `publish.py`, `release.py`)
 - [Pipeline map](#pipeline-map)
 - [`ft_battles` schema](#ft_battles-schema)
+- [Output layer contract](#output-layer-contract)
 - [Auditing upload lineage](#auditing-upload-lineage)
 - [Derived structures](#derived-structures) (`structures.py`)
+- [Table contracts and output validation](#table-contracts-and-output-validation)
 - [Output validation gate](#output-validation-gate) (`validate.py`)
 - [Canonical emcee names](#canonical-emcee-names) (`rename_map.py`)
 - [Battle results / annotations](#battle-results--annotations) (`annotations.py`, `annotate.py`)
@@ -32,19 +34,26 @@ reimplement it.
 
 ## Architecture at a glance
 
-Everything flows one way toward `ft_battles` as the hub: the pipeline builds
-metadata, `release.py` assembles and checks a complete candidate, and only a
-passing candidate replaces the three processed tables that other modules use.
+Everything flows one way toward an official release: the pipeline builds
+metadata once, `release.py` assembles and checks a complete candidate, and only
+a passing candidate replaces the three processed tables and their manifest.
 
 ```
- data/raw/youtube_videos.json ─┐
-                               ├─► pipeline.py ─► battles.py ─► publish.py ─► ft_battles ──┬─► structures.py
- data/raw/matchup_events_      ─┘   (+ emcee_aliases.csv)      │
-   metadata.csv                                                ??? annotations.py (validated result store)
-
- scripts/ (fetch raw) ──► data/raw/        refresh.py orchestrates: fetch (optional) → build → write
-                                           lineage.py projects audits from the same run
-                                           annotate.py records battle results into data/annotations/
+ scripts/ --optional fetch--> staged raw snapshot --validated promotion--> data/raw/
+                                                                         |
+ raw + aliases + rules + overrides + annotations --> PipelineInputs      |
+                                        |                                |
+                                        v                                |
+                                  pipeline.py <---------------------------+
+                                        |
+                                        v
+                            PipelineRun + lineage audits
+                                        |
+                                        v
+                       release.py: candidate + release gate
+                                        |
+                                        v
+                     three processed tables + release_manifest.json
 ```
 
 **Design principles**
@@ -90,6 +99,12 @@ fliptop/
 ├── uploads.py          # upload-side cleaning, title filters, and matchup parsing
 ├── events.py           # event metadata parsing, date/location fixes, event joins
 ├── publish.py          # final ft_battles schema, annotation join, and file writes
+├── release.py          # candidate, review reports, release manifest, safe publication
+├── raw_snapshot.py     # staged, validated, rollback-safe raw-data publication
+├── contracts.py        # versioned contracts for files and pipeline boundaries
+├── integrity.py        # cross-platform content fingerprints for release files
+├── verify_release.py   # fliptop-verify-release CLI and offline integrity checks
+├── io.py               # atomic single-file write helper
 ├── lineage.py          # audit tables explaining raw upload inclusion/exclusion
 ├── rename_map.py       # loads/validates the alias map from data/emcee_aliases.csv
 ├── overrides.py        # loads/validates the correction tables in data/overrides/
@@ -98,7 +113,7 @@ fliptop/
 ├── validate.py         # output data-quality gate for ft_battles
 ├── annotations.py      # battle-results store (winner/judging/notes) + helpers
 ├── annotate.py         # fliptop-annotate CLI: interactively record battle results
-└── refresh.py          # fliptop-refresh CLI: rebuild (and optionally re-fetch) the datasets
+└── refresh.py          # fliptop-refresh CLI: orchestrate optional fetch + one build run
 ```
 
 ---
@@ -141,12 +156,13 @@ lazy re-exports; the owning module below is where the behavior lives.
 
 | order | stage | owner | input | output | exits / notes |
 | ----- | ----- | ----- | ----- | ------ | ------------- |
-| 1 | load raw sources | `pipeline.py` | `data/raw/youtube_videos.json`, `data/raw/matchup_events_metadata.csv`, `data/raw/versetracker_event_dates.csv` | raw upload/event frames plus VerseTracker date map | File loading only; no filtering. |
+| 1 | load all run inputs | `inputs.py` | raw sources, aliases, rules, overrides, VerseTracker dates, and annotations | one immutable `PipelineInputs` snapshot | Every file-backed dependency is loaded and contract-checked once. |
 | 2 | clean and filter uploads | `uploads.py` | raw YouTube uploads, alias map, `manual_matchups.csv`, `upload_decisions.csv`, `title_exclusions.csv` | parseable 1v1 upload candidates with canonical `emcee1`, `emcee2`, `matchup_clean` | Exact upload decisions can include/exclude/review rows; title/format filters remove non-battles and unsupported multi-emcee titles unless manually resolved. |
 | 3 | attach and filter event metadata | `events.py` | 1v1 uploads plus scraped event metadata and event/location/date overrides | uploads with `event_name`, `event_date`, `event_date_source`, `event_location_clean` | COVID-era website dates are masked, post-COVID descriptions can fill missing metadata, and `event_exclusions.csv` removes out-of-scope event categories. |
 | 4 | finalize battle metadata | `battles.py` | event-enriched upload rows plus VerseTracker dates | rich one-row-per-battle metadata with `METADATA_COLUMNS` | Multi-part uploads are consolidated; event locations/dates are overridden or imputed; provenance/debug fields remain available. |
-| 5 | publish final output | `publish.py` | rich battle metadata plus `battle_results.csv` | standalone `ft_battles` table with `FINAL_COLUMNS` | Annotation results are validated and joined; list-valued multipart ids are scalarized; provenance/debug-only columns are intentionally excluded. |
+| 5 | build final analysis table | `publish.py` | rich battle metadata plus `battle_results.csv` | standalone `ft_battles` table with `FINAL_COLUMNS` | Annotation results are validated and joined; list-valued multipart ids are scalarized; provenance/debug-only columns are intentionally excluded. |
 | 6 | derive analysis structures | `structures.py` | final `ft_battles` | `battle_participants.csv`, `emcees.csv`, battle network | No-show/helper participation is modeled in the participant table. |
+| 7 | validate and publish release | `release.py` | one candidate containing metadata, final tables, input snapshot, and blockers | three processed tables plus `release_manifest.json` | The staged tables are reloaded before all four files are promoted together; failure restores the prior bundle. |
 | audit | explain every raw upload | `lineage.py` | the completed `PipelineRun` | `upload_lineage.csv`, `filtered_out.csv`, `manual_matchup_needed.csv`, `pipeline_summary.csv`, `pipeline_stage_drops.csv` | Projects the exits and stage frames recorded by the actual build; no second filter execution. |
 
 ### Stage 1 — clean YouTube uploads → 1v1 uploads
@@ -316,13 +332,14 @@ Rich audit fields such as `description`, `duration_hms`, and
 
 ## Output Layer Contract
 
-The project has four output layers with different jobs:
+The project exposes these distinct artifacts and layers:
 
 | layer | created by | purpose |
 | ----- | ---------- | ------- |
 | `battle_metadata` | `build_battle_metadata()` | rich internal build table with provenance/debug fields such as `description`, `duration_hms`, and `event_date_source` |
 | `ft_battles.json` | `build_ft_battles()` / `fliptop-refresh` | clean standalone battle-level analysis output with only `FINAL_COLUMNS` |
 | `battle_participants.csv` | `build_battle_participants()` / `fliptop-refresh` | long participant table for event-history/survival-style analysis |
+| `emcees.csv` | `build_emcees_table()` / `fliptop-refresh` | stable id-to-canonical-emcee lookup derived from the released battles |
 | `release_manifest.json` | `fliptop-refresh` | cross-platform input/output hashes, canonical byte sizes, row counts, contract versions, and pipeline commit for offline verification |
 | `data/debug/*` | `fliptop-refresh` | regenerated lineage, human review queues, release blockers, proposed changes, and a hashed run manifest |
 
@@ -546,8 +563,8 @@ writes cleanly to disk. `validate_ft_battles(df)` returns a list of
 human-readable problems (empty == ok), checking the invariants the pipeline is
 supposed to guarantee:
 
-- every expected column is present (`fliptop.battles.FINAL_COLUMNS`, the single
-  source of truth for the output schema);
+- every expected column is present (`fliptop.publish.FINAL_COLUMNS`, re-exported
+  by `fliptop.battles` for compatibility, is the source of truth);
 - no metadata/audit-only columns are present in `ft_battles` (for example
   `event_date_source`, `rule_id`, or `upload_decision_note`);
 - one row per battle — the scalar battle key (first id for multi-part battles) is
@@ -562,8 +579,8 @@ including the `event_date_source` vocabulary (`website` | `description` |
 `fliptop-refresh` builds a candidate and writes its review files first, then
 runs the gate and **aborts before changing processed data** if anything fails.
 A passing candidate is serialized into a temporary bundle and reloaded before
-all three processed tables are promoted; a promotion error restores the old
-bundle. `summarize_ft_battles(df)` produces the
+all three processed tables and `release_manifest.json` are promoted together; a
+promotion error restores the old four-file bundle. `summarize_ft_battles(df)` produces the
 one-line build summary (battle count + `battle_type` breakdown) printed on each
 refresh.
 
@@ -575,7 +592,7 @@ refresh.
 way to regenerate the processed datasets.
 
 ```bash
-uv run fliptop-refresh                        # rebuild ft_battles.json + emcees.csv from existing raw data
+uv run fliptop-refresh                        # rebuild all three tables + release manifest from existing inputs
 uv run fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first, then rebuild
 uv run fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
 uv run fliptop-refresh --no-audit             # rebuild without writing data/debug audit files
@@ -622,30 +639,49 @@ so `import fliptop` stays cheap:
 ```python
 from fliptop import (
     RAW_DATA_DIR, PROCESSED_DATA_DIR, DATA_DIR,   # shared paths
-    build_battle_metadata,   # raw -> rich metadata
-    build_ft_battles,        # raw + annotations -> final ft_battles
-    build_excluded_uploads,  # audit of dropped uploads
-    build_upload_lineage,    # audit of every raw YouTube upload
+    load_pipeline_inputs,      # load every file-backed dependency once
+    build_pipeline_run,        # execute the metadata pipeline once
+    build_candidate_artifacts, # derive final tables + release blockers
+    build_battle_metadata,     # raw -> rich metadata
+    build_ft_battles,          # raw + annotations -> final ft_battles
+    build_excluded_uploads,    # audit of dropped uploads
+    build_upload_lineage,      # audit of every raw YouTube upload
     build_manual_matchup_review_uploads,  # pending manual matchup queue
     build_battle_participants,  # ft_battles -> long participant table
     write_battle_participants_table,
-    build_emcees_table,      # ft_battles -> emcee table
+    build_emcees_table,        # ft_battles -> emcee table
     write_emcees_table,
-    build_battle_network,    # ft_battles -> networkx graph
-    merge_results,           # join full battle results onto a battle table
+    build_battle_network,      # ft_battles -> networkx graph
+    merge_results,             # join full battle results onto a battle table
     validate_battle_metadata,
-    validate_ft_battles,     # data-quality gate for final ft_battles
+    validate_ft_battles,       # data-quality gate for final ft_battles
 )
 ```
 
 Build the dataset in memory:
 
 ```python
-from fliptop import RAW_DATA_DIR, build_battle_metadata, build_ft_battles
+from fliptop import (
+    RAW_DATA_DIR,
+    build_candidate_artifacts,
+    build_pipeline_run,
+    load_pipeline_inputs,
+)
 
-metadata = build_battle_metadata(raw_dir=RAW_DATA_DIR)
-ft_battles = build_ft_battles(raw_dir=RAW_DATA_DIR)
+inputs = load_pipeline_inputs(RAW_DATA_DIR)
+run = build_pipeline_run(inputs=inputs)
+candidate = build_candidate_artifacts(run)
+
+metadata = run.battle_metadata
+ft_battles = candidate.ft_battles
+participants = candidate.participants
+emcees = candidate.emcees
 ```
+
+The convenience functions `build_battle_metadata(raw_dir=...)` and
+`build_ft_battles(raw_dir=...)` remain useful when only one table is needed.
+Calling both separately creates two independent snapshots and executions, so use
+the explicit single-run form above when the outputs must describe one run.
 
 Build and write it to disk. The committed output is newline-delimited JSON, so
 pass `fmt="json"` (the function also supports `fmt="csv"`):
@@ -660,6 +696,10 @@ write_ft_battles(
     fmt="json",
 )
 ```
+
+This low-level writer is useful for scratch outputs, but it does not publish the
+official multi-file release or its manifest. Use `uv run fliptop-refresh` when
+updating committed data.
 
 Reload the written dataset. It's newline-delimited (`lines=True`), and dates are
 stored as epoch-ms, so name the date columns to restore the datetime dtype:
@@ -686,6 +726,9 @@ The pipeline's transforms are covered by a `pytest` suite at the repo root
 
 ```bash
 uv run pytest -q --basetemp .pytest-tmp
+uv run ruff check .
+uv run fliptop-verify-release
+uv lock --check
 ```
 
 Tests use small hand-built DataFrames for the unit transforms, plus end-to-end

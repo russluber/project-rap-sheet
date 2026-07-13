@@ -28,12 +28,12 @@ scripts/  ──fetch──►  data/raw/  ──build (fliptop)──►  data/
 ## When to run these
 
 You normally **don't** run these by hand. The `uv run fliptop-refresh --fetch` command
-([`fliptop/refresh.py`](../fliptop/refresh.py)) runs both of them — with the
+([`fliptop/refresh.py`](../fliptop/refresh.py)) runs the two routine collectors — with the
 right channel id and a `2010 → current year` scrape window — and then rebuilds
 the processed datasets in one shot:
 
 ```bash
-uv run fliptop-refresh --fetch    # fetch both raw sources, then rebuild ft_battles + emcees
+uv run fliptop-refresh --fetch    # fetch routine raw sources, then publish all tables + manifest
 uv run fliptop-refresh            # rebuild only, from the raw data already on disk (no network)
 ```
 
@@ -62,9 +62,10 @@ The end-to-end flow they fit into:
 
 1. Fetch raw data with the scripts here (or `uv run fliptop-refresh --fetch`).
 2. Raw files land in [`data/raw/`](../data/raw/).
-3. The pipeline in [`fliptop/battles.py`](../fliptop/battles.py) cleans those
-   files into [`data/processed/ft_battles.json`](../data/processed/) (the rebuild
-   step `uv run fliptop-refresh` runs by default).
+3. `fliptop-refresh` loads one input snapshot and runs the package pipeline once.
+4. A validated candidate publishes the three tables and
+   [`release_manifest.json`](../data/processed/release_manifest.json) together.
+5. `uv run fliptop-verify-release` verifies the committed release offline.
 
 For the normal "new uploads landed, catch up the dataset" routine, see the
 [`docs/workflows.md`](../docs/workflows.md) maintainer playbook.
@@ -103,7 +104,7 @@ If neither is found the script raises with instructions.
 | `--secret` | | `data/secret/secret.json` | path to the API-key JSON |
 
 ```bash
-python scripts/fetch_youtube_channel_uploads.py \
+uv run python scripts/fetch_youtube_channel_uploads.py \
     --channel UCBdHwFIE4AJWSa3Wxdu7bAQ \
     --output data/raw/youtube_videos.json
 ```
@@ -156,11 +157,11 @@ No API key needed — it's plain HTML scraping with `requests` + `BeautifulSoup`
 | `--allow-shrink` | | off | allow an intentional full overwrite that is substantially smaller than the existing CSV |
 
 ```bash
-# full overwrite (clean, reproducible — the default)
-python scripts/fetch_events_metadata_from_fliptop_web.py --start 2010 --end 2026
+# full overwrite (clean reconciliation — the default)
+uv run python scripts/fetch_events_metadata_from_fliptop_web.py --start 2010 --end 2026
 
 # incremental — only recent years, merged into the existing CSV
-python scripts/fetch_events_metadata_from_fliptop_web.py \
+uv run python scripts/fetch_events_metadata_from_fliptop_web.py \
     --start 2025 --end 2026 --merge --skip-known
 ```
 
@@ -173,7 +174,7 @@ intentional. `--merge` upserts instead (keyed by `video_id`), so events outside
 the scraped range survive untouched and a narrowed `--start` is safe. The
 trade-off is that merged data is path-dependent and stale rows can linger, so
 run a plain full overwrite periodically to reconcile. `uv run fliptop-refresh
---events-since YEAR` bundles `--start YEAR --merge --skip-known` for you.
+--fetch --events-since YEAR` bundles `--start YEAR --merge --skip-known` for you.
 
 **Output** → [`data/raw/matchup_events_metadata.csv`](../data/raw/):
 
@@ -230,10 +231,10 @@ No API key needed — plain HTML scraping with `requests` + `BeautifulSoup`.
 
 ```bash
 # scrape every event currently missing an event_date (the usual case)
-python scripts/fetch_versetracker_event_dates.py
+uv run python scripts/fetch_versetracker_event_dates.py
 
 # or scrape a specific set
-python scripts/fetch_versetracker_event_dates.py --events "Ahon 12" "Zoning 10"
+uv run python scripts/fetch_versetracker_event_dates.py --events "Ahon 12" "Zoning 10"
 ```
 
 **Output** → [`data/raw/versetracker_event_dates.csv`](../data/raw/):

@@ -14,6 +14,7 @@ the reusable logic they settle on gets promoted into the
 ## Contents
 
 - [Notebooks in this folder](#notebooks-in-this-folder)
+- [Running the notebooks](#running-the-notebooks)
 - [Research questions](#research-questions)
 - [What counts as a rap battle?](#what-counts-as-a-rap-battle)
 - [Keywords for inclusion / exclusion](#keywords-for-inclusion--exclusion)
@@ -39,6 +40,20 @@ the reusable logic they settle on gets promoted into the
 > bet** for recovering these dates. Kept around as a record of what I tried.
 > (That bet paid off: the dates are now sourced from **VerseTracker** — see
 > [COVID-era event dates](#covid-era-event-dates--resolved) below.)
+
+## Running the notebooks
+
+Install the locked analysis environment and start Jupyter from the repository
+root:
+
+```bash
+uv sync --locked --extra analysis
+uv run jupyter lab
+```
+
+Treat notebook output as exploration. Promote reusable transforms into
+`fliptop/`, cover them with tests, and regenerate official data with
+`uv run fliptop-refresh` rather than writing `data/processed/` from a notebook.
 
 ---
 
@@ -89,7 +104,8 @@ My criteria for what counts as a rap battle for this project:
 > - **Where I landed:** include the early **a cappella** freestyle battles, but
 >   **not** the freestyle battles that have an accompanying beat.
 
-This filtering is implemented in [`fliptop.battles`](../fliptop/battles.py) — see
+This filtering is implemented in [`fliptop.uploads`](../fliptop/uploads.py) and
+orchestrated by [`fliptop.pipeline`](../fliptop/pipeline.py) — see
 the [pipeline write-up](../fliptop/README.md#stage-1--clean-youtube-uploads--1v1-uploads)
 for exactly where rows get dropped.
 
@@ -98,8 +114,12 @@ for exactly where rows get dropped.
 ## Keywords for inclusion / exclusion
 
 As a long-time viewer, I know a handful of title keywords that make filtering
-against the criteria above much easier. These back the `EXCLUDE_KEYWORDS` list
-and the `vs` filter in [`fliptop.battles`](../fliptop/battles.py).
+against the criteria above much easier. The exclusions now live as reviewable,
+versioned rows in
+[`data/rules/title_exclusions.csv`](../data/rules/title_exclusions.csv); the
+`vs` filter and rule application live in
+[`fliptop.uploads`](../fliptop/uploads.py). The table below records the reasoning,
+while the CSV is the executable source of truth.
 
 **Include**
 
