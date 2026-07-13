@@ -29,11 +29,11 @@ store in `data/annotations/battle_results.csv`, and includes:
 | `event_name` | string | Name of the FlipTop event the battle took place in (standardized — a `(Day N)` suffix is stripped) |
 | `event_date` | datetime | The day the battle actually took place (for multi-day events, the specific day). COVID-era dates are imputed from VerseTracker — see note below. |
 | `event_location` | string | Location of where the battle took place |
-| `url`| string or list[string] | Link to the battle. A list of URLs for multi-part uploads. |
 | `battle_type` | string | `judged` or `promo` |
 | `winner` | string | Winning emcee, or `NA` for promos and judged draws |
 | `votes_winner` | string | Judges voting for the winner, or `NA` |
 | `votes_loser` | string | Judges voting for the loser, or `NA` |
+| `url`| string or list[string] | Link to the battle. A list of URLs for multi-part uploads. This is intentionally the final field in the public schema. |
 
 The richer internal metadata table, available from
 `fliptop.build_battle_metadata`, keeps audit/provenance fields such as

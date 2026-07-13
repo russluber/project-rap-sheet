@@ -303,6 +303,8 @@ Lineage/debug fields such as `rule_id`, `upload_decision_note`, and
 - `battle_type`, `winner`, `votes_winner`, and `votes_loser` come from the
   validated annotation store. Fuller judging detail (`votes_nv`, `votes_ot`,
   `overtime`, `notes`) remains in `data/annotations/battle_results.csv`.
+- `url` is intentionally the final field. Its position is enforced by the
+  versioned `output.ft_battles` contract rather than rearranged after writing.
 
 ### `emcees.csv`
 

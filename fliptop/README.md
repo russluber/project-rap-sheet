@@ -319,10 +319,15 @@ disable imputation explicitly.
 | `event_name` | string | standardized — the `(Day N)` suffix is stripped (see below) |
 | `event_date` | datetime | the battle's actual day (the specific day for multi-day events); COVID-era dates are imputed from VerseTracker (see above) |
 | `event_location` | string | |
-| `url` | string or list | a **list** for multi-part battles |
 | `battle_type` | string | `judged` or `promo`, from `battle_results.csv` |
 | `winner` | string | winning emcee, or `NA` for draws/promos |
 | `votes_winner`, `votes_loser` | string | final vote totals as text, or `NA` when not applicable/unknown |
+| `url` | string or list | a **list** for multi-part battles; intentionally last in the public schema |
+
+Column order is part of the versioned `output.ft_battles` contract in
+`contracts.py`. `publish.FINAL_COLUMNS` derives from that contract, and both the
+builder and validation gate use it, so `url` cannot drift from the final
+position on another output path.
 
 Rich audit fields such as `description`, `duration_hms`, and
 `event_date_source` stay in the internal `battle_metadata` table returned by
@@ -563,8 +568,9 @@ writes cleanly to disk. `validate_ft_battles(df)` returns a list of
 human-readable problems (empty == ok), checking the invariants the pipeline is
 supposed to guarantee:
 
-- every expected column is present (`fliptop.publish.FINAL_COLUMNS`, re-exported
-  by `fliptop.battles` for compatibility, is the source of truth);
+- every expected column is present in the order declared by the versioned
+  `fliptop.contracts.FT_BATTLES` contract (`publish.FINAL_COLUMNS` and
+  `battles.FINAL_COLUMNS` are compatibility lists derived from it);
 - no metadata/audit-only columns are present in `ft_battles` (for example
   `event_date_source`, `rule_id`, or `upload_decision_note`);
 - one row per battle — the scalar battle key (first id for multi-part battles) is

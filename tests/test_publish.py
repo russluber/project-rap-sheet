@@ -9,6 +9,7 @@ import pandas as pd
 import fliptop
 from fliptop.annotations import make_result_row
 from fliptop.battles import METADATA_COLUMNS
+from fliptop.contracts import FT_BATTLES
 from fliptop.publish import (
     FINAL_COLUMNS,
     FINAL_OUTPUT_FORBIDDEN_COLUMNS,
@@ -23,6 +24,8 @@ def test_package_root_exports_publish_builders():
 
 
 def test_final_schema_is_separate_from_metadata_schema():
+    assert list(FT_BATTLES.columns) == FINAL_COLUMNS
+    assert FINAL_COLUMNS[-1] == "url"
     assert set(FINAL_OUTPUT_FORBIDDEN_COLUMNS).isdisjoint(FINAL_COLUMNS)
     assert {"description", "duration_hms", "event_date_source"} <= set(METADATA_COLUMNS)
     assert {"battle_type", "winner", "votes_winner", "votes_loser"} <= set(FINAL_COLUMNS)
@@ -67,4 +70,5 @@ def test_build_ft_battles_from_metadata_publishes_scalar_final_table():
     assert list(out.columns) == FINAL_COLUMNS
     assert out.loc[0, "id"] == "aaaaaaaaaaa"
     assert out.loc[0, "winner"] == "A"
+    assert out.columns[-1] == "url"
     assert "event_date_source" not in out.columns

@@ -25,11 +25,11 @@ EXPECTED_COLUMNS = [
     "event_name",
     "event_date",
     "event_location",
-    "url",
     "battle_type",
     "winner",
     "votes_winner",
     "votes_loser",
+    "url",
 ]
 
 METADATA_COLUMNS = [
