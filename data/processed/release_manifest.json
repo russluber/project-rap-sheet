@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "created_at": "2026-07-12T06:00:36.742941+00:00",
-  "pipeline_commit": "4f72d0757a6c1b1ee0c56940240c881565fb4110",
+  "created_at": "2026-07-13T01:25:22.409638+00:00",
+  "pipeline_commit": "347427f5eeb6a93305488fb664ff3212b3a0c6f5",
   "contract_versions": {
     "raw.youtube_uploads": 1,
     "raw.event_metadata": 1,
@@ -15,6 +15,7 @@
     "maintained.upload_decisions": 1,
     "maintained.exclusion_rules": 1,
     "maintained.battle_results": 1,
+    "output.ft_battles": 2,
     "pipeline.prepare_uploads": 1,
     "pipeline.parse_and_canonicalize_matchups": 1,
     "pipeline.attach_event_metadata": 1,
@@ -77,7 +78,7 @@
   },
   "outputs": {
     "data/processed/ft_battles.json": {
-      "sha256": "90d7ba60227abf88c3363d2a3f33a4062f19764a2374d32435173978fba0fa68",
+      "sha256": "c8bfe37e1f4694926528a10d35aafe4308f8ad43f5ca5019e5c201adcc67ca60",
       "canonical_bytes": 583728,
       "rows": 1275
     },

@@ -57,11 +57,11 @@ def _valid_final() -> pd.DataFrame:
             "event_name": ["Ev1", "Ev2"],
             "event_date": pd.to_datetime(["2015-01-01", "2016-02-02"]),
             "event_location": ["Manila", "Cebu"],
-            "url": ["u1", ["u2a", "u2b"]],
             "battle_type": ["judged", "promo"],
             "winner": ["A", "NA"],
             "votes_winner": ["5", "NA"],
             "votes_loser": ["0", "NA"],
+            "url": ["u1", ["u2a", "u2b"]],
         }
     )
 

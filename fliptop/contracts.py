@@ -391,6 +391,33 @@ BATTLE_METADATA = TableContract(
     ),
 )
 
+# Public processed-table schema. Version 2 moves the source URL behind the
+# result fields so the external reference consistently closes each record.
+FT_BATTLES_COLUMNS = (
+    "id",
+    "title",
+    "upload_date",
+    "duration_seconds",
+    "emcee1",
+    "emcee2",
+    "matchup",
+    "event_name",
+    "event_date",
+    "event_location",
+    "battle_type",
+    "winner",
+    "votes_winner",
+    "votes_loser",
+    "url",
+)
+FT_BATTLES = TableContract(
+    name="final ft_battles",
+    columns=FT_BATTLES_COLUMNS,
+    version=2,
+    allow_extra_columns=False,
+    ordered_columns=True,
+)
+
 PIPELINE_STAGE_CONTRACTS = {
     "prepare_uploads": PREPARED_UPLOADS,
     "parse_and_canonicalize_matchups": PARSED_MATCHUPS,
@@ -412,6 +439,7 @@ CONTRACT_REGISTRY = {
     "maintained.upload_decisions": UPLOAD_DECISIONS_CSV,
     "maintained.exclusion_rules": EXCLUSION_RULES_CSV,
     "maintained.battle_results": RESULTS_CSV,
+    "output.ft_battles": FT_BATTLES,
     **{
         f"pipeline.{stage}": contract
         for stage, contract in PIPELINE_STAGE_CONTRACTS.items()

@@ -4,7 +4,13 @@ import pandas as pd
 import pytest
 
 import fliptop
-from fliptop.contracts import CONTRACT_REGISTRY, ContractViolation, TableContract, contract_versions
+from fliptop.contracts import (
+    CONTRACT_REGISTRY,
+    FT_BATTLES,
+    ContractViolation,
+    TableContract,
+    contract_versions,
+)
 
 
 def test_package_exports_contract_api():
@@ -86,3 +92,13 @@ def test_contract_registry_has_stable_version_for_every_boundary():
     assert set(versions) == set(CONTRACT_REGISTRY)
     assert versions["raw.youtube_uploads"] == 1
     assert versions["pipeline.finalize_battle_metadata"] == 1
+    assert versions["output.ft_battles"] == 2
+
+
+def test_final_output_contract_puts_url_last():
+    assert FT_BATTLES.columns[-1] == "url"
+    assert FT_BATTLES.ordered_columns
+
+    wrong_order = ["url", *FT_BATTLES.columns[:-1]]
+    with pytest.raises(ContractViolation, match="columns are out of order"):
+        FT_BATTLES.require_columns(wrong_order)

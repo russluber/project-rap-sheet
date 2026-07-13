@@ -14,30 +14,15 @@ from pathlib import Path
 
 import pandas as pd
 
+from .contracts import FT_BATTLES_COLUMNS
 from .io import atomic_output_path
 
 PathLike = str | Path
 
-# The columns build_ft_battles() emits, in order. This is the final wrangling
-# artifact: battle metadata plus the core result fields, with only the columns
-# needed for downstream analysis.
-FINAL_COLUMNS = [
-    "id",
-    "title",
-    "upload_date",
-    "duration_seconds",
-    "emcee1",
-    "emcee2",
-    "matchup",
-    "event_name",
-    "event_date",
-    "event_location",
-    "url",
-    "battle_type",
-    "winner",
-    "votes_winner",
-    "votes_loser",
-]
+# Compatibility list used by builders and validators. The versioned contract is
+# the source of truth, so every path that selects FINAL_COLUMNS gets the same
+# public order and cannot independently drift.
+FINAL_COLUMNS = list(FT_BATTLES_COLUMNS)
 
 # Columns that may appear in rich metadata or debug/audit surfaces, but should
 # never be published in ft_battles.json. The final table is intended to stand as
