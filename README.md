@@ -111,6 +111,7 @@ project-rap-sheet/
 │   ├── validate.py
 │   ├── annotations.py
 │   ├── annotate.py
+│   ├── spotcheck.py
 │   └── refresh.py
 ├── notebooks/
 │   ├── README.md
@@ -277,3 +278,15 @@ It is incremental and resumable. After fetching new raw data you only annotate
 records a judged draw and `p` records a promo with no judging. The final refresh
 will refuse to publish if any battle is missing a result row.
 See `fliptop/README.md` for details.
+
+### Spot-checking the published output
+
+`fliptop-spotcheck` prints a fresh random sample from
+`data/processed/ft_battles.json` for quick manual inspection. It is read-only:
+the links are displayed for you to open yourself.
+
+```bash
+uv run fliptop-spotcheck                         # display 5 battles
+uv run fliptop-spotcheck 12                      # display 12 battles
+uv run fliptop-spotcheck 5 --path candidate.json # inspect another JSON-lines file
+```

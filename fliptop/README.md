@@ -113,6 +113,7 @@ fliptop/
 ├── validate.py         # output data-quality gate for ft_battles
 ├── annotations.py      # battle-results store (winner/judging/notes) + helpers
 ├── annotate.py         # fliptop-annotate CLI: interactively record battle results
+├── spotcheck.py        # fliptop-spotcheck CLI: randomly inspect published battles
 └── refresh.py          # fliptop-refresh CLI: orchestrate optional fetch + one build run
 ```
 
@@ -541,6 +542,17 @@ fliptop-annotate --limit 20      # do up to 20, then stop
 fliptop-annotate --event Ahon    # only battles whose event matches "Ahon"
 fliptop-annotate --open          # also open each battle's URL in the browser
 fliptop-annotate --redo "A vs B" # re-annotate an existing battle (fix a mistake)
+```
+
+**`spotcheck.py`** — the read-only `fliptop-spotcheck` console script. It
+uniformly samples published battle rows without replacement and prints the
+matchup, event details, upload date, result, and URL. It reads
+`data/processed/ft_battles.json` by default and never opens links itself.
+
+```bash
+fliptop-spotcheck                         # display 5 random battles
+fliptop-spotcheck 12                      # display 12 random battles
+fliptop-spotcheck 5 --path candidate.json # inspect another JSON-lines file
 ```
 
 ---

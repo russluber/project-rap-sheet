@@ -44,6 +44,7 @@ dev = [
 [project.scripts]
 fliptop-refresh = "fliptop.refresh:main"
 fliptop-annotate = "fliptop.annotate:main"
+fliptop-spotcheck = "fliptop.spotcheck:main"
 fliptop-verify-release = "fliptop.verify_release:main"
 
 [tool.setuptools]
