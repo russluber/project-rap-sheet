@@ -1,6 +1,6 @@
 # Project Rap Sheet
 
-A reproducible pipeline for cleaning and organizing FlipTop rap battle data.
+A reproducible pipeline for cleaning and organizing [FlipTop](https://www.fliptop.com.ph/about) rap battle data.
 
 ## Overview
 
@@ -190,7 +190,7 @@ The whole pipeline is wrapped in a single command, `fliptop-refresh`:
 ```bash
 uv run fliptop-refresh                        # rebuild processed outputs from existing raw data
 uv run fliptop-refresh --fetch                # fetch fresh raw data (YouTube + web) first, then rebuild
-uv run fliptop-refresh --fetch --events-since 2025   # only re-scrape recent events (faster), then rebuild
+uv run fliptop-refresh --fetch --events-since 2026   # only re-scrape recent events (faster), then rebuild
 uv run fliptop-refresh --no-audit             # rebuild processed outputs without local audit files
 uv run fliptop-verify-release                 # verify committed inputs and processed outputs
 ```
