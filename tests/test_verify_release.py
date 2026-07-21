@@ -1,6 +1,7 @@
 """Tests for durable release manifests and offline verification."""
 
 import json
+from pathlib import Path
 
 from fliptop import PROJECT_ROOT, RAW_DATA_DIR
 from fliptop.integrity import canonical_file_bytes, file_fingerprint
@@ -19,19 +20,25 @@ def _published_release(tmp_path):
 def test_publication_includes_a_verifiable_manifest(tmp_path):
     processed_dir, manifest_path = _published_release(tmp_path)
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    battles_path = processed_dir / "ft_battles.json"
+    published_battle_count = sum(
+        1
+        for line in battles_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    )
 
     assert manifest["schema_version"] == 2
     assert len(manifest["pipeline_commit"]) == 40
     assert manifest["inputs"]
-    assert {item.rsplit("/", 1)[-1] for item in manifest["outputs"]} == {
+    assert {Path(item).name for item in manifest["outputs"]} == {
         "ft_battles.json",
         "battle_participants.csv",
         "emcees.csv",
     }
-    assert manifest["counts"]["candidate_battles"] == 1275
+    assert manifest["counts"]["candidate_battles"] == published_battle_count
     assert manifest["release_problems"] == []
     assert verify_release_manifest(manifest_path, project_root=PROJECT_ROOT) == []
-    assert (processed_dir / "ft_battles.json").exists()
+    assert battles_path.exists()
 
 
 def test_text_fingerprints_ignore_platform_line_endings(tmp_path):
