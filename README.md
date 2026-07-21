@@ -161,6 +161,51 @@ uv sync --locked --extra analysis
 uv run python -m ipykernel install --user --name project-rap-sheet --display-name "Project Rap Sheet"
 ```
 
+## Typical Workflow
+
+For a routine update that fetches new battles, annotates them, and publishes a
+new processed release:
+
+```powershell
+# Fetch new raw data and attempt a rebuild.
+uv run fliptop-refresh --fetch --events-since 2026
+
+# Record results for the new battles.
+uv run fliptop-annotate
+
+# Rebuild again so the new annotations reach the processed tables and manifest.
+uv run fliptop-refresh
+
+# Verify the complete release before committing it.
+uv run fliptop-verify-release
+
+# Review and commit the raw inputs, annotations, processed outputs, and manifest.
+git status
+git diff --stat
+
+# Add, commit, and push
+git add .
+git commit -m "commit details"
+git push
+```
+
+The first refresh may report that the release is blocked when newly fetched
+battles still need annotations. This is expected: it leaves the previous
+processed release intact and writes the exact to-do list to
+`data/debug/missing_results.csv`. After annotation, the second refresh is
+required to publish updated processed tables and a matching
+`data/processed/release_manifest.json`.
+
+Run `fliptop-verify-release` **before** committing. It is an offline, read-only
+integrity check that compares the current release inputs and outputs with the
+hashes, canonical byte sizes, and row counts recorded in the release manifest;
+it does not require a clean or committed working tree. If it reports hash or
+byte-size mismatches after annotation, rerun `fliptop-refresh` rather than
+committing the mismatched files.
+
+For matchup review, overrides, and other less common cases, see the
+[detailed maintainer workflow](docs/workflows.md).
+
 ## Development
 
 Run the checks that CI runs:
