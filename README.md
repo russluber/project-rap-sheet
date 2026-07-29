@@ -199,6 +199,16 @@ git commit -m "commit details"
 git push
 ```
 
+No new battles to fetch? Refresh the current views, likes, and comments for
+existing YouTube videos—ideally at least weekly:
+
+```powershell
+uv run fliptop-refresh --metrics-only
+```
+
+This updates only `data/raw/youtube_video_metrics.csv`; it does not fetch new
+uploads or rebuild the processed battle tables.
+
 The first refresh may report that the release is blocked when newly fetched
 battles still need annotations. This is expected: it leaves the previous
 processed release intact and writes the exact to-do list to
