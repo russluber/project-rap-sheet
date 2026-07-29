@@ -71,9 +71,12 @@ a passing candidate replaces the three processed tables and their manifest.
 - **Review before release.** `release.py` builds the final tables and human
   review queues together. It records the run and proposed changes before the
   official processed files are replaced as a rollback-safe bundle.
-- **Raw collection is transactional.** `raw_snapshot.py` gives both collectors
+- **Raw collection is transactional.** `raw_snapshot.py` gives the collectors
   a staged copy of the current raw data, validates their combined result, and
   promotes the raw files together with rollback on publication failure.
+- **Mutable telemetry stays auxiliary.** `youtube_metrics.py` validates and
+  attaches the latest YouTube counts without making them inputs to the stable
+  processed release.
 - **Contracts at every boundary.** `contracts.py` declares the schema, key,
   type, blank-value, and vocabulary rules for source tables and major pipeline
   stages. Failures identify the file or transform that introduced the problem.
@@ -114,6 +117,8 @@ fliptop/
 ├── annotations.py      # battle-results store (winner/judging/notes) + helpers
 ├── annotate.py         # fliptop-annotate CLI: interactively record battle results
 ├── spotcheck.py        # fliptop-spotcheck CLI: randomly inspect published battles
+├── youtube_api.py      # shared YouTube Data API helpers
+├── youtube_metrics.py  # current metrics store + multipart analysis join
 └── refresh.py          # fliptop-refresh CLI: orchestrate optional fetch + one build run
 ```
 
@@ -176,7 +181,6 @@ lazy re-exports; the owning module below is where the behavior lives.
 | `clean_titles` | trim whitespace, strip wrapping quotes |
 | `parse_upload_date` | ISO-8601 → tz-naive `datetime64` |
 | `add_duration_columns` | ISO-8601 duration → `duration_seconds` + `duration_hms` |
-| `convert_video_metrics_to_numeric` | view/like/comment counts → numeric |
 | `copy_yt_title` | preserve the original title (with `pt. N`) as `yt_raw_title` |
 | `strip_pt_suffix_from_title` | drop the `pt. N` suffix from the working title |
 
@@ -612,6 +616,7 @@ way to regenerate the processed datasets.
 ```bash
 uv run fliptop-refresh                        # rebuild all three tables + release manifest from existing inputs
 uv run fliptop-refresh --fetch                # re-fetch raw data (YouTube + web) first, then rebuild
+uv run fliptop-refresh --metrics-only         # refresh auxiliary current YouTube counts and exit
 uv run fliptop-refresh --fetch --events-since 2025   # incremental: only re-scrape recent events, then rebuild
 uv run fliptop-refresh --no-audit             # rebuild without writing data/debug audit files
 uv run fliptop-verify-release                 # verify the committed processed release offline
@@ -621,12 +626,14 @@ uv run fliptop-verify-release                 # verify the committed processed r
   [validation gate](#output-validation-gate), and (if it passes) stages,
   reloads, and publishes all three processed tables plus their official manifest
   as one rollback-safe bundle.
-- `fetch_raw()` (only with `--fetch`) runs the two `scripts/` collectors against
+- `fetch_raw()` (only with `--fetch`) runs the `scripts/` collectors against
   a temporary copy of `data/raw/`; this needs a YouTube API key (see
   `data/README.md`). The combined candidate is contract-validated and promoted
   with rollback protection. The
   YouTube fetch is always incremental; the website events scrape is a **full
   overwrite** (2010 → now) by default.
+- `refresh_youtube_metrics()` (via `--metrics-only`) replaces the auxiliary
+  current-count CSV and exits without running or invalidating the stable build.
 - `--events-since YEAR` makes the events scrape incremental — only YEAR → now is
   scraped and **merged** into the existing CSV (much faster for routine updates).
   Run a plain `--fetch` periodically for a clean full reconcile. See
@@ -671,6 +678,9 @@ from fliptop import (
     write_emcees_table,
     build_battle_network,      # ft_battles -> networkx graph
     merge_results,             # join full battle results onto a battle table
+    load_youtube_video_metrics,
+    build_battle_video_map,    # expand multipart battles to video IDs
+    attach_youtube_metrics,    # attach current multipart-aware totals
     validate_battle_metadata,
     validate_ft_battles,       # data-quality gate for final ft_battles
 )
@@ -734,6 +744,20 @@ ft_battles = pd.read_json(
 
 (Or just call `build_ft_battles(...)` again — building in memory keeps the
 datetime dtypes and skips the JSON round-trip entirely.)
+
+Attach the latest YouTube counts for analysis without changing the released
+schema:
+
+```python
+from fliptop import attach_youtube_metrics
+
+analysis_battles = attach_youtube_metrics(ft_battles)
+```
+
+For multipart battles, each count is summed across all video parts. A metric is
+left missing instead of reporting a partial total if any part lacks that count.
+`youtube_metrics_observed_at` is the oldest part observation time, so it is a
+conservative as-of timestamp.
 
 ---
 

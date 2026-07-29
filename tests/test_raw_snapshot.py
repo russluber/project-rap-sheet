@@ -17,11 +17,8 @@ def _youtube_row(video_id: str):
         "title": f"FlipTop - A vs B {video_id}",
         "description": "FlipTop presents: Test @ Venue. January 1, 2020.",
         "upload_date": "2020-02-01T00:00:00Z",
-        "view_count": "100",
         "duration": "PT10M",
         "url": f"https://example.test/{video_id}",
-        "likeCount": "10",
-        "commentCount": "2",
         "tags": ["battle"],
     }
 
@@ -32,6 +29,19 @@ def _write_snapshot(directory: Path, marker: str) -> dict[str, bytes]:
         json.dumps([_youtube_row(f"video-{marker}")]),
         encoding="utf-8",
     )
+    pd.DataFrame(
+        [
+            {
+                "video_id": f"video-{marker}",
+                "view_count": 100,
+                "like_count": 10,
+                "comment_count": 2,
+                "observed_at": "2026-01-01T00:00:00Z",
+                "checked_at": "2026-01-01T00:00:00Z",
+                "fetch_status": "ok",
+            }
+        ]
+    ).to_csv(directory / "youtube_video_metrics.csv", index=False)
     pd.DataFrame(
         [
             {
@@ -61,7 +71,7 @@ def _output_path(args: list[str]) -> Path:
     return Path(args[args.index("--output") + 1])
 
 
-def test_fetch_raw_publishes_only_after_both_collectors_succeed(tmp_path, monkeypatch):
+def test_fetch_raw_publishes_only_after_all_collectors_succeed(tmp_path, monkeypatch):
     raw_dir = tmp_path / "raw"
     old = _write_snapshot(raw_dir, "old")
     called_outputs = []
@@ -74,8 +84,22 @@ def test_fetch_raw_publishes_only_after_both_collectors_succeed(tmp_path, monkey
             filename: (raw_dir / filename).read_bytes()
             for filename in raw_mod.RAW_SNAPSHOT_FILENAMES
         } == old
-        if "youtube" in script_path.name:
+        if script_path.name == "fetch_youtube_channel_uploads.py":
             output.write_text(json.dumps([_youtube_row("video-new")]), encoding="utf-8")
+        elif script_path.name == "fetch_youtube_video_metrics.py":
+            pd.DataFrame(
+                [
+                    {
+                        "video_id": "video-new",
+                        "view_count": 200,
+                        "like_count": 20,
+                        "comment_count": 3,
+                        "observed_at": "2026-02-01T00:00:00Z",
+                        "checked_at": "2026-02-01T00:00:00Z",
+                        "fetch_status": "ok",
+                    }
+                ]
+            ).to_csv(output, index=False)
         else:
             pd.DataFrame(
                 [
@@ -92,7 +116,7 @@ def test_fetch_raw_publishes_only_after_both_collectors_succeed(tmp_path, monkey
 
     refresh_mod.fetch_raw(raw_dir, end_year=2020)
 
-    assert len(called_outputs) == 2
+    assert len(called_outputs) == 3
     assert "video-new" in (raw_dir / "youtube_videos.json").read_text(encoding="utf-8")
     assert "Event new" in (raw_dir / "matchup_events_metadata.csv").read_text(
         encoding="utf-8"
@@ -102,14 +126,29 @@ def test_fetch_raw_publishes_only_after_both_collectors_succeed(tmp_path, monkey
     ]
 
 
-def test_fetch_raw_keeps_old_snapshot_when_second_collector_fails(tmp_path, monkeypatch):
+def test_fetch_raw_keeps_old_snapshot_when_event_collector_fails(tmp_path, monkeypatch):
     raw_dir = tmp_path / "raw"
     old = _write_snapshot(raw_dir, "old")
 
     def fake_run(script_path, args):
         output = _output_path(args)
-        if "youtube" in script_path.name:
+        if script_path.name == "fetch_youtube_channel_uploads.py":
             output.write_text(json.dumps([_youtube_row("video-new")]), encoding="utf-8")
+            return
+        if script_path.name == "fetch_youtube_video_metrics.py":
+            pd.DataFrame(
+                [
+                    {
+                        "video_id": "video-new",
+                        "view_count": 200,
+                        "like_count": 20,
+                        "comment_count": 3,
+                        "observed_at": "2026-02-01T00:00:00Z",
+                        "checked_at": "2026-02-01T00:00:00Z",
+                        "fetch_status": "ok",
+                    }
+                ]
+            ).to_csv(output, index=False)
             return
         raise RuntimeError("event collection failed")
 
@@ -128,8 +167,22 @@ def test_fetch_raw_keeps_old_snapshot_when_candidate_is_invalid(tmp_path, monkey
 
     def fake_run(script_path, args):
         output = _output_path(args)
-        if "youtube" in script_path.name:
+        if script_path.name == "fetch_youtube_channel_uploads.py":
             output.write_text(json.dumps([_youtube_row("video-new")]), encoding="utf-8")
+        elif script_path.name == "fetch_youtube_video_metrics.py":
+            pd.DataFrame(
+                [
+                    {
+                        "video_id": "video-new",
+                        "view_count": 200,
+                        "like_count": 20,
+                        "comment_count": 3,
+                        "observed_at": "2026-02-01T00:00:00Z",
+                        "checked_at": "2026-02-01T00:00:00Z",
+                        "fetch_status": "ok",
+                    }
+                ]
+            ).to_csv(output, index=False)
         else:
             output.write_text("wrong,column\nvalue,value\n", encoding="utf-8")
 
@@ -140,6 +193,19 @@ def test_fetch_raw_keeps_old_snapshot_when_candidate_is_invalid(tmp_path, monkey
 
     for filename, contents in old.items():
         assert (raw_dir / filename).read_bytes() == contents
+
+
+def test_raw_snapshot_rejects_metrics_inventory_mismatch(tmp_path):
+    raw_dir = tmp_path / "raw"
+    _write_snapshot(raw_dir, "old")
+    metrics_path = raw_dir / "youtube_video_metrics.csv"
+    metrics = pd.read_csv(metrics_path)
+    metrics.loc[0, "video_id"] = "video-unknown"
+    metrics.to_csv(metrics_path, index=False)
+
+    with pytest.raises(ContractViolation, match="missing metrics") as exc_info:
+        raw_mod.validate_raw_snapshot(raw_dir)
+    assert "unknown upload" in str(exc_info.value)
 
 
 def test_raw_promotion_restores_every_file_after_mid_publish_failure(

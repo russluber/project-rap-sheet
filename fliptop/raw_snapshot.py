@@ -10,14 +10,17 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .battles import load_event_metadata, load_youtube_uploads
+from .contracts import YOUTUBE_VIDEO_METRICS, ContractViolation
 from .events import load_versetracker_event_dates
+from .youtube_metrics import load_youtube_video_metrics
 
 RAW_SNAPSHOT_FILENAMES = (
     "youtube_videos.json",
+    "youtube_video_metrics.csv",
     "matchup_events_metadata.csv",
     "versetracker_event_dates.csv",
 )
-REQUIRED_FETCH_FILENAMES = RAW_SNAPSHOT_FILENAMES[:2]
+REQUIRED_FETCH_FILENAMES = RAW_SNAPSHOT_FILENAMES[:3]
 
 
 @contextmanager
@@ -44,8 +47,30 @@ def validate_raw_snapshot(raw_dir: Path) -> None:
         if not (raw_dir / filename).exists():
             raise FileNotFoundError(f"raw snapshot is missing required file: {filename}")
 
-    load_youtube_uploads(raw_dir / "youtube_videos.json")
+    uploads = load_youtube_uploads(raw_dir / "youtube_videos.json")
+    metrics = load_youtube_video_metrics(raw_dir / "youtube_video_metrics.csv")
     load_event_metadata(raw_dir / "matchup_events_metadata.csv")
+    upload_ids = set(uploads["id"].astype(str))
+    metric_ids = set(metrics["video_id"].astype(str))
+    coverage_problems = []
+    missing = sorted(upload_ids - metric_ids)
+    unexpected = sorted(metric_ids - upload_ids)
+    if missing:
+        coverage_problems.append(
+            f"missing metrics for {len(missing)} upload ID(s): "
+            + ", ".join(missing[:5])
+        )
+    if unexpected:
+        coverage_problems.append(
+            f"contains {len(unexpected)} unknown upload ID(s): "
+            + ", ".join(unexpected[:5])
+        )
+    if coverage_problems:
+        raise ContractViolation(
+            YOUTUBE_VIDEO_METRICS.name,
+            coverage_problems,
+            source=raw_dir / "youtube_video_metrics.csv",
+        )
     versetracker = raw_dir / "versetracker_event_dates.csv"
     if versetracker.exists():
         load_versetracker_event_dates(versetracker)

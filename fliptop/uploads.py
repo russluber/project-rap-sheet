@@ -501,7 +501,6 @@ def prepare_uploads(df_yt: pd.DataFrame) -> pd.DataFrame:
         .pipe(clean_titles)
         .pipe(parse_upload_date)
         .pipe(add_duration_columns)
-        .pipe(convert_video_metrics_to_numeric)
         .pipe(copy_yt_title)
         .pipe(strip_pt_suffix_from_title)
     )

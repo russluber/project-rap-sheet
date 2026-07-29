@@ -352,9 +352,6 @@ def finalize_battles(
     # 1) Drop raw / helper columns you don't want in ft_battles
     # (these are from your notebook; safe to ignore if not present)
     cols_to_drop = [
-        "view_count",
-        "likeCount",
-        "commentCount",
         "tags",
         "matchup",           # raw matchup; we will keep matchup_clean instead
         "event_description", # if present

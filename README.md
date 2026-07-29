@@ -12,6 +12,12 @@ The first objective of this project is to create a database for FlipTop rap batt
 
 3. `versetracker_event_dates.csv` - raw event and event date data scraped from [Verse Tracker](https://versetracker.com/battles/fliptop).
 
+Current YouTube engagement data lives separately in
+`data/raw/youtube_video_metrics.csv`. It has one row per upload and is designed
+to be overwritten weekly as views, likes, and comments change. It is not baked
+into the stable `ft_battles` release; analysis code can attach the latest
+snapshot when needed.
+
 The main output is a cleaned, result-enriched `ft_battles` table with one row
 per battle. It is built from the battle metadata plus the hand-collected result
 store in `data/annotations/battle_results.csv`, and includes:
@@ -66,6 +72,7 @@ project-rap-sheet/
 │   ├── emcee_aliases.csv
 │   ├── raw/
 │   │   ├── youtube_videos.json
+│   │   ├── youtube_video_metrics.csv
 │   │   ├── matchup_events_metadata.csv
 │   │   └── versetracker_event_dates.csv
 │   ├── overrides/
@@ -99,6 +106,8 @@ project-rap-sheet/
 │   ├── publish.py
 │   ├── release.py
 │   ├── raw_snapshot.py
+│   ├── youtube_api.py
+│   ├── youtube_metrics.py
 │   ├── contracts.py
 │   ├── integrity.py
 │   ├── verify_release.py
@@ -120,6 +129,7 @@ project-rap-sheet/
 ├── scripts/
 │   ├── README.md
 │   ├── fetch_youtube_channel_uploads.py
+│   ├── fetch_youtube_video_metrics.py
 │   ├── fetch_events_metadata_from_fliptop_web.py
 │   └── fetch_versetracker_event_dates.py
 ├── tests/
@@ -236,6 +246,7 @@ The whole pipeline is wrapped in a single command, `fliptop-refresh`:
 ```bash
 uv run fliptop-refresh                        # rebuild processed outputs from existing raw data
 uv run fliptop-refresh --fetch                # fetch fresh raw data (YouTube + web) first, then rebuild
+uv run fliptop-refresh --metrics-only         # refresh current YouTube metrics only
 uv run fliptop-refresh --fetch --events-since 2026   # only re-scrape recent events (faster), then rebuild
 uv run fliptop-refresh --no-audit             # rebuild processed outputs without local audit files
 uv run fliptop-verify-release                 # verify committed inputs and processed outputs
@@ -259,12 +270,15 @@ uv run fliptop-verify-release                 # verify committed inputs and proc
   The same checks run again at the major in-memory pipeline boundaries. A
   contract failure names the source file or exact stage that broke, and no
   processed file is changed.
-- `--fetch` first runs the two collection scripts in `scripts/` to refresh the
+- `--fetch` first runs the collection scripts in `scripts/` to refresh the
   raw data (this needs a YouTube API key — see `data/README.md`), then rebuilds.
-  Both collectors write into a temporary snapshot first. The snapshot is
+  The collectors write into a temporary snapshot first. The snapshot is
   contract-validated and all raw files are promoted together; a collection,
   validation, or publication failure leaves the previous raw snapshot intact.
   Override the channel or scrape years with `--channel`, `--start`, `--end`.
+- `--metrics-only` refreshes `data/raw/youtube_video_metrics.csv` and exits.
+  It does not rebuild `ft_battles` or change its release manifest because
+  current engagement counts are deliberately an auxiliary analysis input.
 - `--fetch` re-scrapes the whole FlipTop site (2010 → now) by default;
   `--events-since YEAR` instead scrapes only recent events and **merges** them
   into the existing data — much faster for routine top-ups. See

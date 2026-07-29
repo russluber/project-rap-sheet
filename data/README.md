@@ -9,6 +9,7 @@ data/
 ├── emcee_aliases.csv      # hand-maintained alias → canonical name map
 ├── raw/                   # original scraped sources (input to the pipeline)
 │   ├── youtube_videos.json
+│   ├── youtube_video_metrics.csv   # current mutable YouTube engagement snapshot
 │   ├── matchup_events_metadata.csv
 │   └── versetracker_event_dates.csv   # COVID-era event dates (date-imputation reference)
 ├── overrides/             # hand-maintained corrections applied during the build
@@ -34,10 +35,13 @@ data/
 ```
 
 **Data flow.** `raw/` is produced by [`scripts/`](../scripts/). At the start of
-each build, `PipelineInputs` loads `raw/` plus `emcee_aliases.csv`, `rules/`,
+each build, `PipelineInputs` loads the stable pipeline sources in `raw/` plus
+`emcee_aliases.csv`, `rules/`,
 `overrides/`, and `annotations/` exactly once. The [`fliptop`](../fliptop/)
 package runs entirely from that snapshot and writes `processed/` only after the
-candidate passes. `annotations/` is filled in by hand via `fliptop-annotate`.
+candidate passes. The changing `youtube_video_metrics.csv` table is intentionally
+outside that release snapshot and is joined only for analysis. `annotations/`
+is filled in by hand via `fliptop-annotate`.
 
 ```
 scripts/ -> raw/ ------------------+
@@ -121,7 +125,7 @@ collection scripts in [`scripts/`](../scripts/) (or `uv run fliptop-refresh --fe
 
 During `fliptop-refresh --fetch`, collectors update a temporary sibling snapshot
 rather than the official files directly. The candidate is contract-validated
-and the raw files are replaced together only after both collectors succeed;
+and the raw files are replaced together only after all collectors succeed;
 rollback restores the previous snapshot if publication fails midway.
 Treat these as **read-only inputs** — the pipeline never writes here.
 
@@ -132,10 +136,33 @@ one object per video. Written by
 [`fetch_youtube_channel_uploads.py`](../scripts/fetch_youtube_channel_uploads.py).
 
 Key fields: `id`, `title`, `description`, `upload_date` (ISO-8601 UTC),
-`view_count`, `duration` (ISO-8601, e.g. `PT28M1S`), `url`, `likeCount`,
-`commentCount`, `tags`. Counts arrive as **strings** from the API; the pipeline
-coerces them to numbers. (Full field table in the
+`duration` (ISO-8601, e.g. `PT28M1S`), `url`, and `tags`. Mutable engagement
+counts are kept out of this descriptive metadata file. (Full field table in the
 [scripts README](../scripts/README.md#fetch_youtube_channel_uploadspy).)
+
+### `youtube_video_metrics.csv`
+
+The latest known public engagement counts for every ID in
+`youtube_videos.json`, written by
+[`fetch_youtube_video_metrics.py`](../scripts/fetch_youtube_video_metrics.py).
+This is a **current-state snapshot**, not an observation history:
+
+| column | meaning |
+| ------ | ------- |
+| `video_id` | unique YouTube ID; exact foreign key to `youtube_videos.json` |
+| `view_count` | latest public view count |
+| `like_count` | latest public like count, blank when unavailable |
+| `comment_count` | latest public comment count, blank when unavailable |
+| `observed_at` | UTC time the stored counts were successfully observed |
+| `checked_at` | UTC time the video was last checked |
+| `fetch_status` | `ok` or `not_returned` |
+
+A successful weekly refresh replaces the old counts, including legitimate
+decreases. If YouTube does not return a requested video, the last successful
+counts and `observed_at` are preserved, while `checked_at` advances and the
+status becomes `not_returned`. Use `uv run fliptop-refresh --metrics-only`.
+Because this mutable snapshot is excluded from `PipelineInputs` and the release
+manifest's input hashes, it can change without invalidating `ft_battles`.
 
 ### `matchup_events_metadata.csv`
 
@@ -373,6 +400,7 @@ is optional if you prefer env vars.
 ```bash
 uv run fliptop-refresh                        # rebuild processed/ + data/debug/ from existing raw files
 uv run fliptop-refresh --fetch                # re-scrape raw/ first (needs network + API key), then rebuild
+uv run fliptop-refresh --metrics-only         # replace only the current YouTube metrics snapshot
 uv run fliptop-refresh --fetch --events-since 2025   # incremental events scrape (recent years only), then rebuild
 uv run fliptop-refresh --no-audit             # rebuild processed/ without local data/debug audit files
 uv run fliptop-verify-release                 # verify the committed inputs and processed release

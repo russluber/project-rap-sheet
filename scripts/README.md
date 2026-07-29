@@ -19,6 +19,7 @@ scripts/  ──fetch──►  data/raw/  ──build (fliptop)──►  data/
 
 - [When to run these](#when-to-run-these)
 - [`fetch_youtube_channel_uploads.py`](#fetch_youtube_channel_uploadspy)
+- [`fetch_youtube_video_metrics.py`](#fetch_youtube_video_metricspy)
 - [`fetch_events_metadata_from_fliptop_web.py`](#fetch_events_metadata_from_fliptop_webpy)
 - [`fetch_versetracker_event_dates.py`](#fetch_versetracker_event_datespy)
 - [Being a polite scraper](#being-a-polite-scraper)
@@ -34,10 +35,11 @@ the processed datasets in one shot:
 
 ```bash
 uv run fliptop-refresh --fetch    # fetch routine raw sources, then publish all tables + manifest
+uv run fliptop-refresh --metrics-only  # refresh only changing YouTube counts
 uv run fliptop-refresh            # rebuild only, from the raw data already on disk (no network)
 ```
 
-The refresh command gives both scripts a temporary copy of the current raw
+The full refresh command gives the collectors a temporary copy of the current raw
 snapshot instead of letting either overwrite `data/raw/` directly. It validates
 their combined result and publishes all raw files together. A collector,
 validation, or publication failure leaves the old snapshot intact. Running a
@@ -86,8 +88,9 @@ JSON.
 
 **How it works.** It resolves the channel's "uploads" playlist, pages through it
 (50 ids per request) to list every video id, then fetches `snippet` +
-`contentDetails` + `statistics` for those ids in batches of 50. Ids already
+`contentDetails` for those ids in batches of 50. Ids already
 present in the output file are skipped, so a re-run only fetches what's new.
+Legacy view/like/comment fields are removed if an older JSON file still has them.
 
 **Requires an API key**, looked up in this order:
 
@@ -118,11 +121,38 @@ object per video:
 | `title` | `"FlipTop - Hespero vs R-Zone"` | |
 | `description` | `"FlipTop presents: Ahon 16 @ …"` | the box text the pipeline later mines for event name/date/location |
 | `upload_date` | `"2026-02-19T12:40:15Z"` | ISO-8601 (UTC) |
-| `view_count` | `"99300"` | string from the API |
 | `duration` | `"PT28M1S"` | ISO-8601 duration |
 | `url` | `"https://www.youtube.com/watch?v=…"` | |
-| `likeCount` / `commentCount` | `"1488"` / `"444"` | strings from the API |
 | `tags` | `["fliptop", …]` | list of strings |
+
+---
+
+## `fetch_youtube_video_metrics.py`
+
+Fetches the current `statistics` resource for every video in
+`youtube_videos.json` and atomically replaces
+`data/raw/youtube_video_metrics.csv`. It requests at most 50 IDs per API call.
+Views, likes, and comments come from the same API request, so including likes
+and comments does not add a request per field.
+
+```bash
+uv run fliptop-refresh --metrics-only
+
+# equivalent direct collector call
+uv run python scripts/fetch_youtube_video_metrics.py
+```
+
+The CSV schema is
+`video_id,view_count,like_count,comment_count,observed_at,checked_at,fetch_status`.
+There is exactly one row per known upload. Successful observations overwrite
+the prior counts—even if YouTube lowers a count. An ID omitted from a response
+keeps its prior successful values but is marked `not_returned`, avoiding both a
+false zero and silent staleness. The whole file is validated before its atomic
+replacement.
+
+This table is intentionally outside the processed-release input manifest.
+Weekly metric-only refreshes therefore do not force a rebuild or create a new
+`ft_battles` release.
 
 ---
 

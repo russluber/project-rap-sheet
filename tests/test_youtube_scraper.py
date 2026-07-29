@@ -1,6 +1,7 @@
 """Network-free safety tests for the standalone YouTube collection script."""
 
 import importlib.util
+import json
 import sys
 
 import pytest
@@ -41,3 +42,34 @@ def test_main_returns_failure_status_when_collection_fails(monkeypatch, capsys):
 
     assert exc.value.code == 1
     assert "[error] API unavailable" in capsys.readouterr().err
+
+
+def test_no_new_uploads_still_migrates_legacy_metrics(tmp_path, monkeypatch):
+    path = tmp_path / "youtube.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "aaaaaaaaaaa",
+                    "title": "A vs B",
+                    "view_count": "100",
+                    "likeCount": "10",
+                    "commentCount": "2",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(fy, "load_api_key", lambda **kwargs: "key")
+    monkeypatch.setattr(fy, "get_uploads_playlist_id", lambda *args: "playlist")
+    monkeypatch.setattr(
+        fy,
+        "get_all_upload_video_ids",
+        lambda *args: ["aaaaaaaaaaa"],
+    )
+    monkeypatch.setattr(fy, "fetch_video_metadata", lambda *args, **kwargs: [])
+
+    fy.fetch_channel_uploads("channel", output_path=path)
+
+    [stored] = json.loads(path.read_text(encoding="utf-8"))
+    assert stored == {"id": "aaaaaaaaaaa", "title": "A vs B"}

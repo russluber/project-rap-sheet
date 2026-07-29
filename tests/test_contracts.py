@@ -90,7 +90,8 @@ def test_contract_registry_has_stable_version_for_every_boundary():
     versions = contract_versions()
 
     assert set(versions) == set(CONTRACT_REGISTRY)
-    assert versions["raw.youtube_uploads"] == 1
+    assert versions["raw.youtube_uploads"] == 2
+    assert versions["raw.youtube_video_metrics"] == 1
     assert versions["pipeline.finalize_battle_metadata"] == 1
     assert versions["output.ft_battles"] == 2
 

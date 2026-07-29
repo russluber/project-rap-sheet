@@ -9,6 +9,7 @@ into an isolated temp directory.
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
@@ -288,6 +289,25 @@ def test_main_audit_flag_remains_accepted(tmp_path, monkeypatch):
     assert calls[0][1]["pipeline_run"] is pipeline_run
     assert calls[4][1]["pipeline_run"] is pipeline_run
     assert calls[4][1]["candidate"] is candidate
+
+
+def test_main_metrics_only_refreshes_metrics_and_exits(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        refresh_mod,
+        "refresh_youtube_metrics",
+        lambda raw_dir: calls.append(Path(raw_dir))
+        or Path(raw_dir) / "youtube_video_metrics.csv",
+    )
+    monkeypatch.setattr(
+        refresh_mod,
+        "build_pipeline_run",
+        lambda **kwargs: pytest.fail("metrics-only must not build the pipeline"),
+    )
+
+    refresh_mod.main(["--raw-dir", str(tmp_path), "--metrics-only"])
+
+    assert calls == [tmp_path]
 
 
 def test_main_writes_reviews_before_blocked_release(tmp_path, monkeypatch):

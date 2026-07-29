@@ -15,11 +15,8 @@ def _youtube_row(**changes):
         "title": "FlipTop - A vs B",
         "description": "event description",
         "upload_date": "2026-01-01T00:00:00Z",
-        "view_count": "100",
         "duration": "PT10M",
         "url": "https://example.test/video-one",
-        "likeCount": "10",
-        "commentCount": "2",
         "tags": ["battle"],
     }
     row.update(changes)

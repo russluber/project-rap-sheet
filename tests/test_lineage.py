@@ -35,9 +35,6 @@ POI_NO_SHOW_ID = "IO6AaGSupuY"
 def _write_raw(tmp_path, videos, events=None):
     defaults = {
         "description": "",
-        "view_count": "0",
-        "likeCount": "0",
-        "commentCount": "0",
         "tags": [],
     }
     complete_videos = [{**defaults, **video} for video in videos]

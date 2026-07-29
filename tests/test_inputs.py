@@ -29,6 +29,9 @@ def test_load_pipeline_inputs_captures_every_file_backed_dependency():
         "battle_results.csv",
         "title_exclusions.csv",
     }
+    assert "youtube_video_metrics.csv" not in {
+        path.name for path in inputs.source_files
+    }
 
 
 def test_explicit_empty_overrides_are_not_reloaded():

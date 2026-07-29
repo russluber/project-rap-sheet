@@ -1,9 +1,10 @@
 {
   "schema_version": 2,
-  "created_at": "2026-07-21T21:01:11.595260+00:00",
-  "pipeline_commit": "44aaed5c10506a1f4ed4def7d9478505d3af44cf",
+  "created_at": "2026-07-29T03:57:18.220365+00:00",
+  "pipeline_commit": "9946555e445aea0678c9862971fb08b27ad60379",
   "contract_versions": {
-    "raw.youtube_uploads": 1,
+    "raw.youtube_uploads": 2,
+    "raw.youtube_video_metrics": 1,
     "raw.event_metadata": 1,
     "raw.versetracker_event_dates": 1,
     "maintained.emcee_aliases": 1,
@@ -64,8 +65,8 @@
       "canonical_bytes": 1121
     },
     "data/raw/youtube_videos.json": {
-      "sha256": "3c072dd21446deb559b34ab324e1e7112db4dc37b1c417cbd4881254c6468a79",
-      "canonical_bytes": 4498391
+      "sha256": "2e663e85d3c1a4e57636377f718906cbae71425f084f67863091978fa940cad1",
+      "canonical_bytes": 4345955
     },
     "data/rules/event_exclusions.csv": {
       "sha256": "6c0abda67a2d04d3ddab42bd21c30e8e4f123ef13e1b826c371e1705754d1ee4",

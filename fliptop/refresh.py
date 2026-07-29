@@ -9,10 +9,16 @@ disk (fast, deterministic, no network or API key required):
     fliptop-refresh
     # or: python -m fliptop.refresh
 
-With ``--fetch`` it first pulls fresh raw data (YouTube uploads + scraped event
-metadata) by running the two collection scripts, then rebuilds:
+With ``--fetch`` it first pulls fresh raw data (YouTube uploads, current video
+metrics, and scraped event metadata) by running the collection scripts, then
+rebuilds:
 
     fliptop-refresh --fetch
+
+The changing current-state metrics table can instead be refreshed on its own,
+without rebuilding the stable processed release:
+
+    fliptop-refresh --metrics-only
 
 The web events scrape is a full overwrite by default. ``--events-since YEAR``
 makes it incremental instead - only events from YEAR onward are scraped and
@@ -95,11 +101,11 @@ def fetch_raw(
     skip_known_events: bool = False,
 ) -> None:
     """
-    Refresh the raw data files by running the two collection scripts.
+    Refresh the raw data files by running the collection scripts.
 
     Invoked as subprocesses (with the current interpreter) against a temporary
     copy of the current raw snapshot. The candidate is contract-validated and
-    promoted as a rollback-safe bundle only after both collectors succeed.
+    promoted as a rollback-safe bundle only after all collectors succeed.
 
     The YouTube fetch is always incremental (it skips ids already saved). The web
     events scrape overwrites the CSV by default (a clean full rebuild); with
@@ -112,12 +118,19 @@ def fetch_raw(
     raw_dir = Path(raw_dir)
     with staged_raw_snapshot(raw_dir) as staging_dir:
         youtube_staged = staging_dir / "youtube_videos.json"
+        metrics_staged = staging_dir / "youtube_video_metrics.csv"
         events_staged = staging_dir / "matchup_events_metadata.csv"
 
         print(f"[fetch] YouTube uploads (channel={channel}) -> staged snapshot")
         _run_script(
             SCRIPTS_DIR / "fetch_youtube_channel_uploads.py",
             ["--channel", channel, "--output", str(youtube_staged)],
+        )
+
+        print("[fetch] YouTube metrics -> staged current-state snapshot")
+        _run_script(
+            SCRIPTS_DIR / "fetch_youtube_video_metrics.py",
+            ["--ids-from", str(youtube_staged), "--output", str(metrics_staged)],
         )
 
         events_args = [
@@ -144,6 +157,24 @@ def fetch_raw(
         published = publish_raw_snapshot(staging_dir, raw_dir)
 
     print(f"[fetch] published raw snapshot -> {raw_dir} ({len(published)} files)")
+
+
+def refresh_youtube_metrics(raw_dir: Path = RAW_DATA_DIR) -> Path:
+    """Atomically refresh only the auxiliary current YouTube metrics table."""
+    raw_dir = Path(raw_dir)
+    youtube_path = raw_dir / "youtube_videos.json"
+    metrics_path = raw_dir / "youtube_video_metrics.csv"
+    print(f"[fetch] YouTube metrics -> {metrics_path}")
+    _run_script(
+        SCRIPTS_DIR / "fetch_youtube_video_metrics.py",
+        ["--ids-from", str(youtube_path), "--output", str(metrics_path)],
+    )
+
+    from .youtube_metrics import load_youtube_video_metrics
+
+    metrics = load_youtube_video_metrics(metrics_path)
+    print(f"[fetch] refreshed {len(metrics)} YouTube metric rows.")
+    return metrics_path
 
 
 def _run_script(script_path: Path, args: list[str]) -> None:
@@ -216,10 +247,19 @@ def main(argv: list[str] | None = None) -> None:
             "data by default; use --fetch to pull fresh raw data first."
         )
     )
-    parser.add_argument(
+    fetch_group = parser.add_mutually_exclusive_group()
+    fetch_group.add_argument(
         "--fetch",
         action="store_true",
         help="Fetch fresh raw data (YouTube + web) before rebuilding.",
+    )
+    fetch_group.add_argument(
+        "--metrics-only",
+        action="store_true",
+        help=(
+            "Refresh data/raw/youtube_video_metrics.csv and exit without "
+            "rebuilding the stable processed tables."
+        ),
     )
     parser.add_argument(
         "--channel",
@@ -288,6 +328,11 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     args = parser.parse_args(argv)
+
+    if args.metrics_only:
+        refresh_youtube_metrics(args.raw_dir)
+        print("[done] metrics refresh complete.")
+        return
 
     if args.fetch:
         incremental = args.events_since is not None

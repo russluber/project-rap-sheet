@@ -56,6 +56,9 @@ __all__ = [
     "write_emcees_table",
     "build_battle_network",
     "merge_results",
+    "load_youtube_video_metrics",
+    "build_battle_video_map",
+    "attach_youtube_metrics",
     "validate_battle_metadata",
     "validate_ft_battles",
 ]
@@ -93,6 +96,12 @@ _LAZY = {
     "write_emcees_table": (".structures", "write_emcees_table"),
     "build_battle_network": (".structures", "build_battle_network"),
     "merge_results": (".annotations", "merge_results"),
+    "load_youtube_video_metrics": (
+        ".youtube_metrics",
+        "load_youtube_video_metrics",
+    ),
+    "build_battle_video_map": (".youtube_metrics", "build_battle_video_map"),
+    "attach_youtube_metrics": (".youtube_metrics", "attach_youtube_metrics"),
     "validate_battle_metadata": (".validate", "validate_battle_metadata"),
     "validate_ft_battles": (".validate", "validate_ft_battles"),
 }
@@ -125,6 +134,11 @@ if TYPE_CHECKING:  # for type checkers / IDEs only, no runtime import cost
         write_emcees_table,
     )
     from .validate import validate_battle_metadata, validate_ft_battles
+    from .youtube_metrics import (
+        attach_youtube_metrics,
+        build_battle_video_map,
+        load_youtube_video_metrics,
+    )
 
 
 def __getattr__(name: str):

@@ -159,16 +159,14 @@ RAW_YOUTUBE_COLUMNS = (
     "title",
     "description",
     "upload_date",
-    "view_count",
     "duration",
     "url",
-    "likeCount",
-    "commentCount",
     "tags",
 )
 RAW_YOUTUBE_UPLOADS = TableContract(
     name="raw YouTube uploads",
     columns=RAW_YOUTUBE_COLUMNS,
+    version=2,
     allow_extra_columns=False,
     allow_empty=False,
     unique_by=("id",),
@@ -178,13 +176,40 @@ RAW_YOUTUBE_UPLOADS = TableContract(
         ("title", "string"),
         ("description", "string"),
         ("upload_date", "datetime"),
-        ("view_count", "numeric"),
         ("duration", "string"),
         ("url", "string"),
-        ("likeCount", "numeric"),
-        ("commentCount", "numeric"),
         ("tags", "list"),
     ),
+)
+
+YOUTUBE_VIDEO_METRICS_COLUMNS = (
+    "video_id",
+    "view_count",
+    "like_count",
+    "comment_count",
+    "observed_at",
+    "checked_at",
+    "fetch_status",
+)
+YOUTUBE_VIDEO_METRICS = TableContract(
+    name="raw YouTube video metrics",
+    columns=YOUTUBE_VIDEO_METRICS_COLUMNS,
+    version=1,
+    allow_extra_columns=False,
+    ordered_columns=True,
+    allow_empty=False,
+    unique_by=("video_id",),
+    non_blank=("video_id", "checked_at", "fetch_status"),
+    kinds=(
+        ("video_id", "string"),
+        ("view_count", "numeric"),
+        ("like_count", "numeric"),
+        ("comment_count", "numeric"),
+        ("observed_at", "datetime"),
+        ("checked_at", "datetime"),
+        ("fetch_status", "string"),
+    ),
+    allowed_values=(("fetch_status", frozenset({"ok", "not_returned"})),),
 )
 
 RAW_EVENT_COLUMNS = ("matchup", "event_name", "event_description", "video_id")
@@ -428,6 +453,7 @@ PIPELINE_STAGE_CONTRACTS = {
 
 CONTRACT_REGISTRY = {
     "raw.youtube_uploads": RAW_YOUTUBE_UPLOADS,
+    "raw.youtube_video_metrics": YOUTUBE_VIDEO_METRICS,
     "raw.event_metadata": RAW_EVENT_METADATA,
     "raw.versetracker_event_dates": VERSETRACKER_EVENT_DATES,
     "maintained.emcee_aliases": EMCEE_ALIASES_CSV,

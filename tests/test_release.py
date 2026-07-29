@@ -98,7 +98,8 @@ def test_run_manifest_records_inputs_counts_and_status(tmp_path):
     written = json.loads(path.read_text(encoding="utf-8"))
 
     assert manifest["counts"]["candidate_battles"] == len(candidate.ft_battles)
-    assert manifest["contract_versions"]["raw.youtube_uploads"] == 1
+    assert manifest["contract_versions"]["raw.youtube_uploads"] == 2
+    assert manifest["contract_versions"]["raw.youtube_video_metrics"] == 1
     assert manifest["input_sha256"]
     assert written["release_status"] == "ready"
     assert written["git_commit"]
