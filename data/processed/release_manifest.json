@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "created_at": "2026-07-29T03:57:18.220365+00:00",
-  "pipeline_commit": "9946555e445aea0678c9862971fb08b27ad60379",
+  "created_at": "2026-08-05T08:25:10.150297+00:00",
+  "pipeline_commit": "8d65face72804436280effc149212e8868ecdfdf",
   "contract_versions": {
     "raw.youtube_uploads": 2,
     "raw.youtube_video_metrics": 1,
@@ -25,8 +25,8 @@
   },
   "inputs": {
     "data/annotations/battle_results.csv": {
-      "sha256": "a271fffdd54651a34edcbdabb1214d9f77114b319b59165eeb28ac157e697fed",
-      "canonical_bytes": 56857
+      "sha256": "3aaa79de982fd815ec2b2db2bdf0db849117d289243bb6c4cd800933ca8c3ec3",
+      "canonical_bytes": 57060
     },
     "data/emcee_aliases.csv": {
       "sha256": "d558557efac9a3c19ba7d877e61ee6e829d569e3ddc129cc3fe4a25a78d4fc5a",
@@ -57,16 +57,16 @@
       "canonical_bytes": 31
     },
     "data/raw/matchup_events_metadata.csv": {
-      "sha256": "4b47d1a54d06b0313c18640a27702efda0e71422633fd5e2a8d144b517723457",
-      "canonical_bytes": 303474
+      "sha256": "5cb1815adc89efd44ccaf926a8306914473363c86c150d2be88325a61d395134",
+      "canonical_bytes": 304282
     },
     "data/raw/versetracker_event_dates.csv": {
       "sha256": "ae1f1966239549150227e8ea64030cdf5e8cd6988f1ad0818aa5e687a820d9d1",
       "canonical_bytes": 1121
     },
     "data/raw/youtube_videos.json": {
-      "sha256": "2e663e85d3c1a4e57636377f718906cbae71425f084f67863091978fa940cad1",
-      "canonical_bytes": 4345955
+      "sha256": "e9ea7dcc3a44632a2bd6468a22909f07460b04c6fbe956a1faf6c700a66d44ce",
+      "canonical_bytes": 4356145
     },
     "data/rules/event_exclusions.csv": {
       "sha256": "6c0abda67a2d04d3ddab42bd21c30e8e4f123ef13e1b826c371e1705754d1ee4",
@@ -79,30 +79,30 @@
   },
   "outputs": {
     "data/processed/ft_battles.json": {
-      "sha256": "3d6f283dd7fd214413d8d09ffeeaa0bb3bf064e011a8c229066b410e2ab5f038",
-      "canonical_bytes": 586170,
-      "rows": 1280
+      "sha256": "09a36a85aedff38e2d1de80c8fdac52b4ad3710a664374a549d77197e59841fa",
+      "canonical_bytes": 588554,
+      "rows": 1285
     },
     "data/processed/battle_participants.csv": {
-      "sha256": "68f23eb8c6cd9b4e84db664040fecbce08f75740ee95c206f7a6cb11694014a5",
-      "canonical_bytes": 304412,
-      "rows": 2564
+      "sha256": "bb249f5c3c297a610a2a296008d8472a9acb7597c108761f79f970e562cac17c",
+      "canonical_bytes": 305543,
+      "rows": 2574
     },
     "data/processed/emcees.csv": {
-      "sha256": "07d18cfcf123d6fbe041a055152b2fd0c7485aac559cf372165ed46d4cb94960",
-      "canonical_bytes": 4817,
-      "rows": 416
+      "sha256": "17f1740694c8361b17e2a63114cd72b25c7c63a345bd5299d0240ed8a0610fe8",
+      "canonical_bytes": 4877,
+      "rows": 422
     }
   },
   "counts": {
-    "raw_uploads": 1895,
-    "raw_events": 1421,
-    "candidate_battles": 1280,
-    "excluded_uploads": 604,
+    "raw_uploads": 1901,
+    "raw_events": 1425,
+    "candidate_battles": 1285,
+    "excluded_uploads": 605,
     "review_uploads": 0,
     "missing_results": 0,
-    "participants": 2564,
-    "emcees": 416
+    "participants": 2574,
+    "emcees": 422
   },
   "release_problems": []
 }
