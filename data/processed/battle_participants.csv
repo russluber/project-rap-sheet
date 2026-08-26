@@ -1,4 +1,6 @@
 battle_id,matchup,event_name,event_date,upload_date,emcee,participant_slot,participant_role,participation_status,appearance_credit,battle_credit
+tt_smWqiocM,Ruffian vs Keelan,Zoning 22,2026-07-04,2026-08-26 12:18:04,Ruffian,emcee1,scheduled,appeared,True,True
+tt_smWqiocM,Ruffian vs Keelan,Zoning 22,2026-07-04,2026-08-26 12:18:04,Keelan,emcee2,scheduled,appeared,True,True
 PhbanXtWnGQ,Batang Rebelde vs 3rdy,Zoning 22,2026-07-04,2026-08-23 13:16:04,Batang Rebelde,emcee1,scheduled,appeared,True,True
 PhbanXtWnGQ,Batang Rebelde vs 3rdy,Zoning 22,2026-07-04,2026-08-23 13:16:04,3rdy,emcee2,scheduled,appeared,True,True
 FTYtjpvDY-g,Towpher vs K-Ram,Zoning 22,2026-07-04,2026-08-19 13:30:50,Towpher,emcee1,scheduled,appeared,True,True
@@ -1917,10 +1919,10 @@ IQtPpzerEUw,Omar Baliw vs Left Eye Blind,Zoning Quarter Finals,2014-08-30,2014-1
 IQtPpzerEUw,Omar Baliw vs Left Eye Blind,Zoning Quarter Finals,2014-08-30,2014-11-16 14:18:57,Left Eye Blind,emcee2,scheduled,appeared,True,True
 0vJSKdQxlZw,Elbiz vs LilJohn,Zoning Quarter Finals,2014-08-30,2014-11-12 11:20:07,Elbiz,emcee1,scheduled,appeared,True,True
 0vJSKdQxlZw,Elbiz vs LilJohn,Zoning Quarter Finals,2014-08-30,2014-11-12 11:20:07,LilJohn,emcee2,scheduled,appeared,True,True
-7zTePLcK0gE,Kris Delano vs Prosecutor Billy,Zoning Quarter Finals,2014-08-30,2014-11-07 10:54:25,Kris Delano,emcee1,scheduled,appeared,True,True
-7zTePLcK0gE,Kris Delano vs Prosecutor Billy,Zoning Quarter Finals,2014-08-30,2014-11-07 10:54:25,Prosecutor Billy,emcee2,scheduled,appeared,True,True
 wkxxY43BrMo,Batas vs Rudic,Zoning Quarter Finals,2014-08-30,2014-11-07 10:54:25,Batas,emcee1,scheduled,appeared,True,True
 wkxxY43BrMo,Batas vs Rudic,Zoning Quarter Finals,2014-08-30,2014-11-07 10:54:25,Rudic,emcee2,scheduled,appeared,True,True
+7zTePLcK0gE,Kris Delano vs Prosecutor Billy,Zoning Quarter Finals,2014-08-30,2014-11-07 10:54:25,Kris Delano,emcee1,scheduled,appeared,True,True
+7zTePLcK0gE,Kris Delano vs Prosecutor Billy,Zoning Quarter Finals,2014-08-30,2014-11-07 10:54:25,Prosecutor Billy,emcee2,scheduled,appeared,True,True
 Qj1eJV9m7lc,Asero vs Jaffie,Aspakan 2,2014-07-19,2014-11-03 02:16:19,Asero,emcee1,scheduled,appeared,True,True
 Qj1eJV9m7lc,Asero vs Jaffie,Aspakan 2,2014-07-19,2014-11-03 02:16:19,Jaffie,emcee2,scheduled,appeared,True,True
 lq_1doRWQhM,Romano vs Harvey,Aspakan 2,2014-07-19,2014-11-03 02:16:10,Romano,emcee1,scheduled,appeared,True,True
@@ -2215,18 +2217,18 @@ bGq-PlicLjk,Stielo vs Batang X,Dagitay,2012-07-28,2012-09-24 12:43:23,Stielo,emc
 bGq-PlicLjk,Stielo vs Batang X,Dagitay,2012-07-28,2012-09-24 12:43:23,Batang X,emcee2,scheduled,appeared,True,True
 _eq5PlYBbsY,Drei vs Mazstah Locco,Dagitay,2012-07-28,2012-09-22 17:47:07,Drei,emcee1,scheduled,appeared,True,True
 _eq5PlYBbsY,Drei vs Mazstah Locco,Dagitay,2012-07-28,2012-09-22 17:47:07,Mazstah Locco,emcee2,scheduled,appeared,True,True
-OQgCm1Hk6sA,Lazta vs Sniper,Dagitay,2012-07-28,2012-09-15 15:23:35,Lazta,emcee1,scheduled,appeared,True,True
-OQgCm1Hk6sA,Lazta vs Sniper,Dagitay,2012-07-28,2012-09-15 15:23:35,Sniper,emcee2,scheduled,appeared,True,True
 aBYHNveJgTg,Ejo vs W Beat,Dagitay,2012-07-28,2012-09-15 15:23:35,Ejo,emcee1,scheduled,appeared,True,True
 aBYHNveJgTg,Ejo vs W Beat,Dagitay,2012-07-28,2012-09-15 15:23:35,W Beat,emcee2,scheduled,appeared,True,True
+OQgCm1Hk6sA,Lazta vs Sniper,Dagitay,2012-07-28,2012-09-15 15:23:35,Lazta,emcee1,scheduled,appeared,True,True
+OQgCm1Hk6sA,Lazta vs Sniper,Dagitay,2012-07-28,2012-09-15 15:23:35,Sniper,emcee2,scheduled,appeared,True,True
 WcgLqPNtiFE,Jaytee vs Jojo,Dagitay,2012-07-28,2012-09-13 06:47:29,Jaytee,emcee1,scheduled,appeared,True,True
 WcgLqPNtiFE,Jaytee vs Jojo,Dagitay,2012-07-28,2012-09-13 06:47:29,Jojo,emcee2,scheduled,appeared,True,True
 jdpjGv6o1_M,Rudic vs Mastamine,Dagitay,2012-07-28,2012-09-13 06:46:50,Rudic,emcee1,scheduled,appeared,True,True
 jdpjGv6o1_M,Rudic vs Mastamine,Dagitay,2012-07-28,2012-09-13 06:46:50,Mastamine,emcee2,scheduled,appeared,True,True
-PCNfLqPOmSg,Zaito vs PriceTagg,Dagitay,2012-07-28,2012-09-06 12:35:13,Zaito,emcee1,scheduled,appeared,True,True
-PCNfLqPOmSg,Zaito vs PriceTagg,Dagitay,2012-07-28,2012-09-06 12:35:13,PriceTagg,emcee2,scheduled,appeared,True,True
 TDE6yJu0DOU,Tweng vs Fongger,Dagitay,2012-07-28,2012-09-06 12:35:13,Tweng,emcee1,scheduled,appeared,True,True
 TDE6yJu0DOU,Tweng vs Fongger,Dagitay,2012-07-28,2012-09-06 12:35:13,Fongger,emcee2,scheduled,appeared,True,True
+PCNfLqPOmSg,Zaito vs PriceTagg,Dagitay,2012-07-28,2012-09-06 12:35:13,Zaito,emcee1,scheduled,appeared,True,True
+PCNfLqPOmSg,Zaito vs PriceTagg,Dagitay,2012-07-28,2012-09-06 12:35:13,PriceTagg,emcee2,scheduled,appeared,True,True
 B2lUNjvFsmI,Apekz vs Aklas,Dos Por Dos Semis,2012-07-06,2012-07-25 13:01:24,Apekz,emcee1,scheduled,appeared,True,True
 B2lUNjvFsmI,Apekz vs Aklas,Dos Por Dos Semis,2012-07-06,2012-07-25 13:01:24,Aklas,emcee2,scheduled,appeared,True,True
 NJsHd-Az5M0,Aklas vs Zero Hour,Different Ways 2,2012-05-19,2012-07-25 11:46:17,Aklas,emcee1,scheduled,appeared,True,True

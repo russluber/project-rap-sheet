@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
-  "created_at": "2026-08-23T16:32:46.033061+00:00",
-  "pipeline_commit": "52ab58b355876a11c24ef3e80f77f6286323e0de",
+  "created_at": "2026-08-26T19:04:36.846626+00:00",
+  "pipeline_commit": "2b1664402478c928e1a9e11a63afa73a8ae12453",
   "contract_versions": {
     "raw.youtube_uploads": 2,
     "raw.youtube_video_metrics": 1,
@@ -25,8 +25,8 @@
   },
   "inputs": {
     "data/annotations/battle_results.csv": {
-      "sha256": "1b724894290397178ab2941993702ccb05b35d0eab86bc5e9e23c54b89478fad",
-      "canonical_bytes": 57381
+      "sha256": "6ffe95eba0512902b73a27bd326117aa57ca3384232585610ebf89688955ed78",
+      "canonical_bytes": 57423
     },
     "data/emcee_aliases.csv": {
       "sha256": "d558557efac9a3c19ba7d877e61ee6e829d569e3ddc129cc3fe4a25a78d4fc5a",
@@ -65,8 +65,8 @@
       "canonical_bytes": 1121
     },
     "data/raw/youtube_videos.json": {
-      "sha256": "2a518a25e2e68f9f76cbc1d0c416478a3e3f230cd78cdaa85433bac298f4ad1e",
-      "canonical_bytes": 4369485
+      "sha256": "3cd5a26a5311e02d82307fe6a9f819f24f8198263acabcaf6848d398ac78f3fc",
+      "canonical_bytes": 4372827
     },
     "data/rules/event_exclusions.csv": {
       "sha256": "6c0abda67a2d04d3ddab42bd21c30e8e4f123ef13e1b826c371e1705754d1ee4",
@@ -79,14 +79,14 @@
   },
   "outputs": {
     "data/processed/ft_battles.json": {
-      "sha256": "8114cd3928b6ba963eb93d44f95dcdce1c81fdc683979db00215d86228fd936f",
-      "canonical_bytes": 591277,
-      "rows": 1291
+      "sha256": "1f6c4cb5da8231f48820db8253c24e065ba4db8d7262ffea002dece502bb3f97",
+      "canonical_bytes": 591726,
+      "rows": 1292
     },
     "data/processed/battle_participants.csv": {
-      "sha256": "d6f12cf0cb36ded7f682e0e1d3a99177b13f532b234c0820d491bb0ab06cdd07",
-      "canonical_bytes": 306974,
-      "rows": 2586
+      "sha256": "175961865ec471babedc55c063a1b98912a804be67ca229904500d9203cb1098",
+      "canonical_bytes": 307203,
+      "rows": 2588
     },
     "data/processed/emcees.csv": {
       "sha256": "17f1740694c8361b17e2a63114cd72b25c7c63a345bd5299d0240ed8a0610fe8",
@@ -95,13 +95,13 @@
     }
   },
   "counts": {
-    "raw_uploads": 1909,
+    "raw_uploads": 1911,
     "raw_events": 1430,
-    "candidate_battles": 1291,
-    "excluded_uploads": 607,
+    "candidate_battles": 1292,
+    "excluded_uploads": 608,
     "review_uploads": 0,
     "missing_results": 0,
-    "participants": 2586,
+    "participants": 2588,
     "emcees": 422
   },
   "release_problems": []
